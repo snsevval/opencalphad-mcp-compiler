@@ -1,0 +1,13 @@
+total 100
+drwxr-xr-x  2 root root  4096 Jul 26 10:49 .
+drwxrwxrwt 10 root root  4096 Jul 26 10:49 ..
+-rw-r--r--  1 root root  1209 Jul 26 10:49 Eq1.txt
+-rw-r--r--  1 root root  1209 Jul 26 10:49 Eq1_for_table.txt
+-rw-r--r--  1 root root  3158 Jul 26 10:49 fig1.plt
+-rw-r--r--  1 root root   706 Jul 26 10:49 fig1_list_csv.csv
+-rw-r--r--  1 root root     0 Jul 26 10:49 listing.txt
+-rw-r--r--  1 root root   121 Jul 26 10:49 stderr.txt
+-rw-r--r--  1 root root  7076 Jul 26 10:49 stdout.txt
+-rwxr-xr-x  1 root root 56736 Jul 26 10:49 steel1.TDB
+-rwxr-xr-x  1 root root   689 Jul 26 10:49 steel1_FeC_300_2000_step100.ocm
+-rw-r--r--  1 root root   542 Jul 26 10:49 test.LOG

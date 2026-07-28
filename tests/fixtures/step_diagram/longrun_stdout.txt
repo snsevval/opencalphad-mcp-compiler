@@ -1,0 +1,165 @@
+
+3A unfished preparations for XTDB
+
+
+Open Calphad (OC) software version   6.120 , linked 2026-07-22 15:06
+with command line monitor version  75
+
+This program is available with a GNU General Public License.
+either version 2 of the License, or any later version.
+It includes the General Thermodynamic Package, version GTP-3.31,
+Hillert's equilibrium calculation algorithm version HMS-3.0 ,
+step/map/plot software version SMP-2.30 using GNUPLOT 5.2 graphics.
+Numerical routines are extracted from LAPACK and BLAS and
+the assessment procedure uses LMDIF from ANL.
+
+ Warning, no environment variable OCHOME and no help file
+ Working directory is: /tmp/step_repro2
+--->OC6:--->OC6:--->OC6:--->OC6:--->OC6:On? /Y/: --->OC6:--->OC6:... echo: @$ set log
+--->OC6:... echo: set log
+Log file name /oclog/: ... echo: test
+ Setting logfile to: "test.LOG"
+Title:Commands will be logged in file test.LOG
+--->OC6:... echo: @$ read database
+--->OC6:... echo: read tdb steel1.TDB
+ 3E Database file name steel1.TDB
+
+This database has information to users, please read carefully
+ DATABASE_INFO about the steel1 database
+ It is an extract from the SGTE SSOL2 database from 2001 for 6 elements.
+ Most binary and ternary systems have been assessed and bibliographic
+ references are provided.  Most assessments has been made at MSE, KTH, Sweden.
+ for the developent of steels.!
+
+Database has  6 elements: C  CR FE MO SI V 
+Give the elements to select, finish with empty line
+Select elements /all/:... echo: FE C
+Selected  2 elements: FE C 
+Select elements /no more/:Selected  2 elements: FE C 
+3E reading database file: steel1.TDB
+
+3E Out of   356 model parameters    39 have been entered
+
+
+There are     9 bibliographic references
+REF283          'Alan Dinsdale, SGTE Data for Pure Elements, Calphad Vol 
+                 15(1991) p 317-425, also in NPL Report DMA(A)195 Rev. August 
+                 1990'
+REF190          'P. Gustafson, Scan. J. Metall. vol 14, (1985) p 259-267 
+                 TRITA 0237 (1984); C-FE'
+REF281          'Alan Dinsdale, SGTE Data for Pure Elements, NPL Report 
+                 DMA(A)195 September 1989'
+REF267          'W. Huang, Metall. Trans. Vol 21A(1990) p 2115-2123, TRITA
+                 -MAC 411 (Rev 1989); C-FE-MN'
+REF319          'H. Du and M. Hillert, revision; C-Fe-N'
+REF113          'J-O Andersson, Calphad Vol 12 (1988), p 9-23 TRITA 0321 
+                 (1986); C-FE-MO'
+REF102          'J-O Andersson, Met. Trans A, Vol 19A, (1988) p 627-636 TRITA 
+                 0207 (1986); C-CR-FE'
+REF322          'Byeong-Joo Lee, unpublished revision (1991); C-Cr-Fe-Ni'
+REF275          'W. Huang, TRITA-MAC 441 (1990), Fe-Mn-V-C *'
+
+--->OC6:--->OC6:... echo: @$ Eq 1
+--->OC6:... echo: set condition T = 1000.0
+--->OC6:... echo: set condition P = 100000
+--->OC6:... echo: set condition n = 1.0
+--->OC6:... echo: set condition x(C)=0.01
+--->OC6:--->OC6:... echo: calculate equilibrium
+Gridmin:     233 points   6.97E-04 s and       2 clockcycles, T= 1000.00
+ 3Y leaving global_gridmin
+Equilibrium result:  18 its,  1.1030E-03 s,      3 cc, GS= -4.1981578E+04 J/mol
+--->OC6:--->OC6:... echo: list result 4
+   ... the command in full is RESULTS                                 
+
+OC version  6.120  equilibrium:   1, DEFAULT_EQUILIBRIUM        2026.07.26
+Conditions .................................................:
+  1:T=1000, 2:P=100000, 3:N=1, 4:X(C)=.01
+ Degrees of freedom are   0
+
+Some global data, reference state SER ......................:
+T=   1000.00 K (   726.85 C), P=  1.0000E+05 Pa, V=  7.2872E-06 m3
+N=   1.0000E+00 moles, B=   5.5409E+01 g, RT=   8.3145E+03 J/mol
+G= -4.19816E+04 J, G/N=-4.1982E+04 J/mol, H= 2.4637E+04 J, S= 6.662E+01 J/K
+
+Some data for components ...................................:
+Component name    Moles      Mass-fr  Chem.pot/RT  Activities  Ref.state
+C                 1.0000E-02  0.00217 -1.5224E+00  2.1818E-01  SER (default)   
+FE                9.9000E-01  0.99783 -5.0848E+00  6.1900E-03  SER (default)   
+
+Some data for phases .......................................:
+Name                Status Mass       Volume    Form.Units Cmp/FU dGm/RT  Comp:
+BCC_A2.................. E  5.530E-02  7.24E-06  9.90E-01    1.00  0.00E+00  W:
+ FE     9.99845E-01  C      1.55365E-04
+
+GRAPHITE................ E  1.115E-04  5.01E-08  9.28E-03    1.00  0.00E+00  W:
+ C      1.00000E+00  FE     0.00000E+00
+
+--->OC6:--->OC6:--->OC6:... echo: list /output=Eq1.txt
+Output on file: Eq1.txt
+LIST what? /RESULTS/: ... echo: results
+Results output mode /4/: ... echo: 4
+Output unit reset to screen:    6
+--->OC6:--->OC6:... echo: list /output=Eq1_for_table.txt
+Output on file: Eq1_for_table.txt
+LIST what? /RESULTS/: ... echo: results
+Results output mode /4/: ... echo: 4
+Output unit reset to screen:    6
+--->OC6:--->OC6:... echo: set axis 1 T 300.0 2000.0 100
+--->OC6:--->OC6:--->OC6:--->OC6:--->OC6:... echo: step
+Step options? /NORMAL/: ... echo: normal
+ There are            1  start equilibria
+ Entering map_startpoint           1
+ SMP2A call map_doallines
+
+Line   1 from   1.000000E+03 with: BCC_A2 GRAPHITE  
+Creating a node at    1011.17 where FCC_A1 appears
+This is an invariant node
+Finishing line with     4 equilibria at T= 1011.17, xaxis:  1.0112E+03 
+
+Line   2 from   1.000000E+03 with: BCC_A2 GRAPHITE  
+MM Iteration:   501  500    7
+Failed calculate equilibrium, along line, T= 400.00   4204
+Terminating line with   11 equilibria at   5.0000E+02 due to error 4204
+
+Line   3 from   1.012273E+03 with: BCC_A2 FCC_A1  
+MM Iteration:   501  500    7
+MM Iteration:   501  500    7
+Failed calculate equilibrium, along line, T=1011.36   4204
+Terminating line with    1 equilibria at   1.0113E+03 due to error 4204
+
+Finished step/map with    17 equilibria in   3.4448E-02 CPU s and      35 cc
+--->OC6:--->OC6:--->OC6:--->OC6:--->OC6:--->OC6:--->OC6:--->OC6:... echo: @$ Plot 1
+--->OC6:... echo: list
+LIST what? /RESULTS/: ... echo: excel_csv_file
+   ... the command in full is EXCELL_CSV_FILE                         
+Independent variable /T/: ... echo: T
+Dependent values /NP(*)/: ... echo: BPW(*)
+Output file:... echo: fig1_list_csv
+ Output will be on: fig1_list_csv.csv
+ SMP2B writing csv file: fig1_list_csv.csv
+ CSV output saved on file: fig1_list_csv.csv
+--->OC6:--->OC6:... echo: plot
+Horizontal axis variable /T/: ... echo: T
+Vertical axis variable /NP(*)/: ... echo: BPW(*)
+
+Note: give only one option per line!
+Plot options? /RENDER/: ... echo: title fig 1
+
+Note: give only one option per line!
+Plot options? /RENDER/: ... echo: output fig1
+   ... the command in full is OUTPUT_FILE                             
+ To use file the browser give just a <
+
+Note: give only one option per line!
+Plot options? /RENDER/: ... echo: axis_labels X
+Axis label /T/: ... echo: Temperature_K
+
+Note: give only one option per line!
+Plot options? /RENDER/: ... echo: axis_labels Y
+Axis label /BPW(*)/: ... echo: Mass fraction of phase,
+
+Note: give only one option per line!
+Plot options? /RENDER/: ... echo: render
+ SMP2B writing gnuplot file: fig1.plt
+ SMP2B executing command: gnuplot fig1.plt  &
+--->OC6:--->OC6:... echo: exit Y

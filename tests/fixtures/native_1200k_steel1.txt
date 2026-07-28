@@ -1,0 +1,25 @@
+min
+Phase change iteration:     4  -FE4N
+Equilibrium result:  11 its,  5.5800E-04 s,      2 cc, GS= -5.6563789E+04 J/mol
+--->OC6:
+OC version  6.120  equilibrium:   1, DEFAULT_EQUILIBRIUM        2026.07.26
+Conditions .................................................:
+  1:T=1200, 2:P=100000, 3:N=1, 4:X(C)=.01
+ Degrees of freedom are   0
+
+Some global data, reference state SER ......................:
+T=   1200.00 K (   926.85 C), P=  1.0000E+05 Pa, V=  7.2784E-06 m3
+N=   1.0000E+00 moles, B=   5.5409E+01 g, RT=   9.9774E+03 J/mol
+G= -5.65638E+04 J, G/N=-5.6564E+04 J/mol, H= 3.5345E+04 J, S= 7.659E+01 J/K
+
+Some data for components ...................................:
+Component name    Moles      Mole-fr  Chem.pot/RT  Activities  Ref.state
+C                 1.0000E-02  0.01000 -3.9611E+00  1.9041E-02  SER (default)   
+FE                9.9000E-01  0.99000 -5.6864E+00  3.3917E-03  SER (default)   
+
+Some data for phases .......................................:
+Name                Status Moles      Volume    Form.Units Cmp/FU dGm/RT  Comp:
+FCC_A1.................. E  1.000E+00  7.28E-06  9.90E-01    1.01  0.00E+00  X:
+ FE     9.90000E-01  C      1.00000E-02
+
+--->OC6:  *** WARNING: MACRO END
