@@ -1,5 +1,16 @@
 """Native OpenCalphad STEP + gnuplot backend for calculate_property_diagram.
 
+Design principle (Faz 10): the CALCULATION loop and the ARTIFACT
+(CSV/chart) loop are separate, and must stay separate. If a result's
+numbers are correct but its chart looks wrong (wrong axis range, a
+mislabeled/duplicated phase series, missing gridlines), the fix belongs
+entirely in render_gnuplot_png/open_interactive_window -- never re-run
+build_combined_series or the underlying engines over it. The y-range fix
+and the "..">-truncated-name canonicalization in this file are both
+examples of artifact-only fixes that touched no calculation code. Re-
+running OCASI/native because a plot looked ugly would waste real
+engine time solving a problem that was never in the numbers.
+
 Runs OpenCalphad's own continuation-based STEP algorithm (via the native
 ./OC command-line binary) instead of recomputing every temperature from
 scratch in Python -- this is what OpenCalphad's own CAE GUI does, and its
@@ -44,7 +55,17 @@ import time
 import native_fallback
 
 OC_BUILD_DIR = os.environ.get("OC_BUILD_DIR", "/root/projects/opencalphad")
-OC_BINARY = os.path.join(OC_BUILD_DIR, "OC")
+# Now sharing native_fallback.OC_BINARY (prefers the bundled 6.058 Windows
+# binary when present): its STEP line-tracer is far more capable than our
+# own 6.120 build's -- it finds the true invariant node and adaptively
+# refines right up to a phase-count-changing transition (confirmed: 155
+# equilibria vs our 6.120's 8, for agcu.TDB 800-1400K -- see the plan file,
+# Faz 7 addendum), which is exactly the sharp transition shape STEP-based
+# GUI charts show and our gap-fill (evenly spaced, discrete points) could
+# never reproduce on its own. Its "list/excel_csv_file" export prints the
+# table to the screen instead of writing the named file; run_native_step's
+# _extract_screen_csv_block recovers it from stdout instead.
+OC_BINARY = native_fallback.OC_BINARY
 
 _FLOAT = r"[-+]?\d+(?:\.\d+)?(?:[Ee][-+]?\d+)?"
 
@@ -104,11 +125,12 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
     seed_T = temperature_min_K
 
     macro = (
-        "set echo\n"
-        "Y\n"
-        "set log\n"
-        "run\n"
-        "\n"
+        # "set echo"/"set log" (from the GUI-captured macro this is
+        # otherwise based on) are intentionally omitted: we never read the
+        # resulting .LOG file, and "set log" hangs specifically when the
+        # engine binary runs against a UNC working directory (confirmed
+        # with the Windows 6.058 binary invoked from WSL over
+        # \\wsl.localhost\...) trying to create the log file there.
         f"read tdb {db_stem}.TDB\n"
         f"{elements_line}\n"
         "\n"
@@ -158,7 +180,13 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
         raise NativeStepError(f"Database not found: {db_path}")
 
     csv_basename = "step_data"
-    with tempfile.TemporaryDirectory(prefix="oc_step_") as scratch:
+    # The Windows binary's file-writing commands (here: the CSV export)
+    # hang when the working directory is a WSL UNC path
+    # (\\wsl.localhost\...) -- confirmed with "set log" and reproduced for
+    # the CSV write too. Give it a real Windows-drive scratch directory
+    # instead; the Linux ELF binary works fine with a normal /tmp dir.
+    scratch_parent = "/mnt/c/Windows/Temp" if OC_BINARY.lower().endswith(".exe") else None
+    with tempfile.TemporaryDirectory(prefix="oc_step_", dir=scratch_parent) as scratch:
         db_stem = os.path.splitext(os.path.basename(db_path))[0]
         scratch_db = os.path.join(scratch, f"{db_stem}.TDB")
         with open(db_path, "rb") as src, open(scratch_db, "wb") as dst:
@@ -195,16 +223,68 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
                 pass
 
         csv_path = os.path.join(scratch, f"{csv_basename}.csv")
-        if not os.path.isfile(csv_path):
-            with open(stdout_path, errors="ignore") as f:
-                tail = f.read()[-2000:]
-            raise NativeStepError(
-                "Native STEP did not produce a CSV output file "
-                f"(macro likely failed before reaching the list step). "
-                f"stdout tail: {tail}"
-            )
-        with open(csv_path, errors="ignore") as f:
-            return f.read()
+        if os.path.isfile(csv_path):
+            with open(csv_path, errors="ignore") as f:
+                return f.read()
+
+        # The 6.058 binary's "excel_csv_file" list variant does not write
+        # the named file at all -- it always answers "Output on screen"
+        # regardless of the filename macro line, and prints the same
+        # comma-separated table directly to stdout instead (confirmed by
+        # direct inspection; this also means it captures the true STEP
+        # line-tracer's output, including the fine adaptive stepping right
+        # at a phase-count-changing invariant node, which our own Linux
+        # 6.120 build's STEP algorithm doesn't reach in the first place).
+        # Recover the table from stdout instead of requiring a file.
+        with open(stdout_path, errors="ignore") as f:
+            stdout_text = f.read()
+        screen_csv = _extract_screen_csv_block(stdout_text)
+        if screen_csv is not None:
+            return screen_csv
+
+        tail = stdout_text[-2000:]
+        raise NativeStepError(
+            "Native STEP did not produce a CSV output file or a "
+            "recognizable on-screen CSV block "
+            f"(macro likely failed before reaching the list step). "
+            f"stdout tail: {tail}"
+        )
+
+
+def _extract_screen_csv_block(stdout_text):
+    """Pull the excel_csv_file table back out of raw stdout when it was
+    printed to the screen instead of written to a file (see
+    run_native_step). Returns the CSV text (header + data lines) or None
+    if no such block is found.
+
+    Tolerant of stray non-data lines in the middle of the block (engine
+    log/warning lines occasionally interleave with the table when stdout
+    and stderr share a buffer) -- only lines matching the expected
+    "<float>,..." shape are kept; anything else between the header and the
+    next non-CSV section is silently dropped rather than treated as fatal.
+    """
+    lines = stdout_text.splitlines()
+    header_idx = None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('"T",') and "BPW(" in stripped:
+            header_idx = i
+            break
+    if header_idx is None:
+        return None
+
+    data_row_re = re.compile(rf"^\s*{_FLOAT}\s*,")
+    kept = [lines[header_idx]]
+    for line in lines[header_idx + 1:]:
+        if data_row_re.match(line):
+            kept.append(line.strip())
+        elif line.strip() == "" or line.strip().startswith(("Note:", "STOP")):
+            continue  # blank lines / interleaved warnings: skip, keep scanning
+        else:
+            break  # reached the next command's own output -- table is done
+    if len(kept) <= 1:
+        return None
+    return "\n".join(kept) + "\n"
 
 
 def parse_step_csv(csv_text):
@@ -286,27 +366,48 @@ def _phase_mass_fractions_from_moles(phase_molar_amounts, phase_element_composit
     return {name: m / total_mass for name, m in masses.items()}
 
 
-def _canonicalize_phase_name(name, known_full_names):
-    """De-truncate a STEP CSV column header like "FCC_A..TO#2" back to its
-    full phase-tuple name (e.g. "FCC_A1_AUTO#2") by matching the prefix/
-    suffix around ".." against phase names already seen from native_fallback
-    (which prints full, untruncated names). OC's own STEP CSV writer
-    truncates long phase-tuple names to fit a fixed column width; this does
-    NOT happen in our code and is not something we control -- we can only
-    reverse it heuristically. If no unambiguous match is found, the name is
-    returned unchanged (worst case: that phase shows as a separate series
-    on the chart instead of being merged, which is safe, just less tidy).
+def _strip_default_composition_set(name):
+    """Drop a trailing "#1" composition-set suffix.
+
+    In OpenCalphad "#1" is a phase's FIRST (default) composition set, and
+    the engine prints it inconsistently depending on which output path it
+    came through: STEP's CSV writes plain "LIQUID" while the single-point
+    equilibrium listing writes "LIQUID#1" for the very same phase. Left
+    alone, a combined series ends up with both spellings as two separate
+    chart series covering different temperature ranges -- which is exactly
+    what the independent Layer B reviewer flagged on agcu.TDB.
+
+    Only "#1" is stripped. "#2" and higher denote genuinely additional
+    composition sets (e.g. FCC_A1_AUTO#2, the Cu-rich half of the Ag-Cu
+    miscibility gap) and must stay distinct -- merging those would fuse
+    two physically different phases into one line.
     """
-    if ".." not in name:
-        return name
-    prefix, _, suffix = name.partition("..")
-    candidates = [
-        full for full in known_full_names
-        if ".." not in full and full.startswith(prefix) and full.endswith(suffix)
-    ]
-    if len(candidates) == 1:
-        return candidates[0]
-    return name
+    return name[:-2] if name.endswith("#1") else name
+
+
+def _canonicalize_phase_name(name, known_full_names):
+    """Bring a phase name to the one spelling used across both data
+    sources: de-truncate STEP's fixed-width column headers, and drop the
+    default "#1" composition-set suffix.
+
+    De-truncation: OC's own STEP CSV writer shortens long phase-tuple
+    names to fit its column width, e.g. "FCC_A1_AUTO#2" becomes
+    "FCC_A..TO#2". That happens inside the engine, not in our code, so it
+    can only be reversed heuristically -- by matching the prefix/suffix
+    around ".." against the full, untruncated names native_fallback
+    prints. If no unambiguous match exists the truncated name is kept as
+    is (worst case: that phase plots as its own series, which is safe,
+    just less tidy).
+    """
+    if ".." in name:
+        prefix, _, suffix = name.partition("..")
+        candidates = [
+            full for full in known_full_names
+            if ".." not in full and full.startswith(prefix) and full.endswith(suffix)
+        ]
+        if len(candidates) == 1:
+            return _strip_default_composition_set(candidates[0])
+    return _strip_default_composition_set(name)
 
 
 def _validate_combined_points(combined, sum_tol=1e-5):
@@ -396,21 +497,27 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
                 continue
             fallback_points.append((T, mass_fractions))
 
+    # Built from the RAW fallback names, before canonicalization: these are
+    # the full, untruncated spellings that STEP's truncated headers get
+    # matched back against.
     known_full_names = set()
     for _, fractions in fallback_points:
         known_full_names.update(fractions.keys())
 
-    combined = []
-    for T, fractions in step_points:
-        canon_fractions = {
+    def _canonicalize(fractions):
+        return {
             _canonicalize_phase_name(name, known_full_names): value
             for name, value in fractions.items()
         }
-        combined.append((T, canon_fractions, "step"))
+
+    # Both sources go through the same canonicalization -- the fallback
+    # side needs it too, since it's the one that spells the default
+    # composition set as "LIQUID#1" where STEP writes plain "LIQUID".
+    combined = [(T, _canonicalize(fractions), "step") for T, fractions in step_points]
 
     gap_filled_temperatures = []
     for T, fractions in fallback_points:
-        combined.append((T, fractions, "native_fallback"))
+        combined.append((T, _canonicalize(fractions), "native_fallback"))
         gap_filled_temperatures.append(T)
 
     combined.sort(key=lambda p: p[0])
@@ -445,7 +552,9 @@ def render_gnuplot_png(combined_points, title, output_png_path, timeout=20):
                 f.write(",".join(row) + "\n")
 
         script_lines = [
-            f'set terminal pngcairo size 1400,850 font "Arial,14"',
+            # noenhanced: phase names contain underscores (FCC_A1_AUTO#2) and
+            # gnuplot's enhanced text would render them as subscripts.
+            f'set terminal pngcairo size 1400,850 font "Arial,14" noenhanced',
             f'set output "{output_png_path}"',
             f'set title "{title}"',
             'set xlabel "Temperature (K)"',
@@ -453,6 +562,7 @@ def render_gnuplot_png(combined_points, title, output_png_path, timeout=20):
             'set datafile separator ","',
             'set key outside right',
             'set grid',
+            'set yrange [0:1]',
         ]
         plot_terms = [
             f'"{data_path}" using 1:{i + 2} with linespoints title "{name}"'
@@ -509,13 +619,14 @@ def open_interactive_window(combined_points, title):
                 f.write(",".join(row) + "\n")
 
         script_lines = [
-            'set terminal qt size 1100,750 font "Arial,12"',
+            'set terminal qt size 1100,750 font "Arial,12" noenhanced',
             f'set title "{title}"',
             'set xlabel "Temperature (K)"',
             'set ylabel "Phase fraction"',
             'set datafile separator ","',
             'set key outside right',
             'set grid',
+            'set yrange [0:1]',
         ]
         plot_terms = [
             f'"{data_path}" using 1:{i + 2} with linespoints title "{name}"'

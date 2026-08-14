@@ -17,6 +17,18 @@ than fight that (attempts to end cleanly with "set interactive" did not
 work reliably), run_native_equilibrium reads output with both a time and a
 byte-count cap and always kills the process afterward -- the data we need
 is printed within the first couple KB, long before the spin loop matters.
+This same read-then-kill pattern is what makes it safe to use here too.
+
+Which binary: our own compiled OpenCalphad 6.120 (dev branch) build has a
+confirmed weaker grid-minimizer/STEP solver than the 6.058 stable release
+bundled with the separately-installed OpenCalphad CAE GUI (e.g. steel1
+Fe-C at 1200K does not converge cold-start in our 6.120 build at all, in
+either grid-minimizer mode -- see the plan file, Faz 4/6 -- but converges
+in 11 iterations on 6.058, matching the known-correct reference value
+G=-56563.789 J/mol exactly). Since WSL2 can invoke a Windows .exe directly
+from a Linux path via its process interop, we prefer that 6.058 binary
+when it's present on disk, and only fall back to our own Linux build if
+it isn't (e.g. on a machine without that separate GUI install).
 """
 import os
 import re
@@ -24,7 +36,12 @@ import subprocess
 import time
 
 OC_BUILD_DIR = os.environ.get("OC_BUILD_DIR", "/root/projects/opencalphad")
-OC_BINARY = os.path.join(OC_BUILD_DIR, "OC")
+_LINUX_BINARY = os.path.join(OC_BUILD_DIR, "OC")
+_WINDOWS_GUI_BINARY = "/mnt/c/OpenCalphad_CAE_0_1_0/Console/Windows/oc6P.exe"
+OC_BINARY = os.environ.get(
+    "OC_BINARY",
+    _WINDOWS_GUI_BINARY if os.path.isfile(_WINDOWS_GUI_BINARY) else _LINUX_BINARY,
+)
 
 _FLOAT = r"[-+]?\d+(?:\.\d+)?(?:[Ee][-+]?\d+)?"
 
