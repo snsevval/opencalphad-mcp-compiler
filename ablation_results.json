@@ -1,0 +1,1270 @@
+[
+  {
+    "mod": "bare",
+    "no": 3,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.168,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "bare",
+    "no": 4,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.183,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "bare",
+    "no": 5,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.168,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -59870.53909558296,
+    "phases": [
+      "BCC_4SL"
+    ]
+  },
+  {
+    "mod": "bare",
+    "no": 6,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.159,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium calculation failed: _rawpyOC.f90wrap_rawopencalphad__pytqsetc() 2nd argument (nn1) can't be converted to int"
+  },
+  {
+    "mod": "bare",
+    "no": 7,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.153,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -42271.75288058687,
+    "phases": [
+      "BCC_A2"
+    ]
+  },
+  {
+    "mod": "bare",
+    "no": 8,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 0.301,
+    "backend_used": "ocasi_loop",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "bare",
+    "no": 9,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.146,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4187) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "bare",
+    "no": 10,
+    "tool": "calculate_equilibrium",
+    "outcome": "engine_error",
+    "engine_touched": true,
+    "error": "Database not found: /mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros/olmayan_bir_dosya.TDB",
+    "runtime_s": 0.129
+  },
+  {
+    "mod": "bare",
+    "no": 11,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 0.286,
+    "backend_used": "ocasi_loop",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "bare",
+    "no": 12,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 0.631,
+    "backend_used": "ocasi_loop",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "bare",
+    "no": 13,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 1.186,
+    "backend_used": "ocasi_loop",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "bare",
+    "no": 14,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.291,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "bare",
+    "no": 15,
+    "tool": "compare_alloys",
+    "engine_touched": true,
+    "runtime_s": 0.17,
+    "backend_used": "ocasi",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "gibbs_energy_J_b": -40796.80099313512
+  },
+  {
+    "mod": "bare",
+    "no": 16,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.154,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41966.01528175919,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "bare",
+    "no": 17,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.12,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -52635.87250121081,
+    "phases": [
+      "FCC_A1#1",
+      "FCC_A1_AUTO#2"
+    ]
+  },
+  {
+    "mod": "bare",
+    "no": 18,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.152,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -42248.152473183436,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "bare",
+    "no": 19,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.243,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "bare",
+    "no": 20,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.158,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "preflight",
+    "no": 3,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.166,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "preflight",
+    "no": 4,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.173,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "preflight",
+    "no": 5,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.172,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -59870.53909558296,
+    "phases": [
+      "BCC_4SL"
+    ]
+  },
+  {
+    "mod": "preflight",
+    "no": 6,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Element(s) ['NI'] not declared in steel1.TDB (database has: ['C', 'CR', 'FE', 'MO', 'SI', 'V'])"
+    ],
+    "runtime_s": 0.125
+  },
+  {
+    "mod": "preflight",
+    "no": 7,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "At least two elements with a nonzero amount are required (a pure single-element composition is a known unstable condition state for this engine)."
+    ],
+    "runtime_s": 0.116
+  },
+  {
+    "mod": "preflight",
+    "no": 8,
+    "tool": "calculate_property_diagram",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "temperature_min_K (1500) must be less than temperature_max_K (800)."
+    ],
+    "runtime_s": 0.143
+  },
+  {
+    "mod": "preflight",
+    "no": 9,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Temperature must be positive (Kelvin), got -500."
+    ],
+    "runtime_s": 0.14
+  },
+  {
+    "mod": "preflight",
+    "no": 10,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Database not found: /mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros/olmayan_bir_dosya.TDB"
+    ],
+    "runtime_s": 0.137
+  },
+  {
+    "mod": "preflight",
+    "no": 11,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 0.281,
+    "backend_used": "ocasi_loop",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "preflight",
+    "no": 12,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 0.551,
+    "backend_used": "ocasi_loop",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "preflight",
+    "no": 13,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 1.167,
+    "backend_used": "ocasi_loop",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "preflight",
+    "no": 14,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.291,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "preflight",
+    "no": 15,
+    "tool": "compare_alloys",
+    "engine_touched": true,
+    "runtime_s": 0.196,
+    "backend_used": "ocasi",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "gibbs_energy_J_b": -40796.80099313512
+  },
+  {
+    "mod": "preflight",
+    "no": 16,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.163,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41966.01528175919,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "preflight",
+    "no": 17,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Phase(s) ['GRAPHITE'] not declared in agcu.TDB (database has: ['BCC_A2', 'FCC_A1', 'HCP_A3', 'LIQUID'])"
+    ],
+    "runtime_s": 0.128
+  },
+  {
+    "mod": "preflight",
+    "no": 18,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.183,
+    "backend_used": null,
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -42248.152473183436,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "preflight",
+    "no": 19,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.272,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "preflight",
+    "no": 20,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.165,
+    "outcome": "engine_error",
+    "error": "EquilibriumError: Equilibrium did not converge (error code 4204) even after the native grid-minimizer retry."
+  },
+  {
+    "mod": "cascade",
+    "no": 3,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.166,
+    "backend_used": "ocasi",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "cascade",
+    "no": 4,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.341,
+    "backend_used": "native_oc",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -56564.0,
+    "phases": [
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "cascade",
+    "no": 5,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.192,
+    "backend_used": "ocasi",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -59870.53909558296,
+    "phases": [
+      "BCC_4SL"
+    ]
+  },
+  {
+    "mod": "cascade",
+    "no": 6,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Element(s) ['NI'] not declared in steel1.TDB (database has: ['C', 'CR', 'FE', 'MO', 'SI', 'V'])"
+    ],
+    "runtime_s": 0.096
+  },
+  {
+    "mod": "cascade",
+    "no": 7,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "At least two elements with a nonzero amount are required (a pure single-element composition is a known unstable condition state for this engine)."
+    ],
+    "runtime_s": 0.126
+  },
+  {
+    "mod": "cascade",
+    "no": 8,
+    "tool": "calculate_property_diagram",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "temperature_min_K (1500) must be less than temperature_max_K (800)."
+    ],
+    "runtime_s": 0.118
+  },
+  {
+    "mod": "cascade",
+    "no": 9,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Temperature must be positive (Kelvin), got -500."
+    ],
+    "runtime_s": 0.117
+  },
+  {
+    "mod": "cascade",
+    "no": 10,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Database not found: /mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros/olmayan_bir_dosya.TDB"
+    ],
+    "runtime_s": 0.135
+  },
+  {
+    "mod": "cascade",
+    "no": 11,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 5.544,
+    "backend_used": "native_oc_step_gnuplot",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 58,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "cascade",
+    "no": 12,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 4.422,
+    "backend_used": "native_oc_step_gnuplot",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 151,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "cascade",
+    "no": 13,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 1.491,
+    "backend_used": "python_loop_matplotlib",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "cascade",
+    "no": 14,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.561,
+    "backend_used": "native_oc",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -57674.0,
+    "phases": [
+      "FCC_A1#1",
+      "FCC_A1_AUTO#2",
+      "M23C6",
+      "M6C"
+    ]
+  },
+  {
+    "mod": "cascade",
+    "no": 15,
+    "tool": "compare_alloys",
+    "engine_touched": true,
+    "runtime_s": 0.229,
+    "backend_used": "ocasi",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "gibbs_energy_J_b": -40796.80099313512
+  },
+  {
+    "mod": "cascade",
+    "no": 16,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.174,
+    "backend_used": "ocasi",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41966.01528175919,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "cascade",
+    "no": 17,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Phase(s) ['GRAPHITE'] not declared in agcu.TDB (database has: ['BCC_A2', 'FCC_A1', 'HCP_A3', 'LIQUID'])"
+    ],
+    "runtime_s": 0.117
+  },
+  {
+    "mod": "cascade",
+    "no": 18,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.155,
+    "backend_used": "ocasi",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -42248.152473183436,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "cascade",
+    "no": 19,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.51,
+    "backend_used": "native_oc",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -62458.0,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1",
+      "SIGMA"
+    ]
+  },
+  {
+    "mod": "cascade",
+    "no": 20,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.368,
+    "backend_used": "native_oc",
+    "layer_a_passed": null,
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -56564.0,
+    "phases": [
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 3,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.171,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 4,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.354,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -56564.0,
+    "phases": [
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 5,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.183,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -59870.53909558296,
+    "phases": [
+      "BCC_4SL"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 6,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Element(s) ['NI'] not declared in steel1.TDB (database has: ['C', 'CR', 'FE', 'MO', 'SI', 'V'])"
+    ],
+    "runtime_s": 0.121
+  },
+  {
+    "mod": "layera",
+    "no": 7,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "At least two elements with a nonzero amount are required (a pure single-element composition is a known unstable condition state for this engine)."
+    ],
+    "runtime_s": 0.122
+  },
+  {
+    "mod": "layera",
+    "no": 8,
+    "tool": "calculate_property_diagram",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "temperature_min_K (1500) must be less than temperature_max_K (800)."
+    ],
+    "runtime_s": 0.142
+  },
+  {
+    "mod": "layera",
+    "no": 9,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Temperature must be positive (Kelvin), got -500."
+    ],
+    "runtime_s": 0.117
+  },
+  {
+    "mod": "layera",
+    "no": 10,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Database not found: /mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros/olmayan_bir_dosya.TDB"
+    ],
+    "runtime_s": 0.122
+  },
+  {
+    "mod": "layera",
+    "no": 11,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 46.298,
+    "backend_used": "native_oc_step_gnuplot",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 58,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "layera",
+    "no": 12,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 12.036,
+    "backend_used": "native_oc_step_gnuplot",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 151,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "layera",
+    "no": 13,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 1.503,
+    "backend_used": "python_loop_matplotlib",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "layera",
+    "no": 14,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.523,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -57674.0,
+    "phases": [
+      "FCC_A1#1",
+      "FCC_A1_AUTO#2",
+      "M23C6",
+      "M6C"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 15,
+    "tool": "compare_alloys",
+    "engine_touched": true,
+    "runtime_s": 0.226,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "gibbs_energy_J_b": -40796.80099313512
+  },
+  {
+    "mod": "layera",
+    "no": 16,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.145,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -41966.01528175919,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 17,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Phase(s) ['GRAPHITE'] not declared in agcu.TDB (database has: ['BCC_A2', 'FCC_A1', 'HCP_A3', 'LIQUID'])"
+    ],
+    "runtime_s": 0.119
+  },
+  {
+    "mod": "layera",
+    "no": 18,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.17,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -42248.152473183436,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 19,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.491,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -62458.0,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1",
+      "SIGMA"
+    ]
+  },
+  {
+    "mod": "layera",
+    "no": 20,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.359,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": null,
+    "layer_b_passed": null,
+    "outcome": "computed",
+    "gibbs_energy_J": -56564.0,
+    "phases": [
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 3,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.181,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 4,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.377,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -56564.0,
+    "phases": [
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 5,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.285,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -59870.53909558296,
+    "phases": [
+      "BCC_4SL"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 6,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Element(s) ['NI'] not declared in steel1.TDB (database has: ['C', 'CR', 'FE', 'MO', 'SI', 'V'])"
+    ],
+    "runtime_s": 0.14
+  },
+  {
+    "mod": "full",
+    "no": 7,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "At least two elements with a nonzero amount are required (a pure single-element composition is a known unstable condition state for this engine)."
+    ],
+    "runtime_s": 0.134
+  },
+  {
+    "mod": "full",
+    "no": 8,
+    "tool": "calculate_property_diagram",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "temperature_min_K (1500) must be less than temperature_max_K (800)."
+    ],
+    "runtime_s": 0.119
+  },
+  {
+    "mod": "full",
+    "no": 9,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Temperature must be positive (Kelvin), got -500."
+    ],
+    "runtime_s": 0.136
+  },
+  {
+    "mod": "full",
+    "no": 10,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Database not found: /mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros/olmayan_bir_dosya.TDB"
+    ],
+    "runtime_s": 0.108
+  },
+  {
+    "mod": "full",
+    "no": 11,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 3.942,
+    "backend_used": "native_oc_step_gnuplot",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "n_points": 58,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "full",
+    "no": 12,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 6.773,
+    "backend_used": "native_oc_step_gnuplot",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "n_points": 151,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "full",
+    "no": 13,
+    "tool": "calculate_property_diagram",
+    "engine_touched": true,
+    "runtime_s": 1.532,
+    "backend_used": "python_loop_matplotlib",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "n_points": 15,
+    "n_failed_points": 0
+  },
+  {
+    "mod": "full",
+    "no": 14,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.53,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -57674.0,
+    "phases": [
+      "FCC_A1#1",
+      "FCC_A1_AUTO#2",
+      "M23C6",
+      "M6C"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 15,
+    "tool": "compare_alloys",
+    "engine_touched": true,
+    "runtime_s": 0.213,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -41981.57771667154,
+    "gibbs_energy_J_b": -40796.80099313512
+  },
+  {
+    "mod": "full",
+    "no": 16,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.212,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -41966.01528175919,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 17,
+    "tool": "calculate_equilibrium",
+    "outcome": "preflight_rejected",
+    "engine_touched": false,
+    "problems": [
+      "Phase(s) ['GRAPHITE'] not declared in agcu.TDB (database has: ['BCC_A2', 'FCC_A1', 'HCP_A3', 'LIQUID'])"
+    ],
+    "runtime_s": 0.124
+  },
+  {
+    "mod": "full",
+    "no": 18,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.13,
+    "backend_used": "ocasi",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -42248.152473183436,
+    "phases": [
+      "BCC_A2",
+      "GRAPHITE"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 19,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.514,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -62458.0,
+    "phases": [
+      "BCC_A2",
+      "FCC_A1",
+      "SIGMA"
+    ]
+  },
+  {
+    "mod": "full",
+    "no": 20,
+    "tool": "calculate_equilibrium",
+    "engine_touched": true,
+    "runtime_s": 0.383,
+    "backend_used": "native_oc",
+    "layer_a_passed": true,
+    "layer_a_problems": [],
+    "layer_b_available": true,
+    "layer_b_passed": true,
+    "layer_b_model": "deepseek-ai/deepseek-v4-flash",
+    "outcome": "computed",
+    "gibbs_energy_J": -56564.0,
+    "phases": [
+      "FCC_A1"
+    ]
+  }
+]
