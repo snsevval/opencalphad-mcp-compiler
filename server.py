@@ -10,6 +10,17 @@ non-converging inputs; that must not be allowed to take the whole MCP
 server down. calculate_property_diagram and compare_alloys are built on top
 of that same single-point primitive, so a bad point among many still fails
 in isolation instead of aborting the whole call.
+
+Request pipeline (see the plan file, Faz 10): every calculation tool runs
+PREFLIGHT before touching an engine and VERIFY A on whatever comes back.
+PREFLIGHT rejects impossible requests (element not in the database, bad
+composition, inverted temperature range) for free, instead of letting
+OCASI discover them the expensive way -- that class of mistake is exactly
+what caused this project's earlier segfaults. VERIFY A then runs the same
+deterministic structural checks (result_check.py) that the verification
+loop uses, so a result reaching the user has been checked by the same
+rules the test harness applies -- and says so, via the "verification"
+field it attaches.
 """
 import io
 import json
@@ -26,8 +37,124 @@ sys.path.insert(0, HERE)
 
 import oc_service  # noqa: E402
 import native_step  # noqa: E402
+import preflight  # noqa: E402
+import result_check  # noqa: E402
+import semantic_check  # noqa: E402
+import failure_classify  # noqa: E402
 
 mcp = FastMCP("opencalphad")
+
+# Layer B costs a round trip to an external model (~12s measured), so it
+# is opt-out rather than mandatory -- set OC_SEMANTIC_CHECK=0 to skip it
+# when latency matters more than the second opinion.
+SEMANTIC_CHECK_ENABLED = os.environ.get("OC_SEMANTIC_CHECK", "1") != "0"
+# DEBUGGER: classify a verification failure and, where a retry is honest,
+# close the loop. Off switch kept because it is the only stage that can
+# issue a second outbound call after the result already exists.
+DEBUGGER_ENABLED = os.environ.get("OC_DEBUGGER", "1") != "0"
+
+
+def _preflight_failure(problems: list) -> dict:
+    """Shape a PREFLIGHT rejection the same way every tool reports it, so
+    a client can tell "this request was never run" apart from "it ran and
+    failed" by the stage field alone."""
+    return {
+        "error": "Request rejected before calculation: " + "; ".join(problems),
+        "stage": "PREFLIGHT",
+        "problems": problems,
+    }
+
+
+def _attach_verification(result: dict, request_args: Optional[dict] = None) -> dict:
+    """Run VERIFY A (and VERIFY B when enabled) and record the outcome.
+
+    Deliberately non-destructive: a result that fails a check is still
+    returned with its numbers intact, flagged rather than replaced. The
+    caller asked for a calculation and the engine produced one; hiding it
+    would remove the very evidence needed to judge what went wrong.
+
+    Layer B runs only if Layer A passed -- there is no point paying for an
+    outside opinion on a result already known to be malformed -- and its
+    outcome is recorded separately from Layer A's. Crucially, a Layer B
+    that could not be reached (the free tier returns 529 unpredictably) is
+    reported as unavailable, never as disapproval: NVIDIA's capacity must
+    not turn into a false alarm about the user's chemistry.
+    """
+    passed, problems = result_check.verify_result(result)
+    verification = {
+        "stage": "VERIFY_A",
+        "passed": passed,
+        "problems": problems,
+    }
+
+    if passed and SEMANTIC_CHECK_ENABLED and request_args is not None:
+        review = semantic_check.review(request_args, result)
+        verification["layer_b"] = review
+        _apply_review(verification, review, problems)
+
+    result["verification"] = verification
+
+    # ---- DEBUGGER + RE-VERIFY -------------------------------------
+    # Everything above is a pipeline: it reports what happened and stops.
+    # This closes it into a loop for the one failure class where a retry
+    # is honest. failure_classify says which class we are in and whether
+    # anything can be done; only a review that produced no usable verdict
+    # gets retried, and only against a DIFFERENT reviewer. The numbers are
+    # never recomputed -- the calculation is deterministic, so re-running
+    # it would return the same result and the same verdict.
+    if DEBUGGER_ENABLED and request_args is not None:
+        failure = failure_classify.classify(result)
+        if failure is not None:
+            result["failure"] = failure
+            if failure.get("strategy") == failure_classify.STRATEGY_RETRY_REVIEWER:
+                _retry_review(result, verification, request_args, problems)
+
+    return result
+
+
+def _apply_review(verification: dict, review: dict, problems: list) -> None:
+    """Fold a Layer B outcome into the verification record. A reviewer that
+    objected fails the result; a reviewer that could not be reached, or
+    whose verdict could not be read, leaves Layer A's decision standing --
+    an absent opinion is not a negative one."""
+    if review.get("available") and review.get("passed") is False:
+        verification["passed"] = False
+        verification["stage"] = "VERIFY_A+B"
+        verification["problems"] = problems + [
+            "Bağımsız model denetimi sonucu makul bulmadı: "
+            + review.get("reason", "")[:500]
+        ]
+    elif review.get("available"):
+        verification["stage"] = "VERIFY_A+B"
+
+
+def _retry_review(result: dict, verification: dict, request_args: dict,
+                  problems: list) -> None:
+    """Ask the rest of the reviewer chain, skipping whoever already failed
+    to produce a usable verdict. Records the attempt either way, so a
+    result never silently gains (or loses) an independent review."""
+    first = verification.get("layer_b") or {}
+    tried = [m for m in [first.get("model_used")] if m]
+    retry = semantic_check.review(request_args, result, skip_models=tried)
+
+    attempt = {
+        "stage": "DEBUGGER",
+        "category": result["failure"]["category"],
+        "skipped_models": tried,
+        "layer_b_retry": retry,
+    }
+    if retry.get("available") and retry.get("passed") is not None:
+        verification["layer_b"] = retry
+        _apply_review(verification, retry, problems)
+        attempt["outcome"] = "resolved"
+        # The retry answered, so the original failure no longer stands.
+        result.pop("failure", None)
+        residual = failure_classify.classify(result)
+        if residual is not None:
+            result["failure"] = residual
+    else:
+        attempt["outcome"] = "unresolved"
+    verification["debugger"] = attempt
 
 
 def _calc_one(
@@ -114,6 +241,18 @@ def calculate_equilibrium(
 ) -> dict:
     """Calculate a single-point thermodynamic equilibrium with OpenCalphad.
 
+    PREFLIGHT REJECTION — STOP RULE
+    If the result has stage="PREFLIGHT", the request was refused before any
+    calculation ran. When that happens:
+      1. Do NOT call this or any other calculation tool again in this turn.
+      2. Quote the rejection reason to the user, including any list of valid
+         elements or phases it names.
+      3. Ask which corrected request they want. Naming options is fine;
+         running one is not.
+    The user asked a specific question. Computing a different one — even a
+    near-identical one, even while announcing the change — hands them a
+    result they did not ask for.
+
     Args:
         database: database filename (e.g. "steel7.TDB") or full path.
         elements_composition: element symbol -> molar amount, e.g.
@@ -127,8 +266,26 @@ def calculate_equilibrium(
         pressure_Pa: pressure in Pascal (default 1e5, i.e. 1 bar).
         suspended_phases: phase names to exclude from the calculation
             (e.g. ["GRAPHITE"]) — this is how you turn a phase "off".
+            Must be phases the database actually declares; use
+            inspect_database to see them. A name the database does not
+            declare is rejected rather than silently ignored.
     """
-    return _calc_one(database, elements_composition, temperature_K, pressure_Pa, suspended_phases)
+    problems = preflight.check_equilibrium_request(
+        database, elements_composition, temperature_K, pressure_Pa, suspended_phases
+    )
+    if problems:
+        return _preflight_failure(problems)
+
+    result = _calc_one(
+        database, elements_composition, temperature_K, pressure_Pa, suspended_phases
+    )
+    return _attach_verification(result, {
+        "database": database,
+        "elements_composition": elements_composition,
+        "temperature_K": temperature_K,
+        "pressure_Pa": pressure_Pa,
+        "suspended_phases": suspended_phases,
+    })
 
 
 @mcp.tool()
@@ -144,6 +301,13 @@ def compare_alloys(
 ) -> dict:
     """Calculate equilibrium for two compositions at the same T/P and compare them.
 
+    PREFLIGHT REJECTION — STOP RULE
+    If the result has stage="PREFLIGHT", the request was refused before any
+    calculation ran. Do NOT call this or any other calculation tool again in
+    this turn. Quote the rejection reason to the user (including any list of
+    valid elements or phases it names) and ask which corrected request they
+    want. Naming options is fine; running one is not.
+
     Useful for questions like "suspend graphite and compare to the normal
     result" (call this twice with suspended_phases set only for B), or
     "how does adding more Cr change the stable phases".
@@ -155,11 +319,43 @@ def compare_alloys(
         temperature_K: temperature in Kelvin, shared by both calculations.
         pressure_Pa: pressure in Pascal, shared by both calculations.
         suspended_phases: phase names to exclude, shared by both calculations.
+            Must be phases the database actually declares.
         label_a: short label for composition_a in the result (e.g. "with C").
         label_b: short label for composition_b in the result (e.g. "no C").
     """
-    result_a = _calc_one(database, composition_a, temperature_K, pressure_Pa, suspended_phases)
-    result_b = _calc_one(database, composition_b, temperature_K, pressure_Pa, suspended_phases)
+    problems = (
+        preflight.check_equilibrium_request(
+            database, composition_a, temperature_K, pressure_Pa, suspended_phases
+        )
+        + preflight.check_equilibrium_request(
+            database, composition_b, temperature_K, pressure_Pa, suspended_phases
+        )
+    )
+    if problems:
+        return _preflight_failure(problems)
+
+    # Both sides get the same verification treatment. That means two Layer B
+    # round trips when it's enabled, which roughly doubles this tool's
+    # latency -- accepted rather than special-cased, since a comparison
+    # whose two halves were checked differently would be worth less than
+    # the seconds saved. OC_SEMANTIC_CHECK=0 turns it off when that matters.
+    def _args_for(composition):
+        return {
+            "database": database,
+            "elements_composition": composition,
+            "temperature_K": temperature_K,
+            "pressure_Pa": pressure_Pa,
+            "suspended_phases": suspended_phases,
+        }
+
+    result_a = _attach_verification(
+        _calc_one(database, composition_a, temperature_K, pressure_Pa, suspended_phases),
+        _args_for(composition_a),
+    )
+    result_b = _attach_verification(
+        _calc_one(database, composition_b, temperature_K, pressure_Pa, suspended_phases),
+        _args_for(composition_b),
+    )
 
     if "error" in result_a or "error" in result_b:
         comparison = {
@@ -197,6 +393,13 @@ def calculate_property_diagram(
 ):
     """Sweep temperature and calculate a phase diagram over that range.
 
+    PREFLIGHT REJECTION — STOP RULE
+    If the result has stage="PREFLIGHT", the request was refused before any
+    calculation ran. Do NOT call this or any other calculation tool again in
+    this turn. Quote the rejection reason to the user (including any list of
+    valid elements or phases it names) and ask which corrected request they
+    want. Naming options is fine; running one is not.
+
     Primary method: runs OpenCalphad's own native STEP algorithm (the same
     continuation-based calculation its GUI uses), rendered with real
     gnuplot. STEP's internal solver can fail to converge at some
@@ -224,11 +427,29 @@ def calculate_property_diagram(
             this modest (<=30) — each point may require its own calculation.
         pressure_Pa: pressure in Pascal (default 1e5, i.e. 1 bar).
         suspended_phases: phase names to exclude from the calculation.
-            Only supported by the matplotlib fallback (native STEP path is
-            skipped entirely when this is given).
+            Must be phases the database actually declares. Only supported
+            by the matplotlib fallback (native STEP path is skipped
+            entirely when this is given).
     """
     if n_points < 2:
         n_points = 2
+
+    problems = preflight.check_property_diagram_request(
+        database, elements_composition, temperature_min_K, temperature_max_K,
+        pressure_Pa, suspended_phases,
+    )
+    if problems:
+        return _preflight_failure(problems)
+
+    _diagram_args = {
+        "database": database,
+        "elements_composition": elements_composition,
+        "temperature_min_K": temperature_min_K,
+        "temperature_max_K": temperature_max_K,
+        "n_points": n_points,
+        "pressure_Pa": pressure_Pa,
+        "suspended_phases": suspended_phases,
+    }
 
     if not suspended_phases:
         try:
@@ -276,7 +497,10 @@ def calculate_property_diagram(
                 ),
                 "chart_error": None,
             }
-            return [data, Image(data=chart_bytes, format="png")]
+            return [
+                _attach_verification(data, _diagram_args),
+                Image(data=chart_bytes, format="png"),
+            ]
         except Exception as exc:
             native_backend_error = str(exc)
     else:
@@ -364,6 +588,7 @@ def calculate_property_diagram(
         "native_backend_error": native_backend_error,
         "chart_error": chart_error,
     }
+    _attach_verification(data, _diagram_args)
     if chart_bytes:
         return [data, Image(data=chart_bytes, format="png")]
     return data
