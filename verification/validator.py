@@ -192,7 +192,9 @@ def _post_once(model, prompt, timeout_s, image_b64=None):
         "model": model,
         "messages": [{"role": "user", "content": content}],
         "temperature": 0.0,
-        "max_tokens": 500,
+        # Same reason as semantic_check.post_once: the verdict marker is
+        # asked for last, so the budget has to reach it.
+        "max_tokens": 1500,
     }).encode("utf-8")
     req = urllib.request.Request(
         f"{NVIDIA_BASE_URL}/chat/completions",

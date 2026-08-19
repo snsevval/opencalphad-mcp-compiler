@@ -53,6 +53,73 @@ SEMANTIC_CHECK_ENABLED = os.environ.get("OC_SEMANTIC_CHECK", "1") != "0"
 # issue a second outbound call after the result already exists.
 DEBUGGER_ENABLED = os.environ.get("OC_DEBUGGER", "1") != "0"
 
+# How long one equilibrium subprocess may run before it is killed. It was
+# 60s -- the same figure the MCP client used for its own per-request
+# timeout, so a slow calculation lost twice over. steel7's six-element
+# system at 1173 K sat right on that line: the client gave up at exactly
+# 60s, and the model, seeing a timeout rather than a result, simply
+# reissued the identical call. Raised here and to 300s in the client, so
+# the two limits are no longer racing. A ceiling, not a target -- a
+# calculation that needs minutes is saying something about the system, and
+# the timeout message still says which combination did it.
+CALC_TIMEOUT_S = int(os.environ.get("OC_CALC_TIMEOUT_S", "300"))
+
+
+def _element_distribution(result: dict, elements_composition: dict) -> Optional[dict]:
+    """How much of each requested element ended up in which phase.
+
+    Arithmetic on the engine's own output -- phase amount times the
+    element's fraction inside that phase -- and no new claim about the
+    chemistry. It is here because leaving the multiplication to the reader
+    was measured to go wrong: asked the same question twice, the client
+    model reported once that molybdenum had collected in the carbide (it
+    had: 65%) and once that it had collected in a phase holding 2% of it.
+    A phase can hold a high CONCENTRATION of an element while holding
+    almost none of its total AMOUNT, because the phase itself is tiny --
+    here a phase making up 0.17% of the system carried a third of the
+    vanadium by concentration and half of it by amount.
+
+    Phases come sorted by amount, so "where is most of it" is read off the
+    first entry rather than derived.
+
+    `total` against `requested` is also the check Layer A never had: an
+    element whose total comes back at zero never entered the calculation,
+    whatever the composition tables look like. The native fallback is
+    known to drop elements it cannot write into its macro, and nothing
+    downstream would otherwise notice.
+    """
+    amounts = result.get("phase_molar_amounts") or {}
+    per_phase = result.get("phase_element_composition") or {}
+    if not amounts or not per_phase:
+        return None
+
+    # The engine normalizes the composition, so compare like with like.
+    scale = sum(elements_composition.values())
+    if scale <= 0:
+        return None
+
+    distribution = {}
+    for element, requested in elements_composition.items():
+        symbol = element.upper()
+        shares = {}
+        for phase, phase_amount in amounts.items():
+            fraction = (per_phase.get(phase) or {}).get(symbol)
+            if fraction:
+                shares[phase] = phase_amount * fraction
+        # Six significant figures, not six decimals: a trace element's
+        # share runs to 1e-6 and fixed rounding would erase it. Float
+        # noise like 0.7898059025999999 otherwise travels into the answer
+        # and implies precision the engine never claimed.
+        distribution[symbol] = {
+            "by_phase": {
+                phase: float(f"{value:.6g}")
+                for phase, value in sorted(shares.items(), key=lambda kv: -kv[1])
+            },
+            "total": float(f"{sum(shares.values()):.6g}"),
+            "requested": float(f"{requested / scale:.6g}"),
+        }
+    return distribution
+
 
 def _preflight_failure(problems: list) -> dict:
     """Shape a PREFLIGHT rejection the same way every tool reports it, so
@@ -181,12 +248,13 @@ def _calc_one(
                 capture_output=True,
                 text=True,
                 env=os.environ,
-                timeout=60,
+                timeout=CALC_TIMEOUT_S,
             )
         except subprocess.TimeoutExpired:
             return {
                 "error": (
-                    "Equilibrium calculation timed out after 60 seconds and was "
+                    f"Equilibrium calculation timed out after {CALC_TIMEOUT_S} "
+                    "seconds and was "
                     "killed. This database/composition/temperature combination "
                     "likely does not converge."
                 )
@@ -269,6 +337,16 @@ def calculate_equilibrium(
             Must be phases the database actually declares; use
             inspect_database to see them. A name the database does not
             declare is rejected rather than silently ignored.
+
+    VERIFICATION
+    Every result carries a "verification" field recording the deterministic
+    checks this server ran on it before handing it back -- phase fractions
+    summing to one, values in range, no NaN, and for a sweep, how many
+    points actually converged. Report its outcome next to the numbers.
+    Someone reading a calculation has no other way to know whether it was
+    checked, and a result that was checked and one that was not must not
+    look alike to them. If "passed" is false, say what "problems" lists
+    rather than presenting the numbers as if nothing had been found.
     """
     problems = preflight.check_equilibrium_request(
         database, elements_composition, temperature_K, pressure_Pa, suspended_phases
@@ -279,6 +357,9 @@ def calculate_equilibrium(
     result = _calc_one(
         database, elements_composition, temperature_K, pressure_Pa, suspended_phases
     )
+    distribution = _element_distribution(result, elements_composition)
+    if distribution is not None:
+        result["element_distribution"] = distribution
     return _attach_verification(result, {
         "database": database,
         "elements_composition": elements_composition,
@@ -322,6 +403,16 @@ def compare_alloys(
             Must be phases the database actually declares.
         label_a: short label for composition_a in the result (e.g. "with C").
         label_b: short label for composition_b in the result (e.g. "no C").
+
+    VERIFICATION
+    Every result carries a "verification" field recording the deterministic
+    checks this server ran on it before handing it back -- phase fractions
+    summing to one, values in range, no NaN, and for a sweep, how many
+    points actually converged. Report its outcome next to the numbers.
+    Someone reading a calculation has no other way to know whether it was
+    checked, and a result that was checked and one that was not must not
+    look alike to them. If "passed" is false, say what "problems" lists
+    rather than presenting the numbers as if nothing had been found.
     """
     problems = (
         preflight.check_equilibrium_request(
@@ -430,6 +521,16 @@ def calculate_property_diagram(
             Must be phases the database actually declares. Only supported
             by the matplotlib fallback (native STEP path is skipped
             entirely when this is given).
+
+    VERIFICATION
+    Every result carries a "verification" field recording the deterministic
+    checks this server ran on it before handing it back -- phase fractions
+    summing to one, values in range, no NaN, and for a sweep, how many
+    points actually converged. Report its outcome next to the numbers.
+    Someone reading a calculation has no other way to know whether it was
+    checked, and a result that was checked and one that was not must not
+    look alike to them. If "passed" is false, say what "problems" lists
+    rather than presenting the numbers as if nothing had been found.
     """
     if n_points < 2:
         n_points = 2

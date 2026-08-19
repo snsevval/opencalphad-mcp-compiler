@@ -40,8 +40,14 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 # with the Nemotron driving this server, so its verdict is a WEAKER kind
 # of independence -- review() reports which model answered so that is
 # never passed off as the independent review.
+#
+# 2026-08-19: the unversioned alias started returning HTTP 410 Gone; the
+# catalogue now lists a dated id instead. A dated id will age too, so the
+# failure to plan for is the reviewer disappearing, not this particular
+# name -- which is what `available` already handles: the chain went dead
+# for two weeks and no calculation was ever reported as wrong for it.
 _DEFAULT_MODELS = [
-    "deepseek-ai/deepseek-v4-flash",
+    "deepseek-ai/deepseek-v4-flash-0731",
     "nvidia/nemotron-3-super-120b-a12b",
 ]
 _pinned = os.environ.get("OC_VALIDATOR_MODEL", "")
@@ -67,7 +73,15 @@ def post_once(model, prompt, timeout_s, image_b64=None):
         "model": model,
         "messages": [{"role": "user", "content": content}],
         "temperature": 0.0,
-        "max_tokens": 500,
+        # The prompt asks for reasoning first and the verdict on the last
+        # line, so the budget has to cover the reasoning or the verdict is
+        # never reached. At 500 a reviewer that opened by converting at%
+        # to wt% -- arithmetic that bears on nothing here -- ran out
+        # mid-sum and returned no decision at all, which the DEBUGGER then
+        # correctly classified as unreadable. The two design choices were
+        # fighting each other; this settles it in favour of the one that
+        # was there for a measured reason.
+        "max_tokens": 1500,
     }).encode("utf-8")
     req = urllib.request.Request(
         f"{NVIDIA_BASE_URL}/chat/completions",
