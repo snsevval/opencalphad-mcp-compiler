@@ -121,6 +121,83 @@ def _element_distribution(result: dict, elements_composition: dict) -> Optional[
     return distribution
 
 
+def _phase_notes(result: dict, elements_composition: dict) -> Optional[dict]:
+    """Flag a phase whose contents contradict what its name suggests.
+
+    A phase name in a TDB denotes crystal structure, not composition, so
+    chemically unrelated things share one. FCC_A1 is austenite -- an
+    iron solution -- and it is also the MC carbides (VC, TiC, NbC), which
+    are FCC by structure and contain almost no iron. steel7 at 1173 K
+    returns both at once, as FCC_A1_AUTO#2 (Fe 0.92) and FCC_A1#1
+    (C 0.46, V 0.36). Only the composition tells them apart.
+
+    Measured over five fresh sessions on one steel1 composition, the
+    client model called an FCC_A1 holding Fe 0.0014 "austenite" in three
+    of them -- once going on to conclude that vanadium "forms no carbide"
+    when 56% of it sat in the very carbide it had just misnamed. It was
+    not short of data: one of those runs printed a distribution table
+    showing iron in that phase at 2.49e-06, in its own output, two
+    sections above the misnaming. So more numbers do not fix this; the
+    contradiction has to be said.
+
+    The note says only what is arithmetically true and leaves the naming
+    alone -- calling it a carbide would be a claim OpenCalphad never made.
+    The trigger carries no chemistry either: a phase is flagged when its
+    dominant element is not the alloy's dominant element, which holds for
+    any database, and stays silent on the ordinary phases where the name
+    and the contents agree.
+
+    Stating the fact was measured first, over five fresh sessions: the
+    note was reproduced in all five, and the phase was still called
+    austenite in three -- the same rate as before it existed. Information
+    was never what was missing. What did change is that the false
+    conclusion drawn from the label ("vanadium forms no carbide") never
+    recurred, because the contradicting number now stands beside it.
+
+    So the note now asks for a justification rather than stating a fact,
+    and deliberately does not forbid a name. Forbidding one would have to
+    name the words to forbid -- austenite, ferrite -- which is steel
+    vocabulary hardcoded into a server that also serves Ag-Cu and
+    Mg-Na-Cl, and the next database would bring its own wrong names. It
+    would also silence the two runs in five where the model read the same
+    phase correctly as a vanadium carbide, which is the reading worth
+    having. A request for justification leaves those intact while giving
+    a model that wants to write "austenite" something it has to reconcile
+    with Fe = 0.0014.
+    """
+    per_phase = result.get("phase_element_composition") or {}
+    if not per_phase or not elements_composition:
+        return None
+
+    alloy_major = max(elements_composition, key=elements_composition.get).upper()
+
+    notes = {}
+    for phase, composition in per_phase.items():
+        if not composition:
+            continue
+        # A phase holding one element cannot be misread -- its composition
+        # is its identity. GRAPHITE is carbon wherever it appears, and
+        # flagging it would be noise on every Fe-C result. The ambiguity
+        # only arises in solution phases, where one name spans many
+        # compositions.
+        if sum(1 for value in composition.values() if value > 0.01) < 2:
+            continue
+        phase_major = max(composition, key=composition.get)
+        if phase_major.upper() == alloy_major:
+            continue
+        notes[phase] = (
+            f"In this phase the dominant element is {phase_major} "
+            f"({composition[phase_major]:.4g}), while the alloy's dominant "
+            f"element is {alloy_major} ({composition.get(alloy_major, 0.0):.4g} "
+            f"here). A phase name in this database denotes crystal "
+            f"structure, not composition -- the same name covers "
+            f"chemically different phases. If you give this phase a name "
+            f"of your own, say which feature of the composition supports "
+            f"that name."
+        )
+    return notes or None
+
+
 def _preflight_failure(problems: list) -> dict:
     """Shape a PREFLIGHT rejection the same way every tool reports it, so
     a client can tell "this request was never run" apart from "it ran and
@@ -360,6 +437,9 @@ def calculate_equilibrium(
     distribution = _element_distribution(result, elements_composition)
     if distribution is not None:
         result["element_distribution"] = distribution
+    notes = _phase_notes(result, elements_composition)
+    if notes:
+        result["phase_notes"] = notes
     return _attach_verification(result, {
         "database": database,
         "elements_composition": elements_composition,
