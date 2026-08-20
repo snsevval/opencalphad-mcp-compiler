@@ -162,6 +162,83 @@ def calculate_equilibrium(
         return native_result
 
 
+def _scalar_or_none(symbol):
+    """Read one state variable from OCASI, or None if it is unavailable.
+
+    pyOC's own getScalarResult cannot be used for this. It allocates the
+    result buffer with numpy.empty -- uninitialised memory -- passes it to
+    the Fortran side, and returns buffer[0] without ever checking the error
+    code. When the symbol is not supported the buffer is left untouched and
+    whatever happened to be in that memory comes back as a number.
+
+    Measured: asking for G, then H, then S, then V in turn returned the
+    correct G, the correct H, and then H's value again for S and for every
+    symbol after it -- numpy had handed out the same freed buffer each
+    time. Nothing in the return value distinguished a real measurement from
+    the previous one echoed back. That is precisely the silent-substitution
+    failure the rest of this server is built to prevent, sitting one layer
+    below it.
+
+    So: a recognisable sentinel goes in, the error code is cleared before
+    and read after, and the value is returned only if the call reported
+    success AND actually wrote. A quantity this engine path cannot provide
+    comes back as None and is then left out of the result entirely, because
+    an absent measurement and a measurement of zero must not look alike.
+    """
+    import numpy  # local: only this helper needs it
+    sentinel = -987654321.0
+    buffer = numpy.array([sentinel])
+    raw = oc.raw()
+    raw.pyseterr(0)
+    try:
+        raw.pytqgetv(symbol, 0, 0, 1, buffer, oc.eq())
+    except Exception:
+        return None
+    if raw.pygeterr() != 0 or buffer[0] == sentinel:
+        raw.pyseterr(0)
+        return None
+    return float(buffer[0])
+
+
+def _ocasi_state_variables(temperature_K, gibbs_energy_J):
+    """The state variables OCASI can supply, plus entropy derived from them.
+
+    Measured against this build (error code checked per symbol):
+
+        G GM H HM V VM N B T P X(component)   supported
+        S SM CP AC(..) DG(..) NP(..)          error 8888 / 4050
+
+    Entropy is missing but not lost: G = H - T*S is an identity, so
+    S = (H - G)/T. Checked against the native engine's own printed entropy
+    at 1200 K -- (35345 + 56564)/1200 = 76.59, which is exactly what native
+    reports -- so this is a rearrangement, not an approximation.
+
+    Activities, driving forces and heat capacity have no route here. The
+    native path prints all three, so the two engine tiers do NOT return the
+    same fields, and pretending otherwise by filling zeros would be worse
+    than the asymmetry. The caller can see which tier ran from
+    backend_used, and a field that tier could not measure is simply absent.
+    """
+    values = {}
+    enthalpy_J = _scalar_or_none("H")
+    if enthalpy_J is not None:
+        values["enthalpy_J"] = enthalpy_J
+        if temperature_K:
+            values["entropy_J_per_K"] = (enthalpy_J - gibbs_energy_J) / temperature_K
+            # Marked, because the difference matters to anyone who later
+            # wants to check G = H - T*S. On the native path entropy is
+            # measured independently and that identity is a real test. Here
+            # it was rearranged FROM G and H, so the same check would be
+            # circular and would pass no matter what the engine returned.
+            # A vacuous check that looks like a real one is worse than none.
+            values["entropy_source"] = "derived_from_G_and_H"
+    for key, symbol in (("volume_m3", "V"), ("moles_total", "N"), ("mass_g", "B")):
+        value = _scalar_or_none(symbol)
+        if value is not None:
+            values[key] = value
+    return values
+
+
 def _calculate_equilibrium_ocasi(
     db_path,
     composition,
@@ -232,7 +309,7 @@ def _calculate_equilibrium_ocasi(
             "stable phases."
         )
 
-    return {
+    result = {
         "database": os.path.basename(db_path),
         "temperature_K": temperature_K,
         "pressure_Pa": pressure_Pa,
@@ -243,3 +320,5 @@ def _calculate_equilibrium_ocasi(
         "phase_molar_amounts": phases.getPhaseMolarAmounts(),
         "phase_element_composition": phases.getPhaseElementComposition(),
     }
+    result.update(_ocasi_state_variables(temperature_K, result["gibbs_energy_J"]))
+    return result

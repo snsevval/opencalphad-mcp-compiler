@@ -178,7 +178,35 @@ def parse_native_output(raw_text):
     gibbs_energy_J = float(gn_match.group(1))
     RT = float(rt_match.group(1)) if rt_match else None
 
+    # The "Some global data" block carries more than the Gibbs energy, and
+    # until now everything but G/N and RT was read straight past:
+    #
+    #   T= 1200.00 K, P= 1.0000E+05 Pa, V= 7.2784E-06 m3
+    #   N= 1.0000E+00 moles, B= 5.5409E+01 g, RT= 9.9774E+03 J/mol
+    #   G= -5.65638E+04 J, G/N=-5.6564E+04 J/mol, H= 3.5345E+04 J, S= 7.659E+01 J/K
+    #
+    # H and S are totals over N moles, as G (not G/N) is. Reading them costs
+    # nothing and buys a check this server never had: G = H - T*S must hold.
+    # On the captured fixture it does, to 0.8 J in 56,564 -- which is the
+    # rounding in a four-significant-figure entropy, not an error. A result
+    # that fails it is malformed in a way no phase-fraction sum would reveal.
+    def _global(pattern):
+        found = re.search(pattern, raw_text)
+        return float(found.group(1)) if found else None
+
+    volume_m3 = _global(rf"\bV=\s*({_FLOAT})\s*m3")
+    moles_total = _global(rf"\bN=\s*({_FLOAT})\s*moles")
+    mass_g = _global(rf"\bB=\s*({_FLOAT})\s*g\b")
+    enthalpy_J = _global(rf"\bH=\s*({_FLOAT})\s*J\b")
+    entropy_J_per_K = _global(rf"\bS=\s*({_FLOAT})\s*J/K")
+
     chemical_potentials = {}
+    # Activity is the fifth column of the component table and was already
+    # being matched by the regex below -- captured, then dropped. It is the
+    # quantity a metallurgist reaches for when asking whether a species will
+    # react, and it was one group index away the whole time.
+    activities = {}
+    component_mole_fractions = {}
     comp_section = re.search(
         r"Some data for components[^\n]*\n(.*?)(?:\n\s*\n|Some data for phases)",
         raw_text,
@@ -197,9 +225,21 @@ def parse_native_output(raw_text):
                 continue
             chem_pot_over_rt = float(m.group(4))
             chemical_potentials[name] = chem_pot_over_rt * RT if RT is not None else chem_pot_over_rt
+            component_mole_fractions[name] = float(m.group(3))
+            activities[name] = float(m.group(5))
 
     phase_molar_amounts = {}
     phase_element_composition = {}
+    # Per-phase columns that were matched and discarded. Status says whether
+    # a phase is ENTERED, DORMANT, FIXED or SUSPENDED -- without it a caller
+    # cannot tell a phase that is genuinely stable from one the request
+    # merely held in place. dGm/RT is the driving force: zero for a stable
+    # phase by definition, and the only way to answer "would this phase form
+    # if it could?" for one that is not.
+    phase_status = {}
+    phase_volume_m3 = {}
+    phase_formula_units = {}
+    phase_driving_force_RT = {}
     phases_section = re.search(
         r"Some data for phases[^\n]*\n[^\n]*\n(.*?)(?:\n-{2,}>|\n---+>|\Z)",
         raw_text,
@@ -219,6 +259,10 @@ def parse_native_output(raw_text):
                 name = m.group(1)
                 moles = float(m.group(3))
                 phase_molar_amounts[name] = moles
+                phase_status[name] = m.group(2)
+                phase_volume_m3[name] = float(m.group(4))
+                phase_formula_units[name] = float(m.group(5))
+                phase_driving_force_RT[name] = float(m.group(7))
                 phase_element_composition[name] = {}
                 current_phase = name
                 _consume_constituents(m.group(8), phase_element_composition[name])
@@ -228,12 +272,40 @@ def parse_native_output(raw_text):
     if not phase_molar_amounts:
         raise NativeEquilibriumError("Native OC output had no parseable stable phases.")
 
-    return {
+    # Existing keys keep their names and meanings -- everything downstream
+    # (result_check, the benchmark, the client models) reads them, and a
+    # rename would be a silent breakage of exactly the kind this project
+    # spends its effort catching. The new fields are additions only, and any
+    # that the output did not carry stay absent rather than becoming zero:
+    # a missing measurement and a measurement of zero must not look alike.
+    result = {
         "gibbs_energy_J": gibbs_energy_J,
         "chemical_potentials_J_per_mol": chemical_potentials,
         "phase_molar_amounts": phase_molar_amounts,
         "phase_element_composition": phase_element_composition,
     }
+    for key, value in (
+        ("enthalpy_J", enthalpy_J),
+        ("entropy_J_per_K", entropy_J_per_K),
+        # Native prints entropy directly, so G = H - T*S is an independent
+        # check here. The OCASI path has no entropy symbol and rearranges it
+        # from G and H, where the same check would be circular -- hence the
+        # marker, so a caller can tell which it is holding.
+        ("entropy_source", "measured" if entropy_J_per_K is not None else None),
+        ("volume_m3", volume_m3),
+        ("moles_total", moles_total),
+        ("mass_g", mass_g),
+        ("RT_J_per_mol", RT),
+        ("activities", activities or None),
+        ("component_mole_fractions", component_mole_fractions or None),
+        ("phase_status", phase_status or None),
+        ("phase_volume_m3", phase_volume_m3 or None),
+        ("phase_formula_units", phase_formula_units or None),
+        ("phase_driving_force_RT", phase_driving_force_RT or None),
+    ):
+        if value is not None:
+            result[key] = value
+    return result
 
 
 def run_and_parse(db_path, elements_composition, temperature_K, pressure_Pa, timeout=12):
