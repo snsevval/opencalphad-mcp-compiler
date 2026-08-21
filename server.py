@@ -231,6 +231,22 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None) -> d
         "problems": problems,
     }
 
+    # Does the result answer the request? A separate question from whether
+    # it is well-formed, so it is reported separately rather than folded
+    # into the same pass/fail -- the two demand different responses. A
+    # malformed result means something in this pipeline is broken; a result
+    # that is fine but answers a different question means the request did
+    # not survive the trip.
+    if request_args is not None:
+        correspondence = result_check.verify_correspondence(result, request_args)
+        if correspondence is not None:
+            verification["correspondence"] = correspondence
+            if not correspondence["passed"]:
+                passed = False
+                verification["passed"] = False
+                problems = problems + correspondence["problems"]
+                verification["problems"] = problems
+
     if passed and SEMANTIC_CHECK_ENABLED and request_args is not None:
         review = semantic_check.review(request_args, result)
         verification["layer_b"] = review

@@ -316,7 +316,9 @@ async def run_all(selected, semantic_check=True):
 
 
 def main(argv):
-    wanted = argv[1] if len(argv) > 1 else None
+    # Bayraklar secici degil: "run.py --hizli" butun vakalari kosmali.
+    secim = [a for a in argv[1:] if not a.startswith("--")]
+    wanted = secim[0] if secim else None
     if wanted in (None, "hepsi"):
         selected = case_registry.CASES
     elif hasattr(case_registry, wanted):

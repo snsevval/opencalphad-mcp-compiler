@@ -194,6 +194,36 @@ def parse_native_output(raw_text):
         found = re.search(pattern, raw_text)
         return float(found.group(1)) if found else None
 
+    # The engine's own account of what it was asked. It prints this before
+    # it prints the answer:
+    #
+    #   Conditions ...: 1:T=1200, 2:P=100000, 3:N=1, 4:X(C)=.01
+    #   Degrees of freedom are   0
+    #
+    # Until now only the presence of the second line was used, as a
+    # sentinel for "a calculation finished". The numbers themselves were
+    # read straight past -- including the degrees of freedom, which is the
+    # engine saying whether the conditions pinned the system down at all.
+    # A macro line swallowed by one of the engine's interactive prompts
+    # (which has happened here more than once) does not stop the
+    # calculation: the engine solves what is left, prints a well-formed
+    # result, and says so only in these two lines.
+    reported_conditions = {}
+    conditions_match = re.search(r"Conditions\s*\.*\s*:\s*\n([^\n]*)", raw_text)
+    if conditions_match:
+        # "1:T=1200, 2:P=100000, 3:N=1, 4:X(C)=.01" -- the index is the
+        # engine's own numbering and carries no meaning for us; the name may
+        # be bare (T) or carry a component (X(C)); the value may be written
+        # without a leading zero (.01).
+        condition_re = re.compile(
+            r"\d+\s*:\s*([A-Za-z]+(?:\([^)]*\))?)\s*=\s*(-?\.?\d[\d.]*(?:[eE][-+]?\d+)?)"
+        )
+        for name, value in condition_re.findall(conditions_match.group(1)):
+            reported_conditions[name.upper()] = float(value)
+
+    dof_match = re.search(r"Degrees of freedom are\s+(-?\d+)", raw_text)
+    degrees_of_freedom = int(dof_match.group(1)) if dof_match else None
+
     volume_m3 = _global(rf"\bV=\s*({_FLOAT})\s*m3")
     moles_total = _global(rf"\bN=\s*({_FLOAT})\s*moles")
     mass_g = _global(rf"\bB=\s*({_FLOAT})\s*g\b")
@@ -285,6 +315,8 @@ def parse_native_output(raw_text):
         "phase_element_composition": phase_element_composition,
     }
     for key, value in (
+        ("reported_conditions", reported_conditions or None),
+        ("degrees_of_freedom", degrees_of_freedom),
         ("enthalpy_J", enthalpy_J),
         ("entropy_J_per_K", entropy_J_per_K),
         # Native prints entropy directly, so G = H - T*S is an independent
