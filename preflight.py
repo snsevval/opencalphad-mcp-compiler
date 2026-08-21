@@ -124,6 +124,72 @@ def check_equilibrium_request(
     return problems
 
 
+def check_isothermal_section_request(
+    database, elements_composition, axis_element, axis_min, axis_max,
+    temperature_K, pressure_Pa=1e5, suspended_phases=None,
+):
+    """PREFLIGHT for calculate_isothermal_section. Returns a list of
+    problem strings; empty list means the request is valid.
+
+    The axis checks are the ones the engine would otherwise discover the
+    expensive way. Scanning an element that is not in the composition
+    would silently scan nothing; scanning the only other element leaves no
+    dependent element for the macro to balance against; and an axis
+    reaching far enough would drive the dependent element negative, which
+    the engine reports as an unsolvable condition rather than a bad
+    request.
+    """
+    problems = _check_common(
+        database, elements_composition, pressure_Pa, suspended_phases
+    )
+    if temperature_K <= 0:
+        problems.append(f"Temperature must be positive (Kelvin), got {temperature_K}.")
+
+    symbols = {el.upper() for el in elements_composition}
+    if axis_element.upper() not in symbols:
+        problems.append(
+            f"axis_element '{axis_element}' is not in the composition "
+            f"({sorted(symbols)}). The scanned element must be one of the "
+            "elements the alloy is made of."
+        )
+    elif len(symbols) < 3:
+        problems.append(
+            f"Scanning {axis_element} in a two-element system leaves only "
+            "one other element, which the macro needs as the dependent "
+            "one. A composition scan needs at least three elements."
+        )
+
+    for name, value in (("axis_min", axis_min), ("axis_max", axis_max)):
+        if not (0.0 <= value < 1.0):
+            problems.append(
+                f"{name} must be a mole fraction in [0, 1), got {value}."
+            )
+    if axis_min >= axis_max:
+        problems.append(
+            f"axis_min ({axis_min}) must be less than axis_max ({axis_max})."
+        )
+
+    # What is left for the dependent element at the far end of the scan.
+    total = sum(elements_composition.values())
+    if total > 0 and axis_element.upper() in symbols:
+        others = sum(
+            amount / total for el, amount in elements_composition.items()
+            if el.upper() not in (axis_element.upper(),)
+        )
+        held = others - max(
+            (amount / total for el, amount in elements_composition.items()
+             if el.upper() != axis_element.upper()),
+            default=0.0,
+        )
+        if axis_max + held >= 1.0:
+            problems.append(
+                f"axis_max ({axis_max}) leaves nothing for the dependent "
+                f"element: the other fixed elements already take "
+                f"{held:.4g} of the total."
+            )
+    return problems
+
+
 def check_property_diagram_request(
     database, elements_composition, temperature_min_K, temperature_max_K,
     pressure_Pa=1e5, suspended_phases=None,

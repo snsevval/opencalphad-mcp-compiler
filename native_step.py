@@ -94,8 +94,16 @@ class NativeStepError(Exception):
 
 
 def generate_step_macro(db_path, elements_composition, temperature_min_K,
-                         temperature_max_K, n_points, pressure_Pa, csv_basename):
+                         temperature_max_K, n_points, pressure_Pa, csv_basename,
+                         axis_element=None, axis_min=None, axis_max=None):
     """Build the native STEP .ocm macro.
+
+    Scans temperature by default. Pass axis_element to scan that element's
+    mole fraction instead, between axis_min and axis_max, holding
+    temperature fixed at temperature_min_K -- an isothermal section, which
+    is the question "what forms as I add more of this?" rather than "what
+    happens to this alloy as it heats".
+
 
     Matches the exact working syntax captured from OpenCalphad CAE's own
     "Generate Macro File" (tests/fixtures/step_diagram/
@@ -109,12 +117,23 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
     """
     total = sum(elements_composition.values())
     fractions = {el: amt / total for el, amt in elements_composition.items()}
-    dependent_el = max(fractions, key=fractions.get)
+    # When an element is being scanned it cannot also be the dependent one:
+    # the dependent element is the one with no condition of its own, and
+    # the axis IS a condition. So it is chosen among the rest.
+    candidates = {el: v for el, v in fractions.items()
+                  if el.upper() != (axis_element or "").upper()}
+    dependent_el = max(candidates, key=candidates.get)
     independents = [el for el in elements_composition if el != dependent_el]
 
     elements_line = " ".join(elements_composition.keys())
+    # The scanned element gets no fixed condition either -- "set axis"
+    # supplies its value at every point. Writing both would over-constrain
+    # the system, which the engine reports as a nonzero degrees of freedom
+    # or simply refuses.
     x_condition_lines = "\n".join(
-        f"set condition x({el.lower()})={fractions[el]:.10g}" for el in independents
+        f"set condition x({el.lower()})={fractions[el]:.10g}"
+        for el in independents
+        if el.upper() != (axis_element or "").upper()
     )
     db_stem = os.path.splitext(os.path.basename(db_path))[0]
     # Seed at the low end of the range rather than the midpoint: a STEP
@@ -123,6 +142,21 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
     # would actually converge at just fine -- the low end tends to be a
     # simpler, more stable phase assemblage and is a safer default seed.
     seed_T = temperature_min_K
+
+    if axis_element:
+        axis_name = f"x({axis_element.lower()})"
+        axis_lo, axis_hi = axis_min, axis_max
+        # The seed has to sit ON the axis, so the scanned element gets its
+        # starting value as a condition here and the axis takes over from
+        # there. Same reasoning as the temperature seed above: start at the
+        # low end, where the phase assemblage tends to be simplest.
+        seed_line = f"set condition {axis_name}={axis_lo:.10g}\n"
+        csv_x_column = f"X({axis_element.upper()})"
+    else:
+        axis_name = "T"
+        axis_lo, axis_hi = temperature_min_K, temperature_max_K
+        seed_line = ""
+        csv_x_column = "T"
 
     macro = (
         # "set echo"/"set log" (from the GUI-captured macro this is
@@ -139,13 +173,14 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
         f"set condition P = {pressure_Pa:.10g}\n"
         "set condition n = 1.0\n"
         f"{x_condition_lines}\n"
+        f"{seed_line}"
         "\n"
         "calculate equilibrium\n"
         "\n"
         "list result 4\n"
         "\n"
         "\n"
-        f"set axis 1 T {temperature_min_K:.10g} {temperature_max_K:.10g} {n_points}\n"
+        f"set axis 1 {axis_name} {axis_lo:.10g} {axis_hi:.10g} {n_points}\n"
         "\n"
         "\n"
         "\n"
@@ -161,7 +196,7 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
         "\n"
         "list\n"
         "excel_csv_file\n"
-        "T\n"
+        f"{csv_x_column}\n"
         "BPW(*)\n"
         f"{csv_basename}\n"
         "\n"
@@ -171,9 +206,13 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
 
 
 def run_native_step(db_path, elements_composition, temperature_min_K,
-                     temperature_max_K, n_points, pressure_Pa, timeout=60):
+                     temperature_max_K, n_points, pressure_Pa, timeout=60,
+                     axis_element=None, axis_min=None, axis_max=None):
     """Run the STEP macro in an isolated scratch directory and return the
-    raw CSV text (or raise NativeStepError if no CSV was produced)."""
+    raw CSV text (or raise NativeStepError if no CSV was produced).
+
+    axis_element switches the scan from temperature to that element's mole
+    fraction, holding temperature at temperature_min_K."""
     if not os.path.isfile(OC_BINARY):
         raise NativeStepError(f"Native OC binary not found: {OC_BINARY}")
     if not os.path.isfile(db_path):
@@ -194,7 +233,8 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
 
         macro_text = generate_step_macro(
             db_path, elements_composition, temperature_min_K,
-            temperature_max_K, n_points, pressure_Pa, csv_basename
+            temperature_max_K, n_points, pressure_Pa, csv_basename,
+            axis_element=axis_element, axis_min=axis_min, axis_max=axis_max,
         )
         macro_path = os.path.join(scratch, "step.ocm")
         with open(macro_path, "w") as f:
@@ -238,7 +278,10 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
         # Recover the table from stdout instead of requiring a file.
         with open(stdout_path, errors="ignore") as f:
             stdout_text = f.read()
-        screen_csv = _extract_screen_csv_block(stdout_text)
+        # Same column name the macro asked the engine to write, so the
+        # on-screen fallback looks for the header it will actually see.
+        csv_x_column = f"X({axis_element.upper()})" if axis_element else "T"
+        screen_csv = _extract_screen_csv_block(stdout_text, csv_x_column)
         if screen_csv is not None:
             return screen_csv
 
@@ -251,7 +294,7 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
         )
 
 
-def _extract_screen_csv_block(stdout_text):
+def _extract_screen_csv_block(stdout_text, x_column="T"):
     """Pull the excel_csv_file table back out of raw stdout when it was
     printed to the screen instead of written to a file (see
     run_native_step). Returns the CSV text (header + data lines) or None
@@ -267,7 +310,7 @@ def _extract_screen_csv_block(stdout_text):
     header_idx = None
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if stripped.startswith('"T",') and "BPW(" in stripped:
+        if stripped.startswith(f'"{x_column}",') and "BPW(" in stripped:
             header_idx = i
             break
     if header_idx is None:
@@ -430,16 +473,70 @@ def _validate_combined_points(combined, sum_tol=1e-5):
                 )
 
 
+def _fractions_agree(a, b, tol=1e-4):
+    """Do two readings of the same axis position describe the same
+    equilibrium? Both sides must already be canonicalized -- otherwise
+    "LIQUID" and "LIQUID#1" would read as a disagreement.
+
+    Phases below tol are ignored on both sides: a phase reported at 1e-7 by
+    one engine and simply absent from the other is the same physical answer,
+    and treating that as a conflict would fire on every point where a phase
+    is just appearing.
+    """
+    def significant(fractions):
+        return {name: value for name, value in fractions.items() if value > tol}
+
+    left, right = significant(a), significant(b)
+    if set(left) != set(right):
+        return False
+    return all(abs(left[name] - right[name]) <= tol for name in left)
+
+
+def composition_at(elements_composition, axis_element, x):
+    """The composition to hand a single-point call at axis position x.
+
+    The scanned element takes the axis value; the others keep their
+    original proportions; the largest of the others absorbs the remainder,
+    which is the same element the macro leaves dependent. Without this the
+    gap-fill would compute a different alloy than STEP did at the same x.
+    """
+    total = sum(elements_composition.values())
+    fractions = {el: amt / total for el, amt in elements_composition.items()}
+    others = {el: v for el, v in fractions.items()
+              if el.upper() != axis_element.upper()}
+    if not others:
+        raise NativeStepError(
+            f"Cannot scan {axis_element}: it is the only element."
+        )
+    dependent = max(others, key=others.get)
+    out = {el: v for el, v in others.items() if el != dependent}
+    scanned = next(el for el in fractions if el.upper() == axis_element.upper())
+    out[scanned] = x
+    remainder = 1.0 - sum(out.values())
+    if remainder <= 0.0:
+        raise NativeStepError(
+            f"Composition axis reached {x:g} for {axis_element}, which "
+            f"leaves nothing for {dependent}."
+        )
+    out[dependent] = remainder
+    return out
+
+
 def build_combined_series(db_path, elements_composition, temperature_min_K,
                            temperature_max_K, n_points, pressure_Pa,
-                           step_timeout=60, fallback_timeout=15):
+                           step_timeout=60, fallback_timeout=15,
+                           axis_element=None, axis_min=None, axis_max=None):
     """Run native STEP, detect gaps where its line terminated early, and
     fill those gaps with native_fallback.run_and_parse single-point calls,
     on a single consistent basis (phase mass fraction).
 
-    STEP's own points are authoritative wherever they exist -- fallback is
-    only ever used to fill temperatures STEP's line dropped, never to
-    override a temperature STEP already covered. Fallback's raw
+    STEP's own points are authoritative wherever they exist, with one
+    measured exception: the two endpoints are read a second time from the
+    single-point engine, which re-minimises globally, and a disagreement
+    there is resolved against STEP (see the endpoint block below for the
+    case that prompted it). Everywhere else fallback only fills positions
+    STEP's line dropped, never overriding one STEP already covered.
+    Fallback's raw
     phase_molar_amounts (moles of phase, not mass fraction) are converted
     via _phase_mass_fractions_from_moles before merging, and STEP's own
     truncated phase-tuple names (e.g. "FCC_A..TO#2") are de-truncated
@@ -455,22 +552,39 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
     """
     csv_text = run_native_step(
         db_path, elements_composition, temperature_min_K, temperature_max_K,
-        n_points, pressure_Pa, timeout=step_timeout
+        n_points, pressure_Pa, timeout=step_timeout,
+        axis_element=axis_element, axis_min=axis_min, axis_max=axis_max,
     )
     raw_points = parse_step_csv(csv_text)
     step_points = _dedupe_sorted(raw_points)
 
-    nominal_spacing = (temperature_max_K - temperature_min_K) / max(n_points - 1, 1)
+    # Everything below works on "axis position", which is temperature on
+    # the default axis and a mole fraction on a composition axis. Only two
+    # things differ between them: the range being covered, and what a
+    # single-point call at a given position needs as arguments.
+    if axis_element:
+        span_lo, span_hi = axis_min, axis_max
+
+        def single_point_args(position):
+            return (composition_at(elements_composition, axis_element, position),
+                    temperature_min_K)
+    else:
+        span_lo, span_hi = temperature_min_K, temperature_max_K
+
+        def single_point_args(position):
+            return elements_composition, position
+
+    nominal_spacing = (span_hi - span_lo) / max(n_points - 1, 1)
     gap_threshold = nominal_spacing * 3
 
     gaps = []
-    if step_points[0][0] > temperature_min_K + gap_threshold:
-        gaps.append((temperature_min_K, step_points[0][0]))
+    if step_points[0][0] > span_lo + gap_threshold:
+        gaps.append((span_lo, step_points[0][0]))
     for (T1, _), (T2, _) in zip(step_points, step_points[1:]):
         if T2 - T1 > gap_threshold:
             gaps.append((T1, T2))
-    if step_points[-1][0] < temperature_max_K - gap_threshold:
-        gaps.append((step_points[-1][0], temperature_max_K))
+    if step_points[-1][0] < span_hi - gap_threshold:
+        gaps.append((step_points[-1][0], span_hi))
 
     # Fill gaps first (mass fraction, from moles + composition) so we have
     # a pool of full, untruncated phase names to de-truncate STEP's own
@@ -484,8 +598,9 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
             if any(abs(T - existing) < 1e-6 for existing in step_temperatures):
                 continue  # STEP already has this exact temperature -- keep STEP's
             try:
+                point_composition, point_temperature = single_point_args(T)
                 result = native_fallback.run_and_parse(
-                    db_path, elements_composition, T, pressure_Pa,
+                    db_path, point_composition, point_temperature, pressure_Pa,
                     timeout=fallback_timeout
                 )
             except Exception:
@@ -497,11 +612,42 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
                 continue
             fallback_points.append((T, mass_fractions))
 
+    # STEP follows a line; it does not re-minimise globally at each step.
+    # Where that line stops being the global minimum, STEP keeps following
+    # it and reports a metastable equilibrium with nothing to say anything
+    # is wrong. Measured on steel1 Fe-Cr-C at 1100 K, scanning x(Cr) from
+    # 0.01 to 0.30: STEP's ordinary steps matched fresh single-point
+    # equilibria to five decimals, but the point it carries to the axis
+    # limit when terminating a line reported FCC_A1+M7C3 where the stable
+    # answer is BCC_A2+M23C6.
+    #
+    # An endpoint is where a continuation has travelled furthest from the
+    # solution it started at, and there are only two of them -- cheap to
+    # read a second time from the engine that does re-minimise globally.
+    # Disagreements are resolved in favour of the global minimisation.
+    endpoint_readings = {}
+    for position in {step_points[0][0], step_points[-1][0]}:
+        try:
+            point_composition, point_temperature = single_point_args(position)
+            result = native_fallback.run_and_parse(
+                db_path, point_composition, point_temperature, pressure_Pa,
+                timeout=fallback_timeout
+            )
+            fresh = _phase_mass_fractions_from_moles(
+                result["phase_molar_amounts"], result["phase_element_composition"]
+            )
+        except Exception:
+            continue  # no second reading available; STEP's own point stands
+        if fresh:
+            endpoint_readings[position] = fresh
+
     # Built from the RAW fallback names, before canonicalization: these are
     # the full, untruncated spellings that STEP's truncated headers get
     # matched back against.
     known_full_names = set()
     for _, fractions in fallback_points:
+        known_full_names.update(fractions.keys())
+    for fractions in endpoint_readings.values():
         known_full_names.update(fractions.keys())
 
     def _canonicalize(fractions):
@@ -510,10 +656,22 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
             for name, value in fractions.items()
         }
 
+    endpoint_replacements = {}
+    for position, fresh in endpoint_readings.items():
+        step_fractions = next(f for T, f in step_points if T == position)
+        if not _fractions_agree(_canonicalize(step_fractions), _canonicalize(fresh)):
+            endpoint_replacements[position] = fresh
+
     # Both sources go through the same canonicalization -- the fallback
     # side needs it too, since it's the one that spells the default
     # composition set as "LIQUID#1" where STEP writes plain "LIQUID".
-    combined = [(T, _canonicalize(fractions), "step") for T, fractions in step_points]
+    combined = []
+    for T, fractions in step_points:
+        if T in endpoint_replacements:
+            combined.append((T, _canonicalize(endpoint_replacements[T]),
+                             "native_fallback (endpoint recheck)"))
+        else:
+            combined.append((T, _canonicalize(fractions), "step"))
 
     gap_filled_temperatures = []
     for T, fractions in fallback_points:
@@ -525,7 +683,8 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
     return combined, gap_filled_temperatures
 
 
-def render_gnuplot_png(combined_points, title, output_png_path, timeout=20):
+def render_gnuplot_png(combined_points, title, output_png_path, timeout=20,
+                       x_label="Temperature (K)"):
     """Build a pngcairo gnuplot script from combined_points and render it.
 
     Raises on any failure (gnuplot missing, script error, timeout) so the
@@ -556,8 +715,7 @@ def render_gnuplot_png(combined_points, title, output_png_path, timeout=20):
             # gnuplot's enhanced text would render them as subscripts.
             f'set terminal pngcairo size 1400,850 font "Arial,14" noenhanced',
             f'set output "{output_png_path}"',
-            f'set title "{title}"',
-            'set xlabel "Temperature (K)"',
+            f'set xlabel "{x_label}"',
             'set ylabel "Phase fraction"',
             'set datafile separator ","',
             'set key outside right',
@@ -587,7 +745,7 @@ def render_gnuplot_png(combined_points, title, output_png_path, timeout=20):
             return f.read()
 
 
-def open_interactive_window(combined_points, title):
+def open_interactive_window(combined_points, title, x_label="Temperature (K)"):
     """Fire-and-forget: opens a real, persistent gnuplot window (qt
     terminal) via WSLg, showing the same chart as render_gnuplot_png.
 
@@ -621,7 +779,7 @@ def open_interactive_window(combined_points, title):
         script_lines = [
             'set terminal qt size 1100,750 font "Arial,12" noenhanced',
             f'set title "{title}"',
-            'set xlabel "Temperature (K)"',
+            f'set xlabel "{x_label}"',
             'set ylabel "Phase fraction"',
             'set datafile separator ","',
             'set key outside right',

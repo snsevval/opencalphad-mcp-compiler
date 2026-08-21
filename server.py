@@ -824,5 +824,236 @@ def calculate_property_diagram(
     return data
 
 
+@mcp.tool()
+def calculate_isothermal_section(
+    database: str,
+    elements_composition: dict[str, float],
+    axis_element: str,
+    axis_min: float,
+    axis_max: float,
+    temperature_K: float,
+    n_points: int = 15,
+    pressure_Pa: float = 1e5,
+):
+    """Hold temperature fixed and scan one element's content instead.
+
+    The companion to calculate_property_diagram, which asks "what happens
+    to this alloy as it heats". This asks the other standard question:
+    "at this temperature, what forms as I add more of this element" --
+    an isothermal section. Use it for questions phrased as adding,
+    increasing, or varying an element rather than heating or cooling.
+
+    PREFLIGHT REJECTION — STOP RULE
+    If the result has stage="PREFLIGHT", the request was refused before any
+    calculation ran. Do NOT call this or any other calculation tool again in
+    this turn. Quote the rejection reason to the user (including any list of
+    valid elements it names) and ask which corrected request they want.
+    Naming options is fine; running one is not.
+
+    Method: OpenCalphad's own native STEP algorithm, with the scanned
+    element's mole fraction as the axis. STEP follows a line by
+    continuation rather than re-minimising at every position, so where its
+    line terminates the missing positions are filled with independent
+    single-point equilibrium calls, and its two endpoints are read a
+    second time from that same single-point engine -- a continuation can
+    stay on a phase set that has stopped being the stable one, and the
+    endpoint is where it has drifted furthest. Each returned point says
+    which engine produced it via its "source" field. If the native STEP
+    path fails entirely, the whole axis is scanned single-point instead.
+    The returned chart is the complete, intended visualization for this
+    data — present it as-is rather than building a separate plot yourself.
+
+    Args:
+        database: database filename or full path.
+        elements_composition: element -> molar amount, giving the alloy the
+            scan starts from. Needs at least three elements: the scanned
+            one, plus one to stay fixed and one to take up the remainder.
+            The scanned element's own value here is replaced by the axis.
+        axis_element: which element's mole fraction to scan.
+        axis_min: mole fraction at the start of the scan.
+        axis_max: mole fraction at the end of the scan.
+        temperature_K: the fixed temperature, in Kelvin.
+        n_points: how many positions to sample (default 15). Keep this
+            modest (<=30) — each position may require its own calculation.
+        pressure_Pa: pressure in Pascal (default 1e5, i.e. 1 bar).
+
+    VERIFICATION
+    Every result carries a "verification" field recording the
+    deterministic checks this server ran on it before handing it back --
+    phase fractions summing to one, values in range, no NaN, and how many
+    positions actually converged. Report its outcome next to the numbers.
+    Someone reading a calculation has no other way to know whether it was
+    checked, and a result that was checked and one that was not must not
+    look alike to them. If "passed" is false, say what "problems" lists
+    rather than presenting the numbers as if nothing had been found.
+    """
+    if n_points < 2:
+        n_points = 2
+
+    problems = preflight.check_isothermal_section_request(
+        database, elements_composition, axis_element, axis_min, axis_max,
+        temperature_K, pressure_Pa,
+    )
+    if problems:
+        return _preflight_failure(problems)
+
+    _section_args = {
+        "database": database,
+        "elements_composition": elements_composition,
+        "axis_element": axis_element,
+        "axis_min": axis_min,
+        "axis_max": axis_max,
+        "temperature_K": temperature_K,
+        "n_points": n_points,
+        "pressure_Pa": pressure_Pa,
+    }
+    db_path = (
+        database if os.path.isabs(database)
+        else os.path.join(oc_service.DEFAULT_DB_DIR, database)
+    )
+    symbol = axis_element.upper()
+    chart_title = (
+        f"{os.path.basename(database)} isothermal section at {temperature_K:g} K"
+    )
+    x_label = f"x({symbol})"
+
+    def _shape(combined, source_counts, backend, extra):
+        points = [
+            {
+                "x": x,
+                "axis_element": symbol,
+                "temperature_K": temperature_K,
+                "phase_molar_amounts": fractions,
+                "source": source,
+            }
+            for x, fractions, source in combined
+        ]
+        data = {
+            "database": os.path.basename(database),
+            "composition": elements_composition,
+            "axis_element": symbol,
+            "axis_min": axis_min,
+            "axis_max": axis_max,
+            "temperature_K": temperature_K,
+            "pressure_Pa": pressure_Pa,
+            "points": points,
+            "backend_used": backend,
+        }
+        data.update(source_counts)
+        data.update(extra)
+        return data
+
+    try:
+        combined, gap_filled = native_step.build_combined_series(
+            db_path, elements_composition, temperature_K, temperature_K,
+            n_points, pressure_Pa,
+            axis_element=symbol, axis_min=axis_min, axis_max=axis_max,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            png_path = os.path.join(tmpdir, "section.png")
+            chart_bytes = native_step.render_gnuplot_png(
+                combined, chart_title, png_path, x_label=x_label,
+            )
+        window_opened = native_step.open_interactive_window(
+            combined, chart_title, x_label=x_label
+        )
+        data = _shape(
+            combined,
+            {
+                "native_step_points": len(combined) - len(gap_filled),
+                "gap_filled_points": len(gap_filled),
+            },
+            "native_oc_step_gnuplot",
+            {
+                "interactive_window_opened": window_opened,
+                "note": (
+                    "Values from native STEP are phase mass fractions; "
+                    "positions its line did not reach, and its two "
+                    "endpoints where a second reading disagreed, come from "
+                    "single-point equilibrium calls converted to the same "
+                    "basis. See each point's 'source' field."
+                ),
+                "chart_error": None,
+            },
+        )
+        return [
+            _attach_verification(data, _section_args),
+            Image(data=chart_bytes, format="png"),
+        ]
+    except Exception as exc:
+        native_backend_error = str(exc)
+
+    # Native STEP could not run at all. The axis is still perfectly
+    # scannable one position at a time -- that is what fills its gaps in
+    # the normal path anyway -- so the fallback is the same calculation
+    # without the continuation, not a different or lesser answer.
+    combined = []
+    failures = []
+    for i in range(n_points):
+        x = axis_min + (axis_max - axis_min) * i / (n_points - 1)
+        try:
+            point_composition = native_step.composition_at(
+                elements_composition, symbol, x
+            )
+        except Exception as exc:
+            failures.append({"x": x, "error": str(exc)})
+            continue
+        result = _calc_one(
+            database, point_composition, temperature_K, pressure_Pa, None
+        )
+        if "error" in result or not result.get("phase_molar_amounts"):
+            failures.append({
+                "x": x,
+                "error": result.get("error") or (
+                    "Calculation returned no stable phases at this position."
+                ),
+            })
+            continue
+        combined.append((
+            x,
+            native_step._phase_mass_fractions_from_moles(
+                result["phase_molar_amounts"], result["phase_element_composition"]
+            ),
+            "native_fallback",
+        ))
+
+    if not combined:
+        return {
+            "error": (
+                "The composition axis could not be scanned: native STEP "
+                f"failed ({native_backend_error}) and every single-point "
+                "position failed as well."
+            ),
+            "stage": "EXECUTION",
+            "failed_positions": failures,
+        }
+
+    chart_bytes = None
+    chart_error = None
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            png_path = os.path.join(tmpdir, "section.png")
+            chart_bytes = native_step.render_gnuplot_png(
+                combined, chart_title, png_path, x_label=x_label,
+            )
+    except Exception as exc:  # a chart is a bonus, never fail the call over it
+        chart_error = str(exc)
+
+    data = _shape(
+        combined,
+        {"native_step_points": 0, "gap_filled_points": len(combined)},
+        "single_point_scan",
+        {
+            "native_backend_error": native_backend_error,
+            "failed_positions": failures,
+            "chart_error": chart_error,
+        },
+    )
+    _attach_verification(data, _section_args)
+    if chart_bytes:
+        return [data, Image(data=chart_bytes, format="png")]
+    return data
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
