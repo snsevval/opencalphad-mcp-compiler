@@ -268,8 +268,21 @@ def _ocasi_state_variables(temperature_K, gibbs_energy_J):
             values["entropy_source"] = "derived_from_G_and_H"
     for key, symbol in (("volume_m3", "V"), ("moles_total", "N"), ("mass_g", "B")):
         value = _scalar_or_none(symbol)
-        if value is not None:
-            values[key] = value
+        if value is None:
+            continue
+        # Volume comes back as exactly zero from databases that carry no
+        # volume data at all -- agcu.TDB is one, and its Gibbs energy is
+        # identical to the last decimal across four orders of magnitude of
+        # pressure for the same reason. Reporting 0.0 would say the system
+        # occupies no space. Absent data and a measurement of zero must not
+        # look alike, which is the same rule the engine-tier fields follow.
+        if key == "volume_m3" and value == 0.0:
+            values["volume_note"] = (
+                "this database carries no volume data, so volume and any "
+                "pressure dependence are unavailable rather than zero"
+            )
+            continue
+        values[key] = value
     return values
 
 

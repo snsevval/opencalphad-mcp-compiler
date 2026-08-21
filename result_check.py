@@ -139,13 +139,35 @@ def check_requested_elements(result, request_args):
     seen = set()
     for composition in per_phase.values():
         seen |= {e.upper() for e in composition}
+    problems = []
     missing = sorted(requested - seen)
     if missing:
-        return [
+        problems.append(
             f"Requested element(s) {missing} appear in no phase composition -- "
             "they were not part of the calculation."
-        ]
-    return []
+        )
+
+    # The other direction, which the first version of this check left out.
+    # A result holding an element nobody asked for is describing a
+    # different system. Observed: steel1 at 1e9 Pa returned FE4N as the
+    # only phase -- an iron nitride, in a database whose elements are
+    # C, CR, FE, MO, SI, V. There is no nitrogen to make it from. The
+    # numbers were well-formed and every other check passed.
+    unexpected = sorted(seen - requested)
+    if unexpected:
+        # Capped because one failure mode makes this list very long and
+        # says the same thing every time: a gas phase reports molecular
+        # species rather than elements, so CHO-gas comes back holding H2,
+        # C1O1, C1O2 and thirty more. The count is the signal there, not
+        # the enumeration.
+        shown = unexpected[:8]
+        more = "" if len(unexpected) <= 8 else f" (+{len(unexpected) - 8} more)"
+        problems.append(
+            f"Result contains {len(unexpected)} constituent(s) that were "
+            f"not requested: {shown}{more} -- the calculation was not run "
+            "on the system asked for."
+        )
+    return problems
 
 
 def check_mass_balance(result, request_args):
