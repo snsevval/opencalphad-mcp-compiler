@@ -50,7 +50,9 @@ class NativeEquilibriumError(Exception):
     """Raised when the native ./OC fallback also fails to produce a result."""
 
 
-def generate_macro(db_path, elements_composition, temperature_K, pressure_Pa):
+def generate_macro(db_path, elements_composition, temperature_K, pressure_Pa,
+                   suspended_phases=None, dormant_phases=None,
+                   fixed_phases=None):
     """Build the native .ocm macro text for a single-point equilibrium.
 
     Uses the N=1 total moles + independent-element X(...) mole-fraction
@@ -70,14 +72,37 @@ def generate_macro(db_path, elements_composition, temperature_K, pressure_Pa):
     )
     db_stem = os.path.splitext(os.path.basename(db_path))[0]
 
+    # Phase status, if any, must be set before the calculation. The prompt
+    # sequence was read out of the engine's own source rather than guessed
+    # (src/userif/pmon6.F90): a name, a blank line to end the name list,
+    # then one of S(uspend) D(ormant) E(ntered) F(ixed). Fixed also asks an
+    # amount, which is why it carries one.
+    status_block = ""
+    for status_letter, names in (("S", suspended_phases), ("D", dormant_phases)):
+        for name in names or ():
+            status_block += f"set status phase\n{name}\n\n{status_letter}\n"
+    for name, amount in (fixed_phases or {}).items():
+        status_block += f"set status phase\n{name}\n\nF\n{amount:.10g}\n"
+
     macro = (
         "new Y\n"
         f"r t ./{db_stem}\n"
         f"{elements_line}\n"
         "\n"
+        f"{status_block}"
         f"set c t={temperature_K:.10g} p={pressure_Pa:.10g} n=1 {x_conditions}\n"
         "c e\n"
         "list,,,,\n"
+        # Every phase in the database, ranked by how close it is to being
+        # stable, with its driving force -- and the dormant ones listed
+        # separately. "list,,,," above shows only what is stable, so the
+        # question "would this phase form?" had no answer at all until now.
+        # The command path is LIST -> SHORT -> P, found in pmon6.F90 where
+        # it calls list_sorted_phases: "phases sorted: stable / unstable in
+        # driving force order / dormant the same".
+        "list\n"
+        "short\n"
+        "P\n"
     )
     return macro
 
@@ -89,6 +114,9 @@ def run_native_equilibrium(
     pressure_Pa,
     timeout=12,
     max_bytes=500_000,
+    suspended_phases=None,
+    dormant_phases=None,
+    fixed_phases=None,
 ):
     """Run native ./OC with a bounded-time, bounded-size read and return raw text.
 
@@ -100,7 +128,11 @@ def run_native_equilibrium(
     if not os.path.isfile(OC_BINARY):
         raise NativeEquilibriumError(f"Native OC binary not found: {OC_BINARY}")
 
-    macro_text = generate_macro(db_path, elements_composition, temperature_K, pressure_Pa)
+    macro_text = generate_macro(
+        db_path, elements_composition, temperature_K, pressure_Pa,
+        suspended_phases=suspended_phases, dormant_phases=dormant_phases,
+        fixed_phases=fixed_phases,
+    )
     db_dir = os.path.dirname(db_path) or "."
 
     env = os.environ.copy()
@@ -302,6 +334,49 @@ def parse_native_output(raw_text):
     if not phase_molar_amounts:
         raise NativeEquilibriumError("Native OC output had no parseable stable phases.")
 
+    # The sorted listing that "list short P" appends: every phase in the
+    # database, ranked by how close it is to being stable, with its driving
+    # force. Until this was added the question "would this phase form?" had
+    # no answer -- the equilibrium listing shows only what IS stable, so a
+    # phase that missed by a hair and one that could never form looked
+    # identical, which is to say invisible.
+    #
+    #   List of stable and entered phases
+    #     No tup Name              Mol.comp. Comp/FU   dGm/RT
+    #      2   2 BCC_A2#1          9.68E-01     1.00  0.00E+00
+    #      5   5 CHI_A12           0.00E+00    58.00 -1.82E-03
+    #     20  20 SIGMA             0.00E+00    30.00 -2.46E-03
+    #   List of dormant phases
+    #     16  16 M23C6             0.00E+00    29.00  2.24E-03
+    #
+    # Sign convention, from the engine's own warning text ("unstable phase
+    # with positive driving force"): zero for a stable phase, negative for
+    # one that cannot form under these conditions, positive for one that
+    # wants to and is only being held out -- which is what a dormant phase
+    # is for.
+    driving_forces = {}
+    dormant_listed = []
+    ranked_re = re.compile(
+        rf"^\s*\d+\s+\d+\s+(\S+)\s+({_FLOAT})\s+({_FLOAT})\s+({_FLOAT})\s*$"
+    )
+    in_dormant = False
+    for line in raw_text.splitlines():
+        # Only a new section heading changes which list we are in. The
+        # column header that follows it ("No tup Name ... dGm/RT") is
+        # shared by both sections and must not reset the flag -- it did in
+        # the first version, which is why the dormant list came back empty
+        # while the driving forces themselves parsed fine.
+        if "List of" in line:
+            in_dormant = "dormant" in line.lower()
+            continue
+        if "No tup Name" in line:
+            continue
+        found = ranked_re.match(line)
+        if found:
+            driving_forces[found.group(1)] = float(found.group(4))
+            if in_dormant:
+                dormant_listed.append(found.group(1))
+
     # Existing keys keep their names and meanings -- everything downstream
     # (result_check, the benchmark, the client models) reads them, and a
     # rename would be a silent breakage of exactly the kind this project
@@ -317,6 +392,8 @@ def parse_native_output(raw_text):
     for key, value in (
         ("reported_conditions", reported_conditions or None),
         ("degrees_of_freedom", degrees_of_freedom),
+        ("driving_force_RT", driving_forces or None),
+        ("dormant_phases_listed", dormant_listed or None),
         ("enthalpy_J", enthalpy_J),
         ("entropy_J_per_K", entropy_J_per_K),
         # Native prints entropy directly, so G = H - T*S is an independent
@@ -340,8 +417,12 @@ def parse_native_output(raw_text):
     return result
 
 
-def run_and_parse(db_path, elements_composition, temperature_K, pressure_Pa, timeout=12):
+def run_and_parse(db_path, elements_composition, temperature_K, pressure_Pa,
+                  timeout=12, suspended_phases=None, dormant_phases=None,
+                  fixed_phases=None):
     raw_text = run_native_equilibrium(
-        db_path, elements_composition, temperature_K, pressure_Pa, timeout=timeout
+        db_path, elements_composition, temperature_K, pressure_Pa,
+        timeout=timeout, suspended_phases=suspended_phases,
+        dormant_phases=dormant_phases, fixed_phases=fixed_phases,
     )
     return parse_native_output(raw_text)

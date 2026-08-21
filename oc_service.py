@@ -95,6 +95,8 @@ def calculate_equilibrium(
     temperature_K,
     pressure_Pa=1e5,
     suspended_phases=None,
+    dormant_phases=None,
+    fixed_phases=None,
 ):
     """Calculate a single-point equilibrium.
 
@@ -129,6 +131,38 @@ def calculate_equilibrium(
             "minimizer. Add a second element with a small nonzero amount, or "
             "use a database that only declares that one element."
         )
+
+    # A dormant phase is a question OCASI cannot answer. pyOC reports only
+    # phases whose amount is above zero (getPhasesAtEquilibrium filters on
+    # exactly that), and a dormant phase has none -- so the very quantity
+    # the request is asking for, its driving force, is the one thing that
+    # tier drops. The native engine prints it. Routing on capability rather
+    # than on convergence is a departure from how the tiers are otherwise
+    # chosen, and it is deliberate: sending this request to a tier that
+    # structurally cannot answer it would return a result that looks fine
+    # and is silent about the thing that was asked.
+    if dormant_phases or fixed_phases:
+        native_result = native_fallback.run_and_parse(
+            db_path, composition, temperature_K, pressure_Pa,
+            suspended_phases=suspended_phases, dormant_phases=dormant_phases,
+            fixed_phases=fixed_phases,
+        )
+        native_result.update({
+            "database": os.path.basename(db_path),
+            "temperature_K": temperature_K,
+            "pressure_Pa": pressure_Pa,
+            "composition": composition,
+            "suspended_phases": list(suspended_phases or []),
+            "dormant_phases": list(dormant_phases or []),
+            "fixed_phases": dict(fixed_phases or {}),
+            "backend_used": "native_oc",
+            "backend_reason": (
+                "dormant or fixed phase status was requested; OCASI reports "
+                "only phases with a nonzero amount and cannot return their "
+                "driving force"
+            ),
+        })
+        return native_result
 
     try:
         result = _calculate_equilibrium_ocasi(

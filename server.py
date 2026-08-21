@@ -323,6 +323,8 @@ def _calc_one(
     temperature_K: float,
     pressure_Pa: float = 1e5,
     suspended_phases: Optional[list] = None,
+    dormant_phases: Optional[list] = None,
+    fixed_phases: Optional[dict] = None,
 ) -> dict:
     """Run one single-point equilibrium in an isolated subprocess."""
     payload = {
@@ -331,6 +333,8 @@ def _calc_one(
         "temperature_K": temperature_K,
         "pressure_Pa": pressure_Pa,
         "suspended_phases": suspended_phases,
+        "dormant_phases": dormant_phases,
+        "fixed_phases": fixed_phases,
     }
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = os.path.join(tmpdir, "result.json")
@@ -399,6 +403,8 @@ def calculate_equilibrium(
     temperature_K: float,
     pressure_Pa: float = 1e5,
     suspended_phases: Optional[list[str]] = None,
+    dormant_phases: Optional[list[str]] = None,
+    fixed_phases: Optional[dict[str, float]] = None,
 ) -> dict:
     """Calculate a single-point thermodynamic equilibrium with OpenCalphad.
 
@@ -430,6 +436,23 @@ def calculate_equilibrium(
             Must be phases the database actually declares; use
             inspect_database to see them. A name the database does not
             declare is rejected rather than silently ignored.
+        dormant_phases: phase names to hold out of the equilibrium while
+            still asking what they would do. Use this to answer "would this
+            phase form?" — a dormant phase comes back with a driving force
+            in driving_force_RT: positive means it wants to form and is
+            only being held out, negative means it could not form here.
+            Suspending removes a phase and says nothing about it; this
+            removes it and reports.
+        fixed_phases: phase name -> amount, to hold a phase at a set amount
+            instead of letting the calculation decide it.
+
+    DRIVING FORCES
+    Every result carries driving_force_RT: for each phase the database
+    declares, how far it is from being stable, in units of RT. Zero means
+    stable. Negative means it cannot form under these conditions -- the
+    more negative, the further away. Positive means it wants to form and
+    something is holding it out. This answers "which phases are close to
+    appearing?" without having to guess and re-run.
 
     VERIFICATION
     Every result carries a "verification" field recording the deterministic
@@ -441,14 +464,22 @@ def calculate_equilibrium(
     look alike to them. If "passed" is false, say what "problems" lists
     rather than presenting the numbers as if nothing had been found.
     """
+    # Every phase name the request mentions goes through the same check,
+    # whatever status it asks for. A dormant or fixed name the database
+    # does not declare is exactly as wrong as a suspended one, and the
+    # rejection is what lets the caller repair it.
+    named_phases = list(suspended_phases or []) + list(dormant_phases or []) \
+        + list(fixed_phases or {})
     problems = preflight.check_equilibrium_request(
-        database, elements_composition, temperature_K, pressure_Pa, suspended_phases
+        database, elements_composition, temperature_K, pressure_Pa,
+        named_phases or None,
     )
     if problems:
         return _preflight_failure(problems)
 
     result = _calc_one(
-        database, elements_composition, temperature_K, pressure_Pa, suspended_phases
+        database, elements_composition, temperature_K, pressure_Pa,
+        suspended_phases, dormant_phases, fixed_phases,
     )
     distribution = _element_distribution(result, elements_composition)
     if distribution is not None:
@@ -462,6 +493,8 @@ def calculate_equilibrium(
         "temperature_K": temperature_K,
         "pressure_Pa": pressure_Pa,
         "suspended_phases": suspended_phases,
+        "dormant_phases": dormant_phases,
+        "fixed_phases": fixed_phases,
     })
 
 
