@@ -22,6 +22,7 @@ GRUPLAR = [
     ("E", "Yarı kararlı hesap (faz kapatma)", "E_YARI_KARARLI"),
     ("F", "İki bileşimin karşılaştırılması", "F_KARSILASTIRMA"),
     ("G", "Çelik dışı sistemler (oksit, tuz, gaz)", "G_CELIK_DISI"),
+    ("H", "Bileşim ekseni (izotermal kesit)", "H_BILESIM_EKSENI"),
     ("R", "Doğru red — reddedilmesi gereken istekler", "DOGRU_RED"),
     ("S", "Doğru rapor — anlatının doğruluğu", "DOGRU_RAPOR"),
 ]
@@ -66,6 +67,23 @@ def beklenen_metni(case):
                         + ", ".join(f"`{p}`" for p in e["phases"]))
     if e.get("phase_count") is not None:
         satirlar.append(f"Toplam **{e['phase_count']} faz** olmalı.")
+    # Bileşim ekseni ölçütleri. Bir taramada asıl bilgi hangi fazların
+    # göründüğü değil, hangi SIRAYLA göründüğü — o yüzden bu satırlar
+    # soru listesinde de görünmeli, yoksa vakanın ne ölçtüğü kaybolur.
+    for once, sonra in e.get("phase_order", []):
+        satirlar.append(
+            f"Eksen boyunca `{once}` **`{sonra}`'den önce** görünmeli."
+        )
+    if e.get("phases_at_start"):
+        satirlar.append("Eksenin başında: "
+                        + ", ".join(f"`{p}`" for p in e["phases_at_start"]))
+    if e.get("phases_at_end"):
+        satirlar.append("Eksenin sonunda: "
+                        + ", ".join(f"`{p}`" for p in e["phases_at_end"]))
+    if case.get("tool") == "calculate_isothermal_section":
+        satirlar.append(
+            "İstenen eksen aralığının **iki ucu da** sonuçta olmalı."
+        )
     if e.get("max_failed_fraction") is not None:
         satirlar.append(
             f"Çözülemeyen nokta oranı %{e['max_failed_fraction'] * 100:.0f}'i "

@@ -612,21 +612,31 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
                 continue
             fallback_points.append((T, mass_fractions))
 
-    # STEP follows a line; it does not re-minimise globally at each step.
-    # Where that line stops being the global minimum, STEP keeps following
-    # it and reports a metastable equilibrium with nothing to say anything
-    # is wrong. Measured on steel1 Fe-Cr-C at 1100 K, scanning x(Cr) from
-    # 0.01 to 0.30: STEP's ordinary steps matched fresh single-point
-    # equilibria to five decimals, but the point it carries to the axis
-    # limit when terminating a line reported FCC_A1+M7C3 where the stable
-    # answer is BCC_A2+M23C6.
+    # The two ends of the range the CALLER asked for, read from the
+    # single-point engine. This settles two separate things with one call
+    # each, which is why they are handled together.
     #
-    # An endpoint is where a continuation has travelled furthest from the
-    # solution it started at, and there are only two of them -- cheap to
-    # read a second time from the engine that does re-minimise globally.
-    # Disagreements are resolved in favour of the global minimisation.
+    # Coverage: gap-fill only ever places points strictly inside a gap, so
+    # a limit STEP's line never reached is simply missing from the answer.
+    # Measured: a scan of x(C) requested from 0.001 to 0.05 came back
+    # ending at 0.0455, and one of x(Mo) requested to 0.15 ended at 0.1364.
+    # A range someone asked for should have both its ends in the result.
+    #
+    # Correctness: where STEP DID reach a limit, it got there by
+    # continuation -- it does not re-minimise globally at each step, so
+    # where its line stops being the global minimum it keeps following it
+    # and reports a metastable equilibrium with nothing to say anything is
+    # wrong. Measured on steel1 Fe-Cr-C at 1100 K, scanning x(Cr) from 0.01
+    # to 0.30: STEP's ordinary steps matched fresh single-point equilibria
+    # to five decimals, but the point it carried to the axis limit reported
+    # FCC_A1+M7C3 where the stable answer is BCC_A2+M23C6. An endpoint is
+    # where a continuation has travelled furthest from the solution it
+    # started at, so it is both the most suspect point and the cheapest to
+    # check. Disagreements are resolved in favour of the global
+    # minimisation.
+    axis_tolerance = max(abs(nominal_spacing) * 1e-3, 1e-12)
     endpoint_readings = {}
-    for position in {step_points[0][0], step_points[-1][0]}:
+    for position in (span_lo, span_hi):
         try:
             point_composition, point_temperature = single_point_args(position)
             result = native_fallback.run_and_parse(
@@ -656,11 +666,24 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
             for name, value in fractions.items()
         }
 
+    # An endpoint reading either corrects a STEP point standing at that
+    # limit, or supplies a limit STEP never reached at all.
     endpoint_replacements = {}
+    endpoint_additions = {}
     for position, fresh in endpoint_readings.items():
-        step_fractions = next(f for T, f in step_points if T == position)
-        if not _fractions_agree(_canonicalize(step_fractions), _canonicalize(fresh)):
-            endpoint_replacements[position] = fresh
+        covering = [
+            (T, f) for T, f in step_points
+            if abs(T - position) <= axis_tolerance
+        ]
+        if not covering:
+            already_filled = any(
+                abs(T - position) <= axis_tolerance for T, _ in fallback_points
+            )
+            if not already_filled:
+                endpoint_additions[position] = fresh
+        elif not _fractions_agree(_canonicalize(covering[0][1]),
+                                  _canonicalize(fresh)):
+            endpoint_replacements[covering[0][0]] = fresh
 
     # Both sources go through the same canonicalization -- the fallback
     # side needs it too, since it's the one that spells the default
@@ -676,6 +699,10 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
     gap_filled_temperatures = []
     for T, fractions in fallback_points:
         combined.append((T, _canonicalize(fractions), "native_fallback"))
+        gap_filled_temperatures.append(T)
+    for T, fractions in endpoint_additions.items():
+        combined.append((T, _canonicalize(fractions),
+                         "native_fallback (axis limit)"))
         gap_filled_temperatures.append(T)
 
     combined.sort(key=lambda p: p[0])

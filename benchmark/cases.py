@@ -22,11 +22,17 @@ tek elementli bilesimi hesaplayamiyor).
 
 KATEGORILER
 
-  1 DOGRU_HESAP  (45)  dogru sayiyi uretiyor mu?      motor + Katman A
-  2 DOGRU_RED    (25)  yapmamasi gerekeni reddediyor  PREFLIGHT
+  1 DOGRU_HESAP  (49)  dogru sayiyi uretiyor mu?      motor + Katman A
+  2 DOGRU_RED    (29)  yapmamasi gerekeni reddediyor  PREFLIGHT
                        mu?
-  3 DOGRU_RAPOR  (30)  gercekte ne oldugunu soyluyor  Katman A/B + anlati
-                       mu?
+  3 DOGRU_RAPOR  ( 0)  gercekte ne oldugunu soyluyor  Katman A/B + anlati
+                       mu?                            -- HENUZ YAZILMADI
+
+Uc numaranin bos olmasi bir eksiklik ve oyle duruyor: 30 soruluk anlati
+olcumu (dogal dil cevirisi, dolayli istek, eksik bilgi, yanlis oncul,
+durust raporlama, ezber tuzagi, kapsam disi istek) elle sorulmasi
+gerektigi icin bu dosyada degil. Sayiyi 30 yazip bos birakmak, olculmemis
+bir seyi olculmus gostermek olurdu.
 
 Uculu ayni zamanda "neyi nasil kosacagiz" ayrimini da veriyor: 1 ve 2
 modelsiz kosulabilir, 3 kosulamaz -- anlatiyi olctugu icin bir modele
@@ -561,6 +567,108 @@ DOGRU_RED = [
             "rejected": True,
             "stage": "PREFLIGHT",
             "reason_contains": ["sum to"],
+        },
+    },
+
+    # --- bilesim ekseni redleri --------------------------------------
+    # Izotermal kesitin kendi kurallari. Ucu de motora hic gitmeden
+    # yakalanabilir cinsten: taranan element bilesimde yoksa hicbir sey
+    # taranmaz, iki elementli sistemde makronun dengeleyecek elementi
+    # kalmaz, ve eksenin ucu bagimli elemente yer birakmiyorsa denklem
+    # cozulemez. Ucu de "motor kesfetsin" yerine burada durdurulmali.
+
+    {
+        "id": "red_kesit_element_bilesimde_yok",
+        "zorluk": "kolay",
+        "kural": "eksen",
+        "olcum": "Taranan element alasimda yok. Motor bunu sessizce hicbir "
+                 "sey taramayarak gecistirebilirdi -- eksen kosulu yazilir, "
+                 "hicbir seye baglanmaz, sonuc sabit bir alasimin ayni "
+                 "cevabi olurdu.",
+        "soru": "steel1.TDB'de 1100 K'de Fe-%20Cr-%1C alasiminda nikeli "
+                "%0'dan %30'a cikarirsam ne olur",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "axis_element": "NI", "axis_min": 0.0, "axis_max": 0.30,
+            "temperature_K": 1100,
+        },
+        "expected": {
+            "rejected": True,
+            "stage": "PREFLIGHT",
+            "reason_contains": ["axis_element", "not in the composition"],
+        },
+    },
+    {
+        "id": "red_kesit_iki_element",
+        "zorluk": "orta",
+        "kural": "eksen",
+        "olcum": "Iki elementli sistemde bir elementi taramak, geriye "
+                 "makronun bagimli birakacagi tek elementi birakir -- yani "
+                 "sistem asiri kisitlanir. Kulaga tamamen makul gelen bir "
+                 "istek ('Fe-C'de karbonu tara') sistemin yapisi geregi "
+                 "yapilamiyor; reddin gerekcesi bunu soylemeli.",
+        "soru": "steel1.TDB'de 1100 K'de Fe-C alasiminda karbonu %0'dan "
+                "%5'e cikarirsam ne olur",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.99, "C": 0.01},
+            "axis_element": "C", "axis_min": 0.0, "axis_max": 0.05,
+            "temperature_K": 1100,
+        },
+        "expected": {
+            "rejected": True,
+            "stage": "PREFLIGHT",
+            "reason_contains": ["at least three elements"],
+        },
+    },
+    {
+        "id": "red_kesit_ters_eksen",
+        "zorluk": "kolay",
+        "kural": "eksen",
+        "olcum": "axis_min >= axis_max. R10'un (ters sicaklik araligi) "
+                 "bilesim eksenindeki karsiligi -- ayni hata sinifinin yeni "
+                 "eksende de yakalandigini sinar.",
+        "soru": "steel1.TDB'de 1100 K'de kromu %30'dan %1'e dusurursem",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "axis_element": "CR", "axis_min": 0.30, "axis_max": 0.01,
+            "temperature_K": 1100,
+        },
+        "expected": {
+            "rejected": True,
+            "stage": "PREFLIGHT",
+            "reason_contains": ["axis_min", "less than"],
+        },
+    },
+    {
+        "id": "red_kesit_bagimli_elemente_yer_yok",
+        "zorluk": "zor",
+        "kural": "eksen",
+        "olcum": "Eksenin ucu tek basina gecerli (%85 < 1) ve degerlerin "
+                 "hicbiri araligin disinda degil -- ama sabit kalan diger "
+                 "elementler zaten %20'yi tutuyor, yani ucta bagimli "
+                 "elemente eksi miktar dusuyor. Hicbir alanin tek basina "
+                 "hatali olmadigi, sadece BIRLIKTE imkansiz oldugu bir "
+                 "istek: her alani ayri ayri denetleyen bir kontrol bunu "
+                 "kacirir.",
+        "soru": "steel1.TDB'de 1100 K'de Fe-%30Cr-%20C alasiminda kromu "
+                "%85'e kadar cikar",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.5, "CR": 0.3, "C": 0.2},
+            "axis_element": "CR", "axis_min": 0.3, "axis_max": 0.85,
+            "temperature_K": 1100,
+        },
+        "expected": {
+            "rejected": True,
+            "stage": "PREFLIGHT",
+            "reason_contains": ["dependent element"],
         },
     },
 ]
@@ -1530,8 +1638,122 @@ G_CELIK_DISI = [
     },
 ]
 
+H_BILESIM_EKSENI = [
+    # Izotermal kesit: sicaklik sabit, bir elementin orani taraniyor.
+    # C grubundan farki, sorunun kendisi: "bu alasim isinirken ne oluyor"
+    # degil, "bu sicaklikta bu elementten daha fazla eklersem ne cikiyor".
+    #
+    # Olcut faz listesi DEGIL, faz SIRASI. Bir taramada "M7C3 de var M23C6
+    # de var" demek hicbir sey soylemiyor; bilgi hangisinin once ciktiginda.
+    # Sira, sistemin kendi ciktisindan degil kimyadan geliyor: M7C3'un
+    # karbonu 3/10 = 0.30, M23C6'nin 6/29 = 0.207. Karbon arttikca daha
+    # karbon-zengini karbur kararli hale gelir, tersi degil.
+
+    {
+        "id": "H1_krom_taramasi_1100K",
+        "zorluk": "orta",
+        "olcum": "Krom artarken uc sey birden olmali: karbur M7C3'ten "
+                 "M23C6'ya donmeli, matris ostenitten ferrite gecmeli, ve "
+                 "eksenin sonu gercekten hesaplanmali. Son nokta ayrica "
+                 "STEP'in surekliligini sinar -- STEP orada yari kararli "
+                 "FCC+M7C3 veriyordu, kararli cevap BCC+M23C6.",
+        "soru": "steel1.TDB'de 1100 K'de Fe-%20Cr-%1C alasiminda kromu "
+                "%1'den %30'a cikarirsam hangi fazlar cikar",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "axis_element": "CR", "axis_min": 0.01, "axis_max": 0.30,
+            "temperature_K": 1100, "n_points": 12,
+        },
+        "expected": {
+            "phases": ["FCC_A1", "M7C3", "M23C6", "BCC_A2"],
+            "phase_order": [("M7C3", "M23C6"), ("FCC_A1", "BCC_A2")],
+            "phases_at_start": ["FCC_A1"],
+            "phases_at_end": ["BCC_A2", "M23C6"],
+            "max_failed_fraction": 0.10,
+        },
+    },
+    {
+        "id": "H2_karbon_taramasi",
+        "zorluk": "orta",
+        "olcum": "Ayni sistemde bu sefer karbon taraniyor. Dusuk karbonda "
+                 "ferrit+ostenit birlikte; karbon arttikca ostenit "
+                 "kararlanip karbur buyuyor ve M23C6'dan M7C3'e -- yani "
+                 "H1'in TERSI sirada -- gecmeli. Iki vaka birlikte, sıranın "
+                 "ezberlenmis bir cevap olmadigini gosteriyor.",
+        "soru": "steel1.TDB'de 1100 K'de Fe-%10Cr alasiminda karbonu "
+                "%0.1'den %5'e cikarirsam ne olur",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.89, "CR": 0.10, "C": 0.01},
+            "axis_element": "C", "axis_min": 0.001, "axis_max": 0.05,
+            "temperature_K": 1100, "n_points": 12,
+        },
+        "expected": {
+            "phases": ["BCC_A2", "FCC_A1", "M23C6", "M7C3"],
+            "phase_order": [("M23C6", "M7C3")],
+            "phases_at_start": ["BCC_A2", "FCC_A1"],
+            "phases_at_end": ["FCC_A1", "M7C3"],
+            "max_failed_fraction": 0.10,
+        },
+    },
+    {
+        "id": "H3_krom_taramasi_1400K",
+        "zorluk": "orta",
+        "olcum": "H1 ile ayni tarama, 300 K daha sicak. Ostenit cok daha "
+                 "gec birakiyor (1100 K'de ~%11'de, 1400 K'de ~%14'te) ve "
+                 "arada genis bir iki-fazli bolge var. Ayni sorunun "
+                 "sicakliga duyarli oldugunu sinar -- tek bir taramaya "
+                 "bakip 'krom ferrit yapar' demek yeterli degil.",
+        "soru": "steel1.TDB'de 1400 K'de Fe-%20Cr-%1C alasiminda kromu "
+                "%1'den %30'a cikarirsam hangi fazlar cikar",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "axis_element": "CR", "axis_min": 0.01, "axis_max": 0.30,
+            "temperature_K": 1400, "n_points": 12,
+        },
+        "expected": {
+            "phases": ["FCC_A1", "BCC_A2", "M23C6"],
+            "phase_order": [("FCC_A1", "BCC_A2")],
+            "phases_at_start": ["FCC_A1"],
+            "phases_at_end": ["BCC_A2", "M23C6"],
+            "max_failed_fraction": 0.10,
+        },
+    },
+    {
+        "id": "H4_molibden_taramasi",
+        "zorluk": "zor",
+        "olcum": "Tek taramada dort ayri rejim: M7C3, M23C6, M6C ve Laves "
+                 "fazi. Molibden kendi karburunu (M6C) yapar ve yeterince "
+                 "artinca Fe2Mo Laves fazi cikar. Dort elementli sistem, "
+                 "uc farkli karbur -- bu sunucunun en kalabalik kesiti.",
+        "soru": "steel1.TDB'de 1100 K'de Fe-%10Cr-%3C alasimina molibden "
+                "eklersem, %15'e kadar, hangi fazlar cikar",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.85, "CR": 0.10, "MO": 0.02,
+                                     "C": 0.03},
+            "axis_element": "MO", "axis_min": 0.0, "axis_max": 0.15,
+            "temperature_K": 1100, "n_points": 12,
+        },
+        "expected": {
+            "phases": ["M7C3", "M23C6", "M6C", "LAVES_PHASE", "BCC_A2"],
+            "phase_order": [("M23C6", "M6C"), ("M6C", "LAVES_PHASE")],
+            "phases_at_start": ["FCC_A1", "M7C3"],
+            "phases_at_end": ["BCC_A2", "M6C", "LAVES_PHASE"],
+            "max_failed_fraction": 0.10,
+        },
+    },
+]
+
 DOGRU_HESAP = (A_TEK_FAZ + B_COK_FAZ + C_FAZ_GECISI + D_BILESIM_KUMESI
-               + E_YARI_KARARLI + F_KARSILASTIRMA + G_CELIK_DISI)
+               + E_YARI_KARARLI + F_KARSILASTIRMA + G_CELIK_DISI
+               + H_BILESIM_EKSENI)
 DOGRU_RAPOR = []
 
 CASES = DOGRU_HESAP + DOGRU_RED + DOGRU_RAPOR

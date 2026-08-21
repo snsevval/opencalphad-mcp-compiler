@@ -187,6 +187,59 @@ def judge_result(case, payload):
         if expected.get("phases"):
             checks.append("beklenen fazlar var")
 
+        # --- eksen boyunca SIRA -------------------------------------
+        # Bir taramada asil bilgi hangi fazlarin gorundugu degil, HANGI
+        # SIRAYLA gorundugu. "Krom artarken karbur M7C3'ten M23C6'ya
+        # doner" cumlesi ancak bu sekilde sinanir; sadece "ikisi de var"
+        # demek sirayi ters cevirmis bir sonucu da gecirirdi.
+        def _ilk_gorundugu(name):
+            for p in solved:
+                if name in (p.get("phase_molar_amounts") or {}):
+                    return p.get("x", p.get("temperature_K"))
+            return None
+
+        for once, sonra in expected.get("phase_order", []):
+            x_once, x_sonra = _ilk_gorundugu(once), _ilk_gorundugu(sonra)
+            if x_once is None:
+                return False, f"'{once}' fazi hic gorunmedi"
+            if x_sonra is None:
+                return False, f"'{sonra}' fazi hic gorunmedi"
+            if not x_once < x_sonra:
+                return False, (f"'{once}' {x_once:.4g}'te, '{sonra}' "
+                               f"{x_sonra:.4g}'te -- sira ters")
+        if expected.get("phase_order"):
+            checks.append("faz sirasi dogru")
+
+        # Eksen uclarinda ne olmasi gerektigi. Ucun kendisi hesaplanmadan
+        # gecerse bu olcut kalir -- istenen araligin sonu sonucta yoksa
+        # soru tam cevaplanmamistir.
+        for anahtar, indeks, etiket in (("phases_at_start", 0, "baslangic"),
+                                        ("phases_at_end", -1, "bitis")):
+            beklenen = expected.get(anahtar)
+            if not beklenen:
+                continue
+            uc = solved[indeks]
+            var = uc.get("phase_molar_amounts") or {}
+            eksik = [n for n in beklenen if n not in var]
+            if eksik:
+                return False, (f"{etiket} noktasinda (x={uc.get('x', uc.get('temperature_K')):.4g}) "
+                               f"beklenen faz(lar) yok: {eksik} (gelen: {sorted(var)})")
+            checks.append(f"{etiket} fazlari dogru")
+
+        # Istenen araligin iki ucu da sonucta olmali. Gap-fill bosluklarin
+        # yalnizca ICINE nokta koydugu icin, STEP'in cizgisi eksen sonuna
+        # ulasamadiginda istenen uc sessizce dusuyordu -- olculdu: 0.05
+        # istenen tarama 0.0455'te bitiyordu.
+        for anahtar, alan in (("axis_min", "axis_min"), ("axis_max", "axis_max")):
+            sinir = payload.get(alan)
+            if sinir is None:
+                continue
+            aralik = abs((payload.get("axis_max") or 0) - (payload.get("axis_min") or 0))
+            if not any(abs(p.get("x", 1e30) - sinir) <= aralik * 1e-3 for p in solved):
+                return False, f"istenen eksen sinirinda ({alan}={sinir:g}) nokta yok"
+        if payload.get("axis_min") is not None:
+            checks.append("eksen uclari kapsandi")
+
     # --- tek nokta vakalari ------------------------------------------
     else:
         if not amounts:
@@ -318,15 +371,30 @@ async def run_all(selected, semantic_check=True):
 def main(argv):
     # Bayraklar secici degil: "run.py --hizli" butun vakalari kosmali.
     secim = [a for a in argv[1:] if not a.startswith("--")]
-    wanted = secim[0] if secim else None
-    if wanted in (None, "hepsi"):
+    if not secim or secim == ["hepsi"]:
         selected = case_registry.CASES
-    elif hasattr(case_registry, wanted):
-        selected = getattr(case_registry, wanted)
     else:
-        selected = [c for c in case_registry.CASES if c["id"] == wanted]
+        # Birden fazla ad verilebilir: kategori adi, grup adi ya da vaka
+        # id'si karisik olarak. Vaka yazarken tam olarak yeni eklenenleri
+        # kosmak icin gerekiyor -- tek tek kosmak her seferinde sunucuyu
+        # yeniden ayaga kaldiriyordu.
+        selected = []
+        bulunmayan = []
+        for wanted in secim:
+            if hasattr(case_registry, wanted):
+                parca = getattr(case_registry, wanted)
+            else:
+                parca = [c for c in case_registry.CASES if c["id"] == wanted]
+            if not parca:
+                bulunmayan.append(wanted)
+            for case in parca:
+                if case not in selected:
+                    selected.append(case)
+        if bulunmayan:
+            print(f"vaka bulunamadi: {', '.join(bulunmayan)}")
+            return 2
     if not selected:
-        print(f"vaka bulunamadi: {wanted}")
+        print("secilen vaka yok")
         return 2
 
     results = asyncio.run(run_all(selected, semantic_check="--hizli" not in argv))
