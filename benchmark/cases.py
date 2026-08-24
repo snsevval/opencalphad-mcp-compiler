@@ -1897,9 +1897,103 @@ I_KATILASMA = [
     },
 ]
 
+J_FAZ_DIYAGRAMI = [
+    # Iki eksenli gercek faz diyagrami. Digerleri bir ekseni sabitler; bu
+    # hicbirini sabitlemez, fazlarin bulustugu SINIRLARI izler.
+    #
+    # Olcut degismez sicakliklar. Bunlar diyagramin en belirgin ozellikleri
+    # ve -- onemlisi -- bu projede BAGIMSIZ olarak olculduler. Fe-C
+    # otektoidi, tek nokta denge hesaplarini ikiye bolerek 1010-1012 K
+    # arasinda bulunmustu (1010 K'de ferrit+grafit, 1012 K'de ostenit).
+    # MAP 1011.173 diyor. Iki yontem, ayni sayi.
+
+    {
+        "id": "J1_agcu_faz_diyagrami",
+        "zorluk": "orta",
+        "olcum": "Ag-Cu, klasik otektik diyagram. Tek bir degismez tepkime "
+                 "olmali ~1056 K'de. Bagimsiz kontrol: tek nokta "
+                 "hesaplarinda 1055 K'de sistem tamamen kati, 1060 K'de "
+                 "%99 sivi -- otektik ikisinin arasinda. Ayrica karismazlik "
+                 "boslugunun iki yarisi (FCC_A1 ve FCC_A1_AUTO#2) ayri "
+                 "gorunmeli.\n\n"
+                 "Tohum sicakligi ozellikle veriliyor ve olcumun bir "
+                 "parcasi: MAP tohumdan disari dogru izler. 1000 K iki "
+                 "kati fazin bolgesinde, oradan baslayinca karismazlik "
+                 "boslugu da bulunuyor. Varsayilan orta nokta (1150 K) tek "
+                 "fazli sivida kaliyor ve diyagram daha az sinir iceriyor "
+                 "-- ayni sistem, ayni arac, farkli baslangic, farkli "
+                 "kapsam. Kaydediliyor cunku kullanicinin bilmesi gereken "
+                 "bir davranis.",
+        "soru": "agcu.TDB icin Ag-Cu faz diyagramini ciz",
+        "tool": "calculate_phase_diagram",
+        "arguments": {
+            "database": "agcu.TDB",
+            "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "axis_element": "CU", "axis_min": 0, "axis_max": 1,
+            "temperature_min_K": 800, "temperature_max_K": 1500,
+            "seed_temperature_K": 1000,
+        },
+        "expected": {
+            "phases": ["LIQUID", "FCC_A1", "FCC_A1_AUTO#2"],
+            "invariant_temperatures_K": [1056.1],
+            "invariant_tolerance_K": 2.0,
+            "min_boundaries": 4,
+        },
+    },
+    {
+        "id": "J2_steel1_fe_c_diyagrami",
+        "zorluk": "zor",
+        "olcum": "Fe-C, kararli (grafit) sistem. UC degismez tepkime birden: "
+                 "peritektik ~1768 K, otektik ~1427 K, otektoid ~1011 K. "
+                 "Ucu de ders kitabi degeri, ve otektoid bu projede ayri "
+                 "bir yontemle dogrulanmis durumda. Bir diyagramin ucunu "
+                 "birden dogru bulmasi, tek bir sayiyi tutturmasindan cok "
+                 "daha zor.",
+        "soru": "steel1.TDB icin Fe-C faz diyagramini %0-25 karbon, "
+                "500-2000 K araliginda ciz",
+        "tool": "calculate_phase_diagram",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.98, "C": 0.02},
+            "axis_element": "C", "axis_min": 0, "axis_max": 0.25,
+            "temperature_min_K": 500, "temperature_max_K": 2000,
+        },
+        "expected": {
+            "phases": ["LIQUID", "BCC_A2", "FCC_A1", "GRAPHITE"],
+            "invariant_temperatures_K": [1011.2, 1426.6, 1767.8],
+            "invariant_tolerance_K": 2.0,
+            "min_boundaries": 8,
+        },
+    },
+    {
+        "id": "J3_alni_diyagram_izlenemiyor",
+        "zorluk": "zor",
+        "olcum": "MAP bu motorun en kirilgan hesabi ve kendisi bunu her "
+                 "kosumdan once yaziyor. Al-Ni'de, tek denge olarak temiz "
+                 "cozulen bir tohumdan hicbir sinir izleyemiyor. Dogru "
+                 "davranis basarmak degil, basaramadigini SOYLEMEK -- ve "
+                 "yerine ne yapilabilecegini onermek, cunku MAP'in yedek "
+                 "kademesi yok: bu motorda sinir izleyen baska bir sey "
+                 "bulunmuyor.",
+        "soru": "alni-4slx.TDB icin Al-Ni faz diyagramini ciz",
+        "tool": "calculate_phase_diagram",
+        "arguments": {
+            "database": "alni-4slx.TDB",
+            "elements_composition": {"AL": 0.5, "NI": 0.5},
+            "axis_element": "NI", "axis_min": 0, "axis_max": 1,
+            "temperature_min_K": 600, "temperature_max_K": 2200,
+        },
+        "expected": {
+            "rejected": True,
+            "stage": "EXECUTION",
+            "reason_contains": ["could not be traced", "isothermal section"],
+        },
+    },
+]
+
 DOGRU_HESAP = (A_TEK_FAZ + B_COK_FAZ + C_FAZ_GECISI + D_BILESIM_KUMESI
                + E_YARI_KARARLI + F_KARSILASTIRMA + G_CELIK_DISI
-               + H_BILESIM_EKSENI + I_KATILASMA)
+               + H_BILESIM_EKSENI + I_KATILASMA + J_FAZ_DIYAGRAMI)
 DOGRU_RAPOR = []
 
 CASES = DOGRU_HESAP + DOGRU_RED + DOGRU_RAPOR

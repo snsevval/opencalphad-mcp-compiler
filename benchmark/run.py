@@ -169,6 +169,48 @@ def judge_result(case, payload):
     amounts = payload.get("phase_molar_amounts") or {}
     points = payload.get("points")
 
+    # --- faz diyagrami (MAP) vakalari --------------------------------
+    # Cikti tablo degil, EGRI KUMESI: her sinir boyunca hangi fazlarin
+    # birlikte var oldugu degisir. O yuzden olcutler de farkli.
+    #
+    # Asil olcut DEGISMEZ SICAKLIKLAR. Bunlar diyagramin en belirgin,
+    # en kolay dogrulanabilir ozellikleri -- ve bu projede BAGIMSIZ
+    # olarak olculduler: Fe-C otektoidi tek denge hesaplarini ikiye
+    # bolerek 1010-1012 K arasinda bulunmustu, MAP 1011.173 diyor.
+    # Yani sistemin kendi ciktisini kendine referans yapmiyoruz.
+    if payload.get("backend_used") == "native_oc_map":
+        sinirlar = payload.get("boundaries") or []
+        if not sinirlar:
+            return False, "hicbir faz siniri izlenemedi"
+        checks.append(f"{len(sinirlar)} sinir, {payload.get('point_count')} nokta")
+
+        for name in expected.get("phases", []):
+            if name not in (payload.get("phases") or []):
+                return False, (f"'{name}' fazi diyagramda yok "
+                               f"(gelen: {payload.get('phases')})")
+        if expected.get("phases"):
+            checks.append("fazlar dogru")
+
+        bulunan = payload.get("invariant_temperatures_K") or []
+        tol = expected.get("invariant_tolerance_K", 2.0)
+        for beklenen in expected.get("invariant_temperatures_K", []):
+            if not any(abs(b - beklenen) <= tol for b in bulunan):
+                return False, (f"{beklenen:g} K civarinda degismez tepkime "
+                               f"bulunamadi (bulunanlar: {bulunan})")
+            checks.append(f"degismez {beklenen:g} K")
+
+        en_az = expected.get("min_boundaries")
+        if en_az is not None and len(sinirlar) < en_az:
+            return False, f"{len(sinirlar)} sinir, en az {en_az} bekleniyordu"
+
+        # Her sinir en az iki fazin bulustugu yerdir; tek fazli bir sinir
+        # tanim geregi olamaz. Ucretsiz bir yapisal denetim.
+        for b in sinirlar:
+            if len(b.get("phases") or []) < 2:
+                return False, f"tek fazli sinir: {b.get('phases')}"
+        checks.append("sinirlar en az iki fazli")
+        return True, " | ".join(checks)
+
     # --- Scheil katilasma vakalari -----------------------------------
     # Denge degil YOL: her nokta kendinden once ayrilan butun katiya
     # bagli. Bu yuzden olcutler de farkli.

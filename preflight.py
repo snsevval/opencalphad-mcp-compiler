@@ -124,6 +124,58 @@ def check_equilibrium_request(
     return problems
 
 
+def check_phase_diagram_request(
+    database, elements_composition, axis_element, axis_min, axis_max,
+    temperature_min_K, temperature_max_K, seed_temperature_K,
+    pressure_Pa=1e5,
+):
+    """PREFLIGHT for calculate_phase_diagram. Returns a list of problem
+    strings; empty list means the request is valid.
+
+    Two axes, so both get the checks a single axis gets, plus one that
+    only makes sense here: the seed has to sit inside the box being
+    mapped. MAP starts from that equilibrium and traces outward, so a seed
+    outside the range is not a diagram of what was asked for.
+    """
+    problems = _check_common(database, elements_composition, pressure_Pa, None)
+
+    symbols = {el.upper() for el in elements_composition}
+    if axis_element.upper() not in symbols:
+        problems.append(
+            f"axis_element '{axis_element}' is not in the composition "
+            f"({sorted(symbols)})."
+        )
+
+    for name, value in (("axis_min", axis_min), ("axis_max", axis_max)):
+        if not (0.0 <= value <= 1.0):
+            problems.append(
+                f"{name} must be a mole fraction in [0, 1], got {value}."
+            )
+    if axis_min >= axis_max:
+        problems.append(
+            f"axis_min ({axis_min}) must be less than axis_max ({axis_max})."
+        )
+
+    for name, value in (("temperature_min_K", temperature_min_K),
+                        ("temperature_max_K", temperature_max_K),
+                        ("seed_temperature_K", seed_temperature_K)):
+        if value <= 0:
+            problems.append(f"{name} must be positive (Kelvin), got {value}.")
+    if temperature_min_K >= temperature_max_K:
+        problems.append(
+            f"temperature_min_K ({temperature_min_K}) must be less than "
+            f"temperature_max_K ({temperature_max_K})."
+        )
+    if not (temperature_min_K <= seed_temperature_K <= temperature_max_K):
+        problems.append(
+            f"seed_temperature_K ({seed_temperature_K}) is outside the "
+            f"temperature range being mapped ({temperature_min_K} to "
+            f"{temperature_max_K}). The diagram is traced outward from the "
+            "seed, so it has to start inside."
+        )
+    return problems
+
+
 def check_scheil_request(
     database, elements_composition, seed_temperature_K, temperature_min_K,
     pressure_Pa=1e5,

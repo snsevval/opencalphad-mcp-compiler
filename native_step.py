@@ -67,6 +67,23 @@ OC_BUILD_DIR = os.environ.get("OC_BUILD_DIR", "/root/projects/opencalphad")
 # _extract_screen_csv_block recovers it from stdout instead.
 OC_BINARY = native_fallback.OC_BINARY
 
+# How long one STEP run may take before it is abandoned. It was 60s, and
+# 60s turned out to be a limit rather than a safety net. In isolation the
+# isothermal-section cases finish in 9-13s, which reads as a five-fold
+# margin; across a full 86-case benchmark run three of them came back at
+# 62-67s instead -- all three at the timeout, none at a plausible
+# calculation time. What that produces is worse than a slow answer: the
+# timeout is swallowed, whatever partial CSV exists is parsed, and the
+# result is a diagram quietly missing points. One of those three then
+# failed on a reversed phase order, which is exactly what a truncated
+# STEP series and a differently-placed gap-fill would produce.
+#
+# The same figure was already raised to 300s for equilibrium subprocesses,
+# for the same reason (see server.py, CALC_TIMEOUT_S) -- this path was
+# simply missed. A ceiling, not a target: a STEP that needs three minutes
+# is saying something, and it now gets the chance to say it.
+STEP_TIMEOUT_S = int(os.environ.get("OC_STEP_TIMEOUT_S", "150"))
+
 _FLOAT = r"[-+]?\d+(?:\.\d+)?(?:[Ee][-+]?\d+)?"
 
 # Standard atomic weights (g/mol), IUPAC conventional values, keyed by the
@@ -206,7 +223,7 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
 
 
 def run_native_step(db_path, elements_composition, temperature_min_K,
-                     temperature_max_K, n_points, pressure_Pa, timeout=60,
+                     temperature_max_K, n_points, pressure_Pa, timeout=STEP_TIMEOUT_S,
                      axis_element=None, axis_min=None, axis_max=None):
     """Run the STEP macro in an isolated scratch directory and return the
     raw CSV text (or raise NativeStepError if no CSV was produced).
@@ -245,24 +262,61 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
 
         stdout_path = os.path.join(scratch, "stdout.txt")
         stderr_path = os.path.join(scratch, "stderr.txt")
+        # Stop when the data is in hand, not when the clock runs out.
+        #
+        # The engine prints "MACRO ENDS WITHOUT SET INTERACTIVE" when it
+        # reaches the end of the macro and then loops on its own prompt
+        # forever. Everything this function wants -- the CSV file, or the
+        # table printed to the screen -- has already been produced by the
+        # time that warning appears, so the loop that follows is pure
+        # waiting. Waiting it out was how this ran until now, which is why
+        # a temperature diagram reliably cost the full timeout: 66s of
+        # which about two were the calculation.
+        #
+        # That was not merely slow, it was fragile. The timeout doubled as
+        # the termination mechanism, so its value had to be large enough
+        # for a slow run and smaller than whatever limit the caller kept --
+        # and when the two crossed, four passing cases turned into
+        # TimeoutError at the client's 180s while the engine sat spinning.
+        # Watching for the end of the macro removes the conflict instead of
+        # retuning it: the timeout goes back to being a safety net for a
+        # run that never gets there.
+        csv_path = os.path.join(scratch, f"{csv_basename}.csv")
+        end_marker = "MACRO ENDS WITHOUT SET INTERACTIVE"
+
         with open(macro_path) as stdin_f, \
              open(stdout_path, "w") as stdout_f, \
              open(stderr_path, "w") as stderr_f:
+            proc = subprocess.Popen(
+                [OC_BINARY],
+                cwd=scratch,
+                stdin=stdin_f,
+                stdout=stdout_f,
+                stderr=stderr_f,
+                env=env,
+            )
+            deadline = time.monotonic() + timeout
             try:
-                subprocess.run(
-                    [OC_BINARY],
-                    cwd=scratch,
-                    stdin=stdin_f,
-                    stdout=stdout_f,
-                    stderr=stderr_f,
-                    env=env,
-                    timeout=timeout,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired:
-                pass
+                while time.monotonic() < deadline:
+                    if proc.poll() is not None:
+                        break  # exited on its own
+                    try:
+                        with open(stdout_path, errors="ignore") as probe:
+                            if end_marker in probe.read():
+                                break
+                    except OSError:
+                        pass
+                    if os.path.isfile(csv_path) and os.path.getsize(csv_path) > 0:
+                        break
+                    time.sleep(0.2)
+            finally:
+                proc.kill()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
 
-        csv_path = os.path.join(scratch, f"{csv_basename}.csv")
+
         if os.path.isfile(csv_path):
             with open(csv_path, errors="ignore") as f:
                 return f.read()
@@ -524,7 +578,7 @@ def composition_at(elements_composition, axis_element, x):
 
 def build_combined_series(db_path, elements_composition, temperature_min_K,
                            temperature_max_K, n_points, pressure_Pa,
-                           step_timeout=60, fallback_timeout=15,
+                           step_timeout=STEP_TIMEOUT_S, fallback_timeout=15,
                            axis_element=None, axis_min=None, axis_max=None):
     """Run native STEP, detect gaps where its line terminated early, and
     fill those gaps with native_fallback.run_and_parse single-point calls,

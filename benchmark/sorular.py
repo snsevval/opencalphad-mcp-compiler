@@ -24,6 +24,7 @@ GRUPLAR = [
     ("G", "Çelik dışı sistemler (oksit, tuz, gaz)", "G_CELIK_DISI"),
     ("H", "Bileşim ekseni (izotermal kesit)", "H_BILESIM_EKSENI"),
     ("I", "Katılaşma (Scheil-Gulliver)", "I_KATILASMA"),
+    ("J", "Faz diyagramı (iki eksen, MAP)", "J_FAZ_DIYAGRAMI"),
     ("R", "Doğru red — reddedilmesi gereken istekler", "DOGRU_RED"),
     ("S", "Doğru rapor — anlatının doğruluğu", "DOGRU_RAPOR"),
 ]
@@ -95,6 +96,28 @@ def beklenen_metni(case):
                 "Scheil'in ölçtüğü şey bu."
             )
         satirlar.append("Sıvı çizgisi (liquidus) bulunmalı.")
+        return satirlar
+
+    # Faz diyagramı: çıktı tablo değil eğri kümesi, ölçütü de değişmez
+    # sıcaklıklar. "Faz miktarları 1'e toplamalı" burada anlamsız.
+    if case.get("tool") == "calculate_phase_diagram":
+        if e.get("phases"):
+            satirlar.append("Diyagramda şu faz(lar) görünmeli: "
+                            + ", ".join(f"`{p}`" for p in e["phases"]))
+        tol = e.get("invariant_tolerance_K", 2.0)
+        for T in e.get("invariant_temperatures_K", []):
+            satirlar.append(
+                f"**{T:g} K** civarında (± {tol:g} K) bir değişmez tepkime "
+                "bulunmalı — ötektik, ötektoid ya da peritektik."
+            )
+        if e.get("min_boundaries"):
+            satirlar.append(
+                f"En az **{e['min_boundaries']} faz sınırı** izlenmeli."
+            )
+        satirlar.append(
+            "Her sınır **en az iki fazlı** olmalı — tanım gereği bir sınır, "
+            "fazların buluştuğu yerdir."
+        )
         return satirlar
 
     if e.get("phases"):

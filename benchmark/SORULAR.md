@@ -1014,6 +1014,70 @@ Ag-%20Cu, otektik bilesime yakin. Sivi dogrudan degismez noktaya iniyor -- Schei
 
 ---
 
+# J · Faz diyagramı (iki eksen, MAP)
+
+*3 soru — kolay 0, orta 1, zor 2*
+
+
+## J1 · J1_agcu_faz_diyagrami
+*zorluk: orta*
+
+**Soru**
+```
+agcu.TDB icin Ag-Cu faz diyagramini ciz
+```
+
+**Neyi sınıyor**
+Ag-Cu, klasik otektik diyagram. Tek bir degismez tepkime olmali ~1056 K'de. Bagimsiz kontrol: tek nokta hesaplarinda 1055 K'de sistem tamamen kati, 1060 K'de %99 sivi -- otektik ikisinin arasinda. Ayrica karismazlik boslugunun iki yarisi (FCC_A1 ve FCC_A1_AUTO#2) ayri gorunmeli.
+
+Tohum sicakligi ozellikle veriliyor ve olcumun bir parcasi: MAP tohumdan disari dogru izler. 1000 K iki kati fazin bolgesinde, oradan baslayinca karismazlik boslugu da bulunuyor. Varsayilan orta nokta (1150 K) tek fazli sivida kaliyor ve diyagram daha az sinir iceriyor -- ayni sistem, ayni arac, farkli baslangic, farkli kapsam. Kaydediliyor cunku kullanicinin bilmesi gereken bir davranis.
+
+**Beklenen cevap**
+- Diyagramda şu faz(lar) görünmeli: `LIQUID`, `FCC_A1`, `FCC_A1_AUTO#2`
+- **1056.1 K** civarında (± 2 K) bir değişmez tepkime bulunmalı — ötektik, ötektoid ya da peritektik.
+- En az **4 faz sınırı** izlenmeli.
+- Her sınır **en az iki fazlı** olmalı — tanım gereği bir sınır, fazların buluştuğu yerdir.
+
+
+## J2 · J2_steel1_fe_c_diyagrami
+*zorluk: zor*
+
+**Soru**
+```
+steel1.TDB icin Fe-C faz diyagramini %0-25 karbon, 500-2000 K araliginda ciz
+```
+
+**Neyi sınıyor**
+Fe-C, kararli (grafit) sistem. UC degismez tepkime birden: peritektik ~1768 K, otektik ~1427 K, otektoid ~1011 K. Ucu de ders kitabi degeri, ve otektoid bu projede ayri bir yontemle dogrulanmis durumda. Bir diyagramin ucunu birden dogru bulmasi, tek bir sayiyi tutturmasindan cok daha zor.
+
+**Beklenen cevap**
+- Diyagramda şu faz(lar) görünmeli: `LIQUID`, `BCC_A2`, `FCC_A1`, `GRAPHITE`
+- **1011.2 K** civarında (± 2 K) bir değişmez tepkime bulunmalı — ötektik, ötektoid ya da peritektik.
+- **1426.6 K** civarında (± 2 K) bir değişmez tepkime bulunmalı — ötektik, ötektoid ya da peritektik.
+- **1767.8 K** civarında (± 2 K) bir değişmez tepkime bulunmalı — ötektik, ötektoid ya da peritektik.
+- En az **8 faz sınırı** izlenmeli.
+- Her sınır **en az iki fazlı** olmalı — tanım gereği bir sınır, fazların buluştuğu yerdir.
+
+
+## J3 · J3_alni_diyagram_izlenemiyor
+*zorluk: zor*
+
+**Soru**
+```
+alni-4slx.TDB icin Al-Ni faz diyagramini ciz
+```
+
+**Neyi sınıyor**
+MAP bu motorun en kirilgan hesabi ve kendisi bunu her kosumdan once yaziyor. Al-Ni'de, tek denge olarak temiz cozulen bir tohumdan hicbir sinir izleyemiyor. Dogru davranis basarmak degil, basaramadigini SOYLEMEK -- ve yerine ne yapilabilecegini onermek, cunku MAP'in yedek kademesi yok: bu motorda sinir izleyen baska bir sey bulunmuyor.
+
+**Beklenen cevap**
+- **Hesap yapılmamalı.** İstek reddedilmeli.
+- Red gerekçesinde `could not be traced` geçmeli.
+- Red gerekçesinde `isothermal section` geçmeli.
+
+
+---
+
 # R · Doğru red — reddedilmesi gereken istekler
 
 *31 soru — kolay 15, orta 10, zor 6*
@@ -1558,5 +1622,5 @@ Eksenin ucu tek basina gecerli (%85 < 1) ve degerlerin hicbiri araligin disinda 
 
 ---
 
-**Toplam: 83 soru.**
+**Toplam: 86 soru.**
 

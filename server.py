@@ -38,6 +38,7 @@ sys.path.insert(0, HERE)
 import oc_service  # noqa: E402
 import native_step  # noqa: E402
 import native_scheil  # noqa: E402
+import native_map  # noqa: E402
 import preflight  # noqa: E402
 import result_check  # noqa: E402
 import semantic_check  # noqa: E402
@@ -1213,6 +1214,177 @@ def calculate_scheil_solidification(
         ),
     }
     return _attach_verification(data, _scheil_args)
+
+
+@mcp.tool()
+def calculate_phase_diagram(
+    database: str,
+    elements_composition: dict[str, float],
+    axis_element: str,
+    axis_min: float,
+    axis_max: float,
+    temperature_min_K: float,
+    temperature_max_K: float,
+    seed_temperature_K: Optional[float] = None,
+    axis_step: Optional[float] = None,
+    temperature_step_K: Optional[float] = None,
+    pressure_Pa: float = 1e5,
+):
+    """Trace the phase boundaries themselves across composition and temperature.
+
+    The phase diagram, in the sense a metallurgist means it. The other
+    tools each fix one axis: calculate_property_diagram fixes composition
+    and sweeps temperature, calculate_isothermal_section fixes temperature
+    and sweeps composition. This one fixes neither -- it follows the
+    boundaries where phases meet, across both at once. Use it when someone
+    asks for "the phase diagram" of a system rather than the behaviour of
+    one alloy.
+
+    PREFLIGHT REJECTION — STOP RULE
+    If the result has stage="PREFLIGHT", the request was refused before any
+    calculation ran. Do NOT call this or any other calculation tool again in
+    this turn. Quote the rejection reason and ask which corrected request
+    the user wants.
+
+    Args:
+        database: database filename or full path.
+        elements_composition: element -> molar amount. This is the seed the
+            diagram is traced outward from, not a restriction on it.
+        axis_element: which element's mole fraction forms the horizontal axis.
+        axis_min, axis_max: the composition range to map.
+        temperature_min_K, temperature_max_K: the temperature range to map.
+        seed_temperature_K: where tracing starts (default: mid-range). Must
+            lie inside the temperature range.
+        axis_step, temperature_step_K: how finely each axis is walked.
+            These are steps, not point counts; leave unset for sensible
+            defaults.
+        pressure_Pa: pressure in Pascal (default 1e5, i.e. 1 bar).
+
+    READING THE RESULT
+    "boundaries" is a list of traced curves, each naming the phases that
+    coexist along it. A boundary marked "invariant" is a reaction happening
+    at one fixed temperature -- eutectic, eutectoid, peritectic -- and
+    "invariant_temperatures_K" collects them, which is usually the first
+    thing a reader wants from a diagram.
+
+    MAP is the engine's most fragile calculation and says so itself before
+    every run. If it produces nothing, that is reported as a failure rather
+    than approximated: no other part of this engine traces boundaries, so
+    there is nothing to fall back to. A property diagram at a fixed
+    composition, or an isothermal section at a fixed temperature, is the
+    nearest thing that will work.
+    """
+    if seed_temperature_K is None:
+        seed_temperature_K = (temperature_min_K + temperature_max_K) / 2.0
+
+    problems = preflight.check_phase_diagram_request(
+        database, elements_composition, axis_element, axis_min, axis_max,
+        temperature_min_K, temperature_max_K, seed_temperature_K, pressure_Pa,
+    )
+    if problems:
+        return _preflight_failure(problems)
+
+    # Steps, not point counts. 40 across and 70 up match the distribution's
+    # own map1.OCM, which is the only calibration available for what this
+    # engine finds comfortable.
+    if axis_step is None:
+        axis_step = (axis_max - axis_min) / 40.0
+    if temperature_step_K is None:
+        temperature_step_K = (temperature_max_K - temperature_min_K) / 70.0
+
+    db_path = (
+        database if os.path.isabs(database)
+        else os.path.join(oc_service.DEFAULT_DB_DIR, database)
+    )
+    symbol = axis_element.upper()
+    title = f"{os.path.basename(database)} phase diagram"
+
+    try:
+        plt_text = native_map.run_native_map(
+            db_path, elements_composition, symbol, axis_min, axis_max,
+            axis_step, temperature_min_K, temperature_max_K,
+            temperature_step_K, seed_temperature_K, pressure_Pa,
+            timeout=CALC_TIMEOUT_S,
+        )
+        diagram = native_map.parse_map_plt(plt_text)
+    except Exception as exc:
+        return {
+            "error": (
+                f"The phase diagram could not be traced: {exc} MAP is the "
+                "most fragile calculation this engine offers and has no "
+                "fallback here. A property diagram at one composition, or "
+                "an isothermal section at one temperature, covers the same "
+                "system a slice at a time."
+            ),
+            "stage": "EXECUTION",
+            "seed_temperature_K": seed_temperature_K,
+        }
+
+    chart_bytes = None
+    chart_error = None
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            png_path = os.path.join(tmpdir, "diagram.png")
+            chart_bytes = native_map.render_gnuplot_png(
+                diagram, title, png_path,
+                axis_min=axis_min, axis_max=axis_max,
+                temperature_min_K=temperature_min_K,
+                temperature_max_K=temperature_max_K,
+            )
+    except Exception as exc:  # a chart is a bonus, never fail the call over it
+        chart_error = str(exc)
+
+    boundaries = [
+        {
+            "phases": b["phases"],
+            "invariant": b["invariant"],
+            **({"temperature_K": b["temperature_K"]} if b["invariant"] else {}),
+            "point_count": len(b["points"]),
+            "points": [
+                {
+                    "temperature_K": float(f"{p['temperature_K']:.6g}"),
+                    "compositions": {
+                        phase: float(f"{value:.6g}")
+                        for phase, value in p["compositions"].items()
+                    },
+                }
+                for p in b["points"]
+            ],
+        }
+        for b in diagram["boundaries"]
+    ]
+
+    data = {
+        "database": os.path.basename(database),
+        "axis_element": diagram["axis_element"] or symbol,
+        "axis_min": axis_min,
+        "axis_max": axis_max,
+        "temperature_min_K": temperature_min_K,
+        "temperature_max_K": temperature_max_K,
+        "pressure_Pa": pressure_Pa,
+        "seed_temperature_K": seed_temperature_K,
+        "phases": diagram["phases"],
+        "invariant_temperatures_K": diagram["invariant_temperatures_K"],
+        "boundaries": boundaries,
+        "point_count": diagram["point_count"],
+        "backend_used": "native_oc_map",
+        "chart_error": chart_error,
+        "note": (
+            "Each boundary is a curve along which the named phases coexist. "
+            "An invariant boundary is a reaction at one fixed temperature. "
+            "The chart is the complete intended visualization for this "
+            "data -- present it as-is rather than building a separate plot."
+        ),
+    }
+    _attach_verification(data, {
+        "database": database,
+        "elements_composition": elements_composition,
+        "temperature_K": seed_temperature_K,
+        "pressure_Pa": pressure_Pa,
+    })
+    if chart_bytes:
+        return [data, Image(data=chart_bytes, format="png")]
+    return data
 
 
 if __name__ == "__main__":
