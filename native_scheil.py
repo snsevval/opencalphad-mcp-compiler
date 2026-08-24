@@ -49,6 +49,45 @@ final per cent is therefore reported next to every result, because the last
 few per cent is exactly where the terminal eutectic forms and where a
 segregation study was looking.
 
+THE ITERATION LIMIT IS SETTABLE, AND DELIBERATELY LEFT ALONE. Runs end at
+"Error storing equilibria 4204 / Too many iterations". That limit is not a
+hard-coded constant: ocparam.F90 defines default_maxiter = 500, each
+equilibrium record carries its own ceq%maxiter, and the engine exposes a
+user command for it -- "set numeric_options", whose first prompt is "Max
+number of iterations". No rebuild needed. Raising it to 5000 was measured:
+
+    steel1 Fe-1C    103 points, 2.88% left  ->  191 points, 1.23% left
+    agcu Ag-80      114 points, 12.7% left  ->  268 points, axis exhausted
+    (50000 changed nothing further; 5000 is past the binding constraint)
+
+The default is kept anyway, because the second row is worse than it looks.
+Following agcu's liquid composition across those extra points:
+
+    99.96% liquid at 1134 K, x(Cu) 0.200
+    11.94% liquid at  870 K, x(Cu) 0.859
+    10.28% liquid at  600 K, x(Cu) 0.982
+
+The fraction plateaus near 10% while the composition runs toward pure
+copper. The Ag-Cu eutectic is at 1052 K and x(Cu) 0.4; by 870 K this path
+is long past it and still following the Ag-rich liquidus into its
+metastable extension -- only FCC_A1 ever forms, the Cu-rich solid never
+appears. Molten metal at 600 K is not a result.
+
+So the higher limit trades an obvious failure for a deceptive one. At 500
+the run stops with an error and nobody is misled; at 5000 it produces 268
+points and a smooth curve that reads as a finished solidification. An
+obvious gap is safer than a plausible fabrication, which is the same
+principle the "completed" field exists to serve.
+
+Raising it becomes the right move only alongside a check that finds where
+the path leaves reality -- each point carries a liquid composition and a
+temperature, so asking whether that composition is actually liquid at that
+temperature is one ordinary equilibrium, and a binary search over the tail
+would locate the departure in a handful of calls. That check is the
+prerequisite, not an accompaniment. Until it exists the limit stays at its
+default, and the parameter is not offered to callers either: a knob whose
+main effect is better-looking wrong answers should not be within reach.
+
 Macro form follows the distribution's own examples/macros/step-scheil.OCM:
 the "set c" shorthand on one line, the axis given as separate lines
 ending with the STEP (not a point count), "step scheil" as a single
