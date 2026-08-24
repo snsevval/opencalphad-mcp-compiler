@@ -241,7 +241,28 @@ def parse_native_output(raw_text):
     # calculation: the engine solves what is left, prints a well-formed
     # result, and says so only in these two lines.
     reported_conditions = {}
-    conditions_match = re.search(r"Conditions\s*\.*\s*:\s*\n([^\n]*)", raw_text)
+    # Read to the "Degrees of freedom" line rather than to the end of the
+    # first line. The engine wraps the list once it runs long, and a
+    # five-element alloy sends seven conditions -- enough to wrap:
+    #
+    #   Conditions ...: 1:T=1200, 2:P=100000, 3:N=1, 4:X(C)=.04,
+    #       5:X(CR)=.06, 6:X(MO)=.02,
+    #       7:X(V)=.001
+    #   Degrees of freedom are   0
+    #
+    # Reading one line dropped the tail, and the correspondence check then
+    # reported that the vanadium condition never reached the engine -- on a
+    # calculation where it plainly had, with the engine's own next line
+    # saying the system was fully determined. A verification layer that
+    # cries wolf on correct results teaches people to ignore it, which
+    # costs more than the check was ever worth.
+    #
+    # The engine marks the end of the block itself, so there is nothing to
+    # count: stop where it stops.
+    conditions_match = re.search(
+        r"Conditions\s*\.*\s*:\s*\n(.*?)\n\s*Degrees of freedom",
+        raw_text, re.DOTALL,
+    )
     if conditions_match:
         # "1:T=1200, 2:P=100000, 3:N=1, 4:X(C)=.01" -- the index is the
         # engine's own numbering and carries no meaning for us; the name may
