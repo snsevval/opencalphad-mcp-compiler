@@ -37,6 +37,7 @@ sys.path.insert(0, HERE)
 
 import oc_service  # noqa: E402
 import native_step  # noqa: E402
+import native_scheil  # noqa: E402
 import preflight  # noqa: E402
 import result_check  # noqa: E402
 import semantic_check  # noqa: E402
@@ -1053,6 +1054,165 @@ def calculate_isothermal_section(
     if chart_bytes:
         return [data, Image(data=chart_bytes, format="png")]
     return data
+
+
+@mcp.tool()
+def calculate_scheil_solidification(
+    database: str,
+    elements_composition: dict[str, float],
+    seed_temperature_K: float,
+    temperature_min_K: Optional[float] = None,
+    pressure_Pa: float = 1e5,
+    temperature_step_K: Optional[float] = None,
+):
+    """Simulate non-equilibrium solidification (Scheil-Gulliver).
+
+    A different question from every other tool here. The others compute
+    equilibrium: given conditions, what is stable. This computes a PATH.
+    The liquid is taken as homogeneous, the solid formed at each
+    temperature step is removed from the system, and the remaining liquid's
+    composition is updated accordingly -- which is what a real casting
+    does, because diffusion in the solid is too slow to keep up with
+    freezing. Use it for questions about casting, solidification,
+    segregation, or why the last part of a melt to freeze differs from the
+    first.
+
+    PREFLIGHT REJECTION — STOP RULE
+    If the result has stage="PREFLIGHT", the request was refused before any
+    calculation ran. Do NOT call this or any other calculation tool again in
+    this turn. Quote the rejection reason to the user and ask which
+    corrected request they want.
+
+    A stage="PRECONDITION" result is different and DOES invite a retry: it
+    means the seed temperature is not in the single-phase liquid, and it
+    names what was stable there instead. Solidification has to start from a
+    melt. Suggest a higher seed temperature and ask before re-running.
+
+    Args:
+        database: database filename or full path.
+        elements_composition: element -> molar amount. At least two.
+        seed_temperature_K: where the simulation starts, in Kelvin. Must be
+            hot enough that the alloy is entirely liquid.
+        temperature_min_K: how far down to cool (default: 800 K below the
+            seed). Solidification usually ends well above this.
+        pressure_Pa: pressure in Pascal (default 1e5, i.e. 1 bar).
+        temperature_step_K: the cooling increment. Leave unset to let the
+            server try several and keep whichever got furthest -- this is
+            not a display setting, it changes how far the simulation gets,
+            and no observable property predicts which value will work.
+
+    READING THE RESULT
+    "completed" is the field that decides how the curve may be described.
+    True means the melt was spent and the path is the whole story. False
+    means the simulation stopped with liquid still unsolidified, and
+    "final_liquid_fraction" says how much: report that figure rather than
+    presenting a partial curve as a finished solidification. The last few
+    per cent is where the terminal eutectic forms, so a run that stopped at
+    12% left out the part a segregation question was usually asking about.
+
+    "liquid_composition" at each point is the segregation: watch an element
+    climb from its nominal value toward the last liquid. That enrichment is
+    the result, not a side effect.
+
+    VERIFICATION
+    Every result carries a "verification" field recording the deterministic
+    checks this server ran. Report its outcome next to the numbers.
+    """
+    if temperature_min_K is None:
+        temperature_min_K = max(seed_temperature_K - 800.0, 1.0)
+
+    problems = preflight.check_scheil_request(
+        database, elements_composition, seed_temperature_K,
+        temperature_min_K, pressure_Pa,
+    )
+    if problems:
+        return _preflight_failure(problems)
+
+    db_path = (
+        database if os.path.isabs(database)
+        else os.path.join(oc_service.DEFAULT_DB_DIR, database)
+    )
+
+    # Scheil's own precondition, checked by computing it rather than by
+    # hoping. The engine states it plainly ("you must have calculated an
+    # equilibrium in the liquid") and then, given a seed that is already
+    # part solid, fails somewhere deep in its line tracer with an error
+    # code that says nothing about the real problem. One equilibrium is far
+    # cheaper than one simulation, and it can name what was stable instead.
+    seed = _calc_one(database, elements_composition, seed_temperature_K,
+                     pressure_Pa, None)
+    if "error" not in seed:
+        amounts = seed.get("phase_molar_amounts") or {}
+        solid = [name for name, amount in amounts.items()
+                 if amount > 1e-6 and not name.upper().startswith("LIQUID")]
+        if solid:
+            return {
+                "error": (
+                    f"Solidification must start from a melt, but at "
+                    f"{seed_temperature_K:g} K this alloy is not fully "
+                    f"liquid: {sorted(solid)} {'is' if len(solid) == 1 else 'are'} "
+                    "already stable there. Try a higher seed temperature."
+                ),
+                "stage": "PRECONDITION",
+                "phases_at_seed": {k: float(f"{v:.6g}") for k, v in amounts.items()},
+                "seed_temperature_K": seed_temperature_K,
+            }
+
+    _scheil_args = {
+        "database": database,
+        "elements_composition": elements_composition,
+        "temperature_K": seed_temperature_K,
+        "pressure_Pa": pressure_Pa,
+    }
+
+    try:
+        result = native_scheil.run_with_step_ladder(
+            db_path, elements_composition, seed_temperature_K,
+            temperature_min_K, pressure_Pa,
+            temperature_step_K=temperature_step_K,
+            timeout=CALC_TIMEOUT_S,
+        )
+    except Exception as exc:
+        return {
+            "error": f"The Scheil simulation could not be run: {exc}",
+            "stage": "EXECUTION",
+        }
+
+    points = [
+        {
+            "temperature_K": p["temperature_K"],
+            "liquid_fraction": float(f"{p['liquid_fraction']:.6g}"),
+            "liquid_composition": {
+                el: float(f"{v:.6g}") for el, v in p["liquid_composition"].items()
+            },
+        }
+        for p in result["points"]
+    ]
+
+    data = {
+        "database": os.path.basename(database),
+        "composition": elements_composition,
+        "pressure_Pa": pressure_Pa,
+        "seed_temperature_K": seed_temperature_K,
+        "liquidus_K": result["liquidus_K"],
+        "solid_phases_formed": result["solid_phases"],
+        "points": points,
+        "completed": result["completed"],
+        "final_liquid_fraction": result["final_liquid_fraction"],
+        "final_temperature_K": result["final_temperature_K"],
+        "termination_reason": result["termination_reason"],
+        "temperature_step_K": result["temperature_step_K"],
+        "steps_tried": result["steps_tried"],
+        "backend_used": "native_oc_scheil",
+        "note": (
+            "Scheil is a path, not an equilibrium: each point depends on "
+            "all the solid removed above it. A temperature the simulation "
+            "did not reach cannot be filled in by computing it separately, "
+            "which is why an incomplete run is reported as incomplete "
+            "rather than completed by other means."
+        ),
+    }
+    return _attach_verification(data, _scheil_args)
 
 
 if __name__ == "__main__":

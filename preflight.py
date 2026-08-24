@@ -124,6 +124,39 @@ def check_equilibrium_request(
     return problems
 
 
+def check_scheil_request(
+    database, elements_composition, seed_temperature_K, temperature_min_K,
+    pressure_Pa=1e5,
+):
+    """PREFLIGHT for calculate_scheil_solidification. Returns a list of
+    problem strings; empty list means the request is valid.
+
+    Only the checks that need no engine. Scheil's other precondition --
+    that the seed temperature is in the single-phase liquid -- cannot be
+    settled here: it is a question about the alloy, not about the request,
+    and answering it means computing an equilibrium. The tool checks it
+    separately, before paying for a simulation that would otherwise fail
+    obscurely.
+    """
+    problems = _check_common(database, elements_composition, pressure_Pa, None)
+
+    if seed_temperature_K <= 0:
+        problems.append(
+            f"seed_temperature_K must be positive (Kelvin), got {seed_temperature_K}."
+        )
+    if temperature_min_K <= 0:
+        problems.append(
+            f"temperature_min_K must be positive, got {temperature_min_K}."
+        )
+    if temperature_min_K >= seed_temperature_K:
+        problems.append(
+            f"temperature_min_K ({temperature_min_K}) must be below "
+            f"seed_temperature_K ({seed_temperature_K}) -- solidification "
+            "is simulated by cooling from the seed."
+        )
+    return problems
+
+
 def check_isothermal_section_request(
     database, elements_composition, axis_element, axis_min, axis_max,
     temperature_K, pressure_Pa=1e5, suspended_phases=None,

@@ -23,6 +23,7 @@ GRUPLAR = [
     ("F", "İki bileşimin karşılaştırılması", "F_KARSILASTIRMA"),
     ("G", "Çelik dışı sistemler (oksit, tuz, gaz)", "G_CELIK_DISI"),
     ("H", "Bileşim ekseni (izotermal kesit)", "H_BILESIM_EKSENI"),
+    ("I", "Katılaşma (Scheil-Gulliver)", "I_KATILASMA"),
     ("R", "Doğru red — reddedilmesi gereken istekler", "DOGRU_RED"),
     ("S", "Doğru rapor — anlatının doğruluğu", "DOGRU_RAPOR"),
 ]
@@ -60,6 +61,40 @@ def beklenen_metni(case):
             "uydurma bir sayı vermeden, iki motor kademesini de denediğini "
             "söyleyerek durmalı."
         )
+        return satirlar
+
+    # Katılaşma vakaları: denge değil yol. Ölçütleri de farkli, ve "faz
+    # miktarları 1'e toplamalı" gibi denge ölçütleri buraya hiç uymuyor.
+    if case.get("tool") == "calculate_scheil_solidification":
+        if e.get("completed") is True:
+            satirlar.append(
+                "Katılaşma **sonuna kadar gitmeli** (`completed: true`)."
+            )
+        elif e.get("completed") is False:
+            satirlar.append(
+                "Katılaşma bu sistemde sonuna kadar **gitmiyor** — ve ölçüt "
+                "bunu düzeltmek değil, **doğru söylemek**: `completed: false` "
+                "dönmeli, kalan sıvı oranı raporlanmalı. Yarım kalmış bir "
+                "eğriyi tam gibi sunmak bu vakayı düşürür."
+            )
+        if e.get("max_final_liquid_fraction") is not None:
+            satirlar.append(
+                f"Sonda kalan sıvı **{e['max_final_liquid_fraction']:.1%}"
+                "'i geçmemeli**."
+            )
+        if e.get("solid_phases"):
+            satirlar.append("Katılaşma sırasında şu faz(lar) oluşmalı: "
+                            + ", ".join(f"`{p}`" for p in e["solid_phases"]))
+        istek = case["arguments"]["elements_composition"]
+        olcek = sum(istek.values()) or 1
+        for element, en_az in (e.get("segregation") or {}).items():
+            nominal = istek.get(element, 0) / olcek
+            satirlar.append(
+                f"**Segregasyon:** son sıvıda `{element}` nominal "
+                f"{nominal:.4g} değerinin üzerine çıkmalı, en az {en_az:.4g}. "
+                "Scheil'in ölçtüğü şey bu."
+            )
+        satirlar.append("Sıvı çizgisi (liquidus) bulunmalı.")
         return satirlar
 
     if e.get("phases"):

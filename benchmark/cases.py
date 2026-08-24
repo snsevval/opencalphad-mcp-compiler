@@ -570,6 +570,60 @@ DOGRU_RED = [
         },
     },
 
+    # --- katilasma redleri --------------------------------------------
+    # Scheil'in kendi on kosullari. Ikisi farkli asamada yakalaniyor ve bu
+    # ayrim kasitli: birincisi istegin kendisinde bir celiski (asla dogru
+    # olamaz), ikincisi alasim hakkinda bir olgu (baska sicaklikta dogru
+    # olur). Ilki tekrar denenmemeli, ikincisi denenmeli.
+
+    {
+        "id": "red_scheil_ters_sogutma",
+        "zorluk": "kolay",
+        "kural": "eksen",
+        "olcum": "Alt sinir tohumun ustunde. Katilasma sogutarak simule "
+                 "edilir; bu istek isitmayi tarif ediyor. Istegin kendi "
+                 "icinde celiskili oldugu icin PREFLIGHT'ta durmali.",
+        "soru": "agcu.TDB'de Ag-%20Cu'yu 900 K'den 1200 K'ye kadar "
+                "katilastir",
+        "tool": "calculate_scheil_solidification",
+        "arguments": {
+            "database": "agcu.TDB",
+            "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "seed_temperature_K": 900,
+            "temperature_min_K": 1200,
+        },
+        "expected": {
+            "rejected": True,
+            "stage": "PREFLIGHT",
+            "reason_contains": ["must be below"],
+        },
+    },
+    {
+        "id": "red_scheil_tohum_sivi_degil",
+        "zorluk": "zor",
+        "kural": "on kosul",
+        "olcum": "900 K'de bu alasim zaten katilasmis. Katilasma erimis "
+                 "metalden baslamak zorunda. Argumanlara bakarak "
+                 "anlasilamaz -- alasim hakkinda bir olgu, ve ancak "
+                 "HESAPLAYARAK bilinir. Bu yuzden PREFLIGHT'ta degil ayri "
+                 "bir asamada yakalanmali, ve red neyin kararli oldugunu "
+                 "sylemeli ki kullanici daha yuksek bir sicaklikla "
+                 "tekrar deneyebilsin.",
+        "soru": "agcu.TDB'de Ag-%20Cu lehimini 900 K'den sogutursam "
+                "katilasma nasil ilerler",
+        "tool": "calculate_scheil_solidification",
+        "arguments": {
+            "database": "agcu.TDB",
+            "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "seed_temperature_K": 900,
+        },
+        "expected": {
+            "rejected": True,
+            "stage": "PRECONDITION",
+            "reason_contains": ["not fully liquid", "FCC_A1"],
+        },
+    },
+
     # --- bilesim ekseni redleri --------------------------------------
     # Izotermal kesitin kendi kurallari. Ucu de motora hic gitmeden
     # yakalanabilir cinsten: taranan element bilesimde yoksa hicbir sey
@@ -1674,6 +1728,12 @@ H_BILESIM_EKSENI = [
             "max_failed_fraction": 0.10,
         },
     },
+    # 2026-08-24: bu vaka bir kez "BCC_A2 hicbir noktada yok" diye kaldi,
+    # o kosum 62 saniye surmustu (normalde saniyeler). Ucu bagimsiz olmak
+    # uzere dort kosumda daha tekrarlamadi; ilk nokta her seferinde
+    # BCC_A2 0.7611 + FCC_A1 0.2389 geldi. Aciklanamadi, o yuzden
+    # yazildi -- tekrarlarsa aranacak yer STEP'in eksen basindaki noktayi
+    # uretip uretmedigi.
     {
         "id": "H2_karbon_taramasi",
         "zorluk": "orta",
@@ -1751,9 +1811,95 @@ H_BILESIM_EKSENI = [
     },
 ]
 
+I_KATILASMA = [
+    # Scheil-Gulliver: denge degil YOL. Sivi homojen sayilir, her sicaklik
+    # adiminda olusan kati sistemden cikarilir, kalan sivinin bilesimi buna
+    # gore guncellenir. Gercek dokumdeki segregasyon budur.
+    #
+    # Olcut faz listesi degil, ZENGINLESME. Son sivinin bilesimi nominal
+    # degerin uzerine cikmali -- Scheil'in var olma sebebi bu. Ve tamamen
+    # hesap makinesiyle kontrol edilebilir.
+    #
+    # Iki vakada BEKLENEN completed=False. Motor bu sistemlerde katilasmayi
+    # sonuna kadar goturemiyor; gecme olcutu bunu duzeltmek degil, DOGRU
+    # SOYLEMEK. Yarim kalmis bir egriyi tam gibi sunmak, bu projenin
+    # yakaladigi hatalarin aynisi olurdu.
+
+    {
+        "id": "I1_cost507R_katilasma",
+        "zorluk": "orta",
+        "olcum": "Al-Mg-Si-Zn dokum alasimi. Katilasma sonuna kadar gidiyor "
+                 "ve son sivi %73 cinko -- nominal %2'den otuz kat fazla. "
+                 "Dagitimin kendi ornek makrosu da 'son sivi %70 Zn' diyor, "
+                 "yani bu sayi motorun kendi belgesiyle bagimsiz olarak "
+                 "dogrulanabiliyor.",
+        "soru": "cost507R.TDB'de Al-%2Mg-%3Si-%2Zn alasimini 1000 K'den "
+                "sogutursam katilasma sirasinda segregasyon nasil olur",
+        "tool": "calculate_scheil_solidification",
+        "arguments": {
+            "database": "cost507R.TDB",
+            "elements_composition": {"AL": 0.93, "MG": 0.02, "SI": 0.03,
+                                     "ZN": 0.02},
+            "seed_temperature_K": 1000,
+            "temperature_min_K": 600,
+        },
+        "expected": {
+            "completed": True,
+            "max_final_liquid_fraction": 0.02,
+            "solid_phases": ["FCC_A1", "MG2SI"],
+            "segregation": {"ZN": 0.5},
+        },
+    },
+    {
+        "id": "I2_steel1_katilasma_eksik",
+        "zorluk": "zor",
+        "olcum": "Fe-%1C. Karbon son siviya suruluyor (%1 -> %17) ama "
+                 "katilasma sonuna kadar gitmiyor: cozucu, sivi asirilastikca "
+                 "yakinsamayi birakiyor. Bu vakanin gecme olcutu hesabin "
+                 "tamamlanmasi DEGIL, tamamlanmadigini soylemesi.",
+        "soru": "steel1.TDB'de Fe-%1C celigini 1900 K'den sogutursam "
+                "katilasma sirasinda karbon nasil dagilir",
+        "tool": "calculate_scheil_solidification",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.99, "C": 0.01},
+            "seed_temperature_K": 1900,
+            "temperature_min_K": 1000,
+        },
+        "expected": {
+            "completed": False,
+            "solid_phases": ["BCC_A2"],
+            "segregation": {"C": 0.05},
+        },
+    },
+    {
+        "id": "I3_agcu_otektige_yakin",
+        "zorluk": "zor",
+        "olcum": "Ag-%20Cu, otektik bilesime yakin. Sivi dogrudan degismez "
+                 "noktaya iniyor -- Scheil icin en zor durum, ve motor "
+                 "%13 sivi kalmisken duruyor. Bakir 0.20'den 0.82'ye "
+                 "zenginlesiyor. I1 ile birlikte: ayni arac hem tamamlanan "
+                 "hem yarim kalan durumu dogru raporlamali.",
+        "soru": "agcu.TDB'de Ag-%20Cu lehimini 1300 K'den sogutursam "
+                "katilasma nasil ilerler",
+        "tool": "calculate_scheil_solidification",
+        "arguments": {
+            "database": "agcu.TDB",
+            "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "seed_temperature_K": 1300,
+            "temperature_min_K": 800,
+        },
+        "expected": {
+            "completed": False,
+            "solid_phases": ["FCC_A1"],
+            "segregation": {"CU": 0.6},
+        },
+    },
+]
+
 DOGRU_HESAP = (A_TEK_FAZ + B_COK_FAZ + C_FAZ_GECISI + D_BILESIM_KUMESI
                + E_YARI_KARARLI + F_KARSILASTIRMA + G_CELIK_DISI
-               + H_BILESIM_EKSENI)
+               + H_BILESIM_EKSENI + I_KATILASMA)
 DOGRU_RAPOR = []
 
 CASES = DOGRU_HESAP + DOGRU_RED + DOGRU_RAPOR

@@ -952,9 +952,71 @@ Tek taramada dort ayri rejim: M7C3, M23C6, M6C ve Laves fazi. Molibden kendi kar
 
 ---
 
+# I · Katılaşma (Scheil-Gulliver)
+
+*3 soru — kolay 0, orta 1, zor 2*
+
+
+## I1 · I1_cost507R_katilasma
+*zorluk: orta*
+
+**Soru**
+```
+cost507R.TDB'de Al-%2Mg-%3Si-%2Zn alasimini 1000 K'den sogutursam katilasma sirasinda segregasyon nasil olur
+```
+
+**Neyi sınıyor**
+Al-Mg-Si-Zn dokum alasimi. Katilasma sonuna kadar gidiyor ve son sivi %73 cinko -- nominal %2'den otuz kat fazla. Dagitimin kendi ornek makrosu da 'son sivi %70 Zn' diyor, yani bu sayi motorun kendi belgesiyle bagimsiz olarak dogrulanabiliyor.
+
+**Beklenen cevap**
+- Katılaşma **sonuna kadar gitmeli** (`completed: true`).
+- Sonda kalan sıvı **2.0%'i geçmemeli**.
+- Katılaşma sırasında şu faz(lar) oluşmalı: `FCC_A1`, `MG2SI`
+- **Segregasyon:** son sıvıda `ZN` nominal 0.02 değerinin üzerine çıkmalı, en az 0.5. Scheil'in ölçtüğü şey bu.
+- Sıvı çizgisi (liquidus) bulunmalı.
+
+
+## I2 · I2_steel1_katilasma_eksik
+*zorluk: zor*
+
+**Soru**
+```
+steel1.TDB'de Fe-%1C celigini 1900 K'den sogutursam katilasma sirasinda karbon nasil dagilir
+```
+
+**Neyi sınıyor**
+Fe-%1C. Karbon son siviya suruluyor (%1 -> %17) ama katilasma sonuna kadar gitmiyor: cozucu, sivi asirilastikca yakinsamayi birakiyor. Bu vakanin gecme olcutu hesabin tamamlanmasi DEGIL, tamamlanmadigini soylemesi.
+
+**Beklenen cevap**
+- Katılaşma bu sistemde sonuna kadar **gitmiyor** — ve ölçüt bunu düzeltmek değil, **doğru söylemek**: `completed: false` dönmeli, kalan sıvı oranı raporlanmalı. Yarım kalmış bir eğriyi tam gibi sunmak bu vakayı düşürür.
+- Katılaşma sırasında şu faz(lar) oluşmalı: `BCC_A2`
+- **Segregasyon:** son sıvıda `C` nominal 0.01 değerinin üzerine çıkmalı, en az 0.05. Scheil'in ölçtüğü şey bu.
+- Sıvı çizgisi (liquidus) bulunmalı.
+
+
+## I3 · I3_agcu_otektige_yakin
+*zorluk: zor*
+
+**Soru**
+```
+agcu.TDB'de Ag-%20Cu lehimini 1300 K'den sogutursam katilasma nasil ilerler
+```
+
+**Neyi sınıyor**
+Ag-%20Cu, otektik bilesime yakin. Sivi dogrudan degismez noktaya iniyor -- Scheil icin en zor durum, ve motor %13 sivi kalmisken duruyor. Bakir 0.20'den 0.82'ye zenginlesiyor. I1 ile birlikte: ayni arac hem tamamlanan hem yarim kalan durumu dogru raporlamali.
+
+**Beklenen cevap**
+- Katılaşma bu sistemde sonuna kadar **gitmiyor** — ve ölçüt bunu düzeltmek değil, **doğru söylemek**: `completed: false` dönmeli, kalan sıvı oranı raporlanmalı. Yarım kalmış bir eğriyi tam gibi sunmak bu vakayı düşürür.
+- Katılaşma sırasında şu faz(lar) oluşmalı: `FCC_A1`
+- **Segregasyon:** son sıvıda `CU` nominal 0.2 değerinin üzerine çıkmalı, en az 0.6. Scheil'in ölçtüğü şey bu.
+- Sıvı çizgisi (liquidus) bulunmalı.
+
+
+---
+
 # R · Doğru red — reddedilmesi gereken istekler
 
-*29 soru — kolay 14, orta 10, zor 5*
+*31 soru — kolay 15, orta 10, zor 6*
 
 
 ## R1 · red_olmayan_dosya
@@ -1390,7 +1452,41 @@ Toplam 2.5 -- kabul araligi [0.5, 2.0]'in hemen disi. Kasitli bir olcek secimi g
 - Red gerekçesinde `sum to` geçmeli.
 
 
-## R26 · red_kesit_element_bilesimde_yok
+## R26 · red_scheil_ters_sogutma
+*zorluk: kolay*
+
+**Soru**
+```
+agcu.TDB'de Ag-%20Cu'yu 900 K'den 1200 K'ye kadar katilastir
+```
+
+**Neyi sınıyor**
+Alt sinir tohumun ustunde. Katilasma sogutarak simule edilir; bu istek isitmayi tarif ediyor. Istegin kendi icinde celiskili oldugu icin PREFLIGHT'ta durmali.
+
+**Beklenen cevap**
+- **Hesap yapılmamalı.** İstek reddedilmeli.
+- Red, motor çalışmadan önce (PREFLIGHT) olmalı.
+- Red gerekçesinde `must be below` geçmeli.
+
+
+## R27 · red_scheil_tohum_sivi_degil
+*zorluk: zor*
+
+**Soru**
+```
+agcu.TDB'de Ag-%20Cu lehimini 900 K'den sogutursam katilasma nasil ilerler
+```
+
+**Neyi sınıyor**
+900 K'de bu alasim zaten katilasmis. Katilasma erimis metalden baslamak zorunda. Argumanlara bakarak anlasilamaz -- alasim hakkinda bir olgu, ve ancak HESAPLAYARAK bilinir. Bu yuzden PREFLIGHT'ta degil ayri bir asamada yakalanmali, ve red neyin kararli oldugunu sylemeli ki kullanici daha yuksek bir sicaklikla tekrar deneyebilsin.
+
+**Beklenen cevap**
+- **Hesap yapılmamalı.** İstek reddedilmeli.
+- Red gerekçesinde `not fully liquid` geçmeli.
+- Red gerekçesinde `FCC_A1` geçmeli.
+
+
+## R28 · red_kesit_element_bilesimde_yok
 *zorluk: kolay*
 
 **Soru**
@@ -1408,7 +1504,7 @@ Taranan element alasimda yok. Motor bunu sessizce hicbir sey taramayarak gecisti
 - Red gerekçesinde `not in the composition` geçmeli.
 
 
-## R27 · red_kesit_iki_element
+## R29 · red_kesit_iki_element
 *zorluk: orta*
 
 **Soru**
@@ -1425,7 +1521,7 @@ Iki elementli sistemde bir elementi taramak, geriye makronun bagimli birakacagi 
 - Red gerekçesinde `at least three elements` geçmeli.
 
 
-## R28 · red_kesit_ters_eksen
+## R30 · red_kesit_ters_eksen
 *zorluk: kolay*
 
 **Soru**
@@ -1443,7 +1539,7 @@ axis_min >= axis_max. R10'un (ters sicaklik araligi) bilesim eksenindeki karsili
 - Red gerekçesinde `less than` geçmeli.
 
 
-## R29 · red_kesit_bagimli_elemente_yer_yok
+## R31 · red_kesit_bagimli_elemente_yer_yok
 *zorluk: zor*
 
 **Soru**
@@ -1462,5 +1558,5 @@ Eksenin ucu tek basina gecerli (%85 < 1) ve degerlerin hicbiri araligin disinda 
 
 ---
 
-**Toplam: 78 soru.**
+**Toplam: 83 soru.**
 

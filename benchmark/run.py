@@ -169,6 +169,64 @@ def judge_result(case, payload):
     amounts = payload.get("phase_molar_amounts") or {}
     points = payload.get("points")
 
+    # --- Scheil katilasma vakalari -----------------------------------
+    # Denge degil YOL: her nokta kendinden once ayrilan butun katiya
+    # bagli. Bu yuzden olcutler de farkli.
+    #
+    # En onemlisi "completed". Yarim kalmis bir katilasma egrisini tam
+    # gibi sunmak, bu projenin yakaladigi hatalarin aynisi olurdu --
+    # ustelik eksik kalan son birkac yuzde, segregasyon sorusunun asil
+    # sordugu yer. Bazi vakalarda BEKLENEN completed=False'tur: gecme
+    # olcutu dogru hesaplamak degil, eksikligi dogru soylemektir.
+    if payload.get("backend_used") == "native_oc_scheil":
+        if not points:
+            return False, "katilasma yolu bos dondu"
+        checks.append(f"{len(points)} nokta")
+
+        beklenen_tamam = expected.get("completed")
+        if beklenen_tamam is not None and payload.get("completed") != beklenen_tamam:
+            return False, (f"completed={payload.get('completed')}, beklenen "
+                           f"{beklenen_tamam} (kalan sivi "
+                           f"{payload.get('final_liquid_fraction')})")
+        if beklenen_tamam is not None:
+            checks.append("tamamlanma dogru raporlandi")
+
+        ust = expected.get("max_final_liquid_fraction")
+        if ust is not None:
+            kalan = payload.get("final_liquid_fraction")
+            if kalan is None or kalan > ust:
+                return False, f"kalan sivi {kalan}, ust sinir {ust}"
+            checks.append(f"kalan sivi {kalan:.4f}")
+
+        for name in expected.get("solid_phases", []):
+            if name not in (payload.get("solid_phases_formed") or []):
+                return False, (f"'{name}' katilasmada olusmamis "
+                               f"(olusanlar: {payload.get('solid_phases_formed')})")
+        if expected.get("solid_phases"):
+            checks.append("katilar dogru")
+
+        # Segregasyonun kendisi: Scheil'in var olma sebebi. Son sivinin
+        # bilesimi nominal degerin uzerine cikmali. Tamamen hesap
+        # makinesiyle kontrol edilebilir, termodinamik gerektirmez.
+        istek = case["arguments"]["elements_composition"]
+        olcek = sum(istek.values())
+        for element, en_az in (expected.get("segregation") or {}).items():
+            son = (points[-1].get("liquid_composition") or {}).get(element)
+            if son is None:
+                return False, f"son sivida '{element}' yok"
+            nominal = istek.get(element, 0) / olcek
+            if son <= nominal:
+                return False, (f"{element} zenginlesmemis: son sivi {son:.4g}, "
+                               f"nominal {nominal:.4g}")
+            if son < en_az:
+                return False, f"{element} son sivida {son:.4g}, beklenen >= {en_az}"
+            checks.append(f"{element} {nominal:.3g}->{son:.3g}")
+
+        if payload.get("liquidus_K") is None:
+            return False, "liquidus bulunamadi"
+        checks.append(f"liquidus {payload['liquidus_K']:.1f} K")
+        return True, " | ".join(checks)
+
     # --- diyagram vakalari -------------------------------------------
     if points is not None:
         solved = [p for p in points if "error" not in p]
