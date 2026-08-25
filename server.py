@@ -500,6 +500,18 @@ def calculate_equilibrium(
     })
 
 
+def _same_elements(composition_a: dict, composition_b: dict) -> bool:
+    """Do both sides contain the same elements in nonzero amount?
+
+    This decides whether the Gibbs energies are comparable at all. An
+    element present on one side only shifts that side's energy by its own
+    reference contribution, which has nothing to do with stability.
+    """
+    def present(composition):
+        return {el.upper() for el, amount in composition.items() if amount}
+    return present(composition_a) == present(composition_b)
+
+
 @mcp.tool()
 def compare_alloys(
     database: str,
@@ -523,6 +535,22 @@ def compare_alloys(
     Useful for questions like "suspend graphite and compare to the normal
     result" (call this twice with suspended_phases set only for B), or
     "how does adding more Cr change the stable phases".
+
+    WHAT THE GIBBS ENERGY DIFFERENCE MEANS — READ BEFORE USING IT
+    "Lower Gibbs energy is more stable" holds between states of ONE
+    composition: which phases a given alloy adopts. It does not hold
+    between different compositions. Each Gibbs energy is measured against
+    its own elements' reference states, so replacing some Fe with Mo moves
+    the number by that swap's reference contribution and says nothing
+    about how favourable either alloy is. Two alloys of different
+    composition are each at equilibrium; neither is "more stable" than the
+    other, and the result carries a note saying so.
+
+    When the elements differ, answer "which is better" with what does
+    transfer: which phases each forms and in what amount, how close other
+    phases are to appearing (each result's driving_force_RT), or over what
+    temperature range each stays single-phase — a property diagram per
+    side answers that last one.
 
     Args:
         database: database filename or full path, shared by both calculations.
@@ -587,14 +615,58 @@ def compare_alloys(
             )
         }
     else:
-        phases_a = set(result_a["phase_molar_amounts"])
-        phases_b = set(result_b["phase_molar_amounts"])
+        # Canonicalize before comparing, or the same phase counts as two
+        # different ones. Measured on Fe-20Cr against Fe-20Cr-2Mo at
+        # 1273 K: both are single-phase ferrite, and the summary said
+        # phases_only_in_A ["BCC_A2"], phases_only_in_B ["BCC_A2#1"],
+        # phases_in_both [] -- reporting that two alloys share no phase at
+        # all when their phase content is identical. "#1" is a phase's
+        # default composition set and the engine prints it inconsistently
+        # depending on the path a result came through; native_step and
+        # native_map already strip it, and this comparison was the one
+        # place still working on the raw spelling.
+        canon = native_step._strip_default_composition_set
+        phases_a = {canon(name) for name in result_a["phase_molar_amounts"]}
+        phases_b = {canon(name) for name in result_b["phase_molar_amounts"]}
         comparison = {
             "gibbs_energy_difference_J": result_b["gibbs_energy_J"] - result_a["gibbs_energy_J"],
             "phases_only_in_" + label_a: sorted(phases_a - phases_b),
             "phases_only_in_" + label_b: sorted(phases_b - phases_a),
             "phases_in_both": sorted(phases_a & phases_b),
         }
+        # Say what the difference means, because the field name alone says
+        # something false. "Lower Gibbs energy" is how stability is decided
+        # BETWEEN STATES OF ONE SYSTEM -- which phases a given composition
+        # adopts. Between two different compositions there is no such
+        # comparison: each G is the energy of a different system relative
+        # to its own elements' reference states, so swapping 2% Fe for 2%
+        # Mo moves G by the reference contribution of that swap and says
+        # nothing about how favourable either alloy is.
+        #
+        # Measured: asked which of Fe-20Cr and Fe-20Cr-2Mo is more stable
+        # at 1273 K, the client model read this field correctly (-569 J)
+        # and concluded the molybdenum alloy was more stable. Both are
+        # single-phase ferrite; neither is more stable than the other. It
+        # took the framing the field name offered, and there was none
+        # anywhere else to take.
+        if _same_elements(composition_a, composition_b):
+            comparison["gibbs_energy_difference_note"] = (
+                "Both sides have the same elements, so this difference is a "
+                "like-for-like comparison: the lower Gibbs energy is the "
+                "more stable state."
+            )
+        else:
+            comparison["gibbs_energy_difference_note"] = (
+                "These compositions do not contain the same elements, so "
+                "this difference does NOT say which alloy is more stable -- "
+                "each Gibbs energy is measured against a different set of "
+                "reference states and the difference mostly reflects that. "
+                "Stability compares states of one composition. To compare "
+                "two alloys, use what does transfer: which phases each "
+                "forms, how much of each, how close other phases are to "
+                "appearing (driving_force_RT), or over what temperature "
+                "range each stays single-phase."
+            )
 
     return {
         label_a: result_a,
