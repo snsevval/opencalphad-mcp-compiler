@@ -23,7 +23,14 @@ sormak modelin kendi önceki cevabını görmesine yol açar; o zaman ölçülen
 sistem değil konuşma olur. Bu kural bir kez atlandığında sekiz soru birden
 çöpe gitti.
 
-**Soruyu olduğu gibi yapıştır.** Eksik bırakılanlar kasıtlı.
+**Soruyu olduğu gibi yapıştır — parantez dahil.** Parantez içindeki
+bilgi (veritabanı, baz bileşim, aralık) sorunun parçası; sorunun eksiksiz
+olması için orada. Atlarsan Blok 1 sorusu farkında olmadan bir eksik bilgi
+testine dönüşür, ve cevap düştüğünde araç seçimi mi yoksa eksiklik mi
+yüzünden düştüğünü ayıramazsın.
+
+**Kasten eksik olan sorularin parantezi yoktur.** Blok 2 baştan sona böyle:
+çıplak cümle, ve ölçülen şey tam olarak o eksiklik.
 
 ## Değerlendirme
 

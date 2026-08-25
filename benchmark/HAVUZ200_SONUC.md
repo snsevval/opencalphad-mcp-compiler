@@ -33,6 +33,17 @@ değer"), ihtiyatlı ifade, fazladan bağlam, "istersen şunu da koşturayım"
 **Gri bölge:** dayanaksız ama doğru çıkan iddia — olgu kipiyle ve cevabın
 esasına dahilse düşürür, açıkça yan not olarak işaretlenmişse düşürmez.
 
+**Anlatı ekseni üç kademeli** (ikili işaret bazı yerlerde fazla sertti):
+
+- **✓** anlatı hesaplananın içinde kalmış
+- **~** cevap doğru ve dayanaklı, yanındaki bir cümle gevşek; **cevabı
+  değiştirmiyor**
+- **✗** anlatı çıktıyla çelişiyor, doğrulama durumunu yanlış aktarıyor, ya
+  da çıkmayan bir sonuca varıyor
+
+Hesap ekseni ikili kalıyor. Sayılmayan bir durum daha var: **değerlendirilemedi**
+— eline verilen veri sistemin kendi kusuru yüzünden bozuksa (1.17).
+
 ## Doğrulama
 
 Bir sayı tartışmalıysa motorla ölçülüyor ve ölçüm değerlendirmenin altına
@@ -44,14 +55,14 @@ yazılıyor. Değerlendirme hafızaya değil ölçüme dayanmalı.
 
 | Blok | Havuz | Soruldu | Hesap ✓ | Anlatı ✓ |
 |---|---|---|---|---|
-| 1 Doğru araç | 40 | 9 | 8 | 6 |
+| 1 Doğru araç | 40 | 23 | 20 | ✓12 ~8 ✗2 |
 | 2 Eksik bilgi | 30 | 0 | 0 | 0 |
 | 3 Yanlış öncül | 25 | 0 | 0 | 0 |
 | 4 Dürüst raporlama | 40 | 0 | 0 | 0 |
 | 5 Ezber tuzağı | 25 | 0 | 0 | 0 |
 | 6 Kapsam ve red | 25 | 0 | 0 | 0 |
 | 7 Zincirleme | 15 | 0 | 0 | 0 |
-| **Toplam** | **200** | **9** | **8** | **6** |
+| **Toplam** | **200** | **23** | **20/22** | **✓12 ~8 ✗2** |
 
 ## Tekrar eden örüntüler
 
@@ -609,5 +620,713 @@ ortak: ['BCC_A2']        ← eskiden []
 not  : "These compositions do not contain the same elements, so this
         difference does NOT say which alloy is more stable..."
 ```
+
+---
+
+> **Bu bölümdeki not (1.10–1.26):** Ham cevapların kutu çizimleri sade
+> tablolara çevrildi; **cümleler ve sayılar değiştirilmedi**. Tam ekran
+> çıktıları oturum kaydında duruyor.
+
+---
+
+## 1.10 · steel1'de %1 karbonlu ile %2 karbonlu çeliği 1100 K'de karşılaştır.
+
+*(oturum `mcp-test77`)*
+
+### Ham cevap (özet)
+
+| | %1 C | %2 C |
+|---|---|---|
+| Fazlar | BCC_A2 (%7.5) + FCC_A1 (%92.5) ⚠ | FCC_A1 (%100) ✓ |
+| Gibbs | −49,049 J/mol | −48,830 J/mol |
+| C kimyasal potansiyeli | −30,615 | −24,128 |
+| Entalpi | 31,854 J | 32,248 J |
+| Entropi | 73.55 J/K | 73.71 J/K |
+| Hacim | 7.23×10⁻⁶ | 7.20×10⁻⁶ |
+| **Doğrulama** | **Fiziksel olarak şüpheli (BCC beklenmiyor)** | Geçerli |
+
+> *"%1 karbonlu çelik sonucu fiziksel olarak tutarsız flaglenmiş. Fe-C faz
+> diyagramına göre 1100 K'de %1 karbonlu çelik tamamen FCC (austenit)
+> bölgesinde olmalı; BCC bu sıcaklıkta kararlı değil. Hesaplanan ~%7.5 BCC
+> fazı termodinamik olarak beklenmeyen bir sonuç... steel1 veritabanının
+> düşük karbon sınırındaki davranışıyla ilgili bir sınırlama olabilir."*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ~**
+
+Sayılar birebir. Üç kayma:
+
+1. **Doğrulama sonucunu ters aktardı.** Çıktıda `verification.passed: True`.
+2. **Yanlış fizik iddiası** — birim karışıklığından: %1 **atomca** C = ağırlıkça %0.22, yani düşük karbonlu çelik, A3'ü ~1128 K. 827 °C'de α+γ olması doğru. Ders kitabı diyagramı ağırlıkça; orada %1 C gerçekten tek fazlı östenit olurdu.
+3. Doğru sonucu **olmayan bir veritabanı kusuruna** yordu.
+
+Birinci maddede payımız var (aşağıya bak), bu yüzden ✗ değil ~.
+
+### Doğrulama
+
+```
+T=1100   BCC_A2 0.0753 + FCC_A1 0.9247     ← iki fazlı, doğru
+T=1150   FCC_A1 1.0                        ← A3 burada
+```
+
+Gerçek `compare_alloys` çıktısı, A tarafı:
+
+```
+verification.passed : True
+layer_b.passed      : None            ← ne geçti ne kaldı
+layer_b.reason      : "Model cevabından net bir SONUC okunamadı:
+                       We need to evaluate the result for physical
+                       reasonableness... Expect phases: at 1100 K,
+                       Fe-C system: austenite (FCC) stable for lo..."
+```
+
+**Bizim tarafta gerçek bir açık:** Katman B İngilizce, yarım kalmış bir
+muhakemeyle döndü, `SONUC:` işaretini üretmedi. Ayrıştırıcı karar okuyamadı
+→ `passed: None`, ve **ham yarım metin** dışarı verildi. O metnin görünen
+parçası şüphe gibi okunuyor.
+
+Sunucunun kendi ilkesi *"ulaşılamayan bir Katman B onaylamama değil mevcut
+değil olarak raporlanır"* diyor; tasarlanmamış üçüncü hal bu: **ulaşıldı ama
+kararı okunamadı.** Düzeltilmedi, Blok 1 sonuna bırakıldı.
+
+---
+
+## 1.11 · Molibden eklemek 1200 K'de Gibbs enerjisini düşürür mü?
+
+*(oturum `mcp-test79`)*
+
+### Ham cevap (özet)
+
+> *"Evet, Gibbs enerjisi daha negatif oluyor (−58,273 J → −58,726 J, −453 J
+> düşüş), ama bu karışıklığa yol açabilir."*
+>
+> *"Bu bileşimler aynı elementleri içermediği için, bu fark hangisinin daha
+> kararlı olduğunu göstermez — her Gibbs enerjisi kendi referans
+> durumlarına göre ölçülür."*
+
+| | Fe-10Cr-1C | +2Mo |
+|---|---|---|
+| Gibbs | −58,273 | −58,726 |
+| Fazlar | FCC_A1 %100 | FCC_A1 %77, BCC_A2 %20, M23C6, M6C |
+| μ(Mo) | — | −72,493 J/mol |
+
+> *"Kısaca: Sayı düşer, ama 'daha kararlı alaşım' demek için yanlış metrik."*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ✓**
+
+Soru kasten tuzaklıydı — "düşürür mü" diye sordu, cevap evet, ve tuzak
+oradan "daha kararlı"ya atlamaktı. Atlamadı.
+
+Notu alıntıladı, referans hali argümanını kurdu, ve **asıl anlamlı
+değişimi** buldu: faz yapısı. Tek fazlı östenit → dört faz. Sorunun gerçek
+cevabı bu ve Gibbs sayısında görünmüyor.
+
+### Doğrulama
+
+```
+Fe-10Cr-1C   G=-58273.0   FCC_A1#1 1.0
++2Mo         G=-58726.0   BCC_A2 0.2049 | FCC_A1 0.7718 | M23C6 0.0183 | M6C 0.0049
+             mu(Mo) = -72492.8
+```
+
+Her sayı doğru, faz değişimi gerçek. **Düzeltmenin ikinci teyidi.**
+
+---
+
+## 1.12 · agcu'da Ag-%20Cu ile Ag-%40Cu 1000 K'de hangisi daha az sıvı içerir?
+
+*(oturum `mcp-test80`)*
+
+### Ham cevap (özet)
+
+> *"Cevap: İkisi de 1000 K'da sıvı içermiyor — her ikisi de tamamen katı."*
+
+| Kompozisyon | Fazlar | Sıvı |
+|---|---|---|
+| Ag-%20Cu | FCC_A1#1 0.888 + FCC_A1_AUTO#2 0.112 | 0 |
+| Ag-%40Cu | FCC_A1#1 0.656 + FCC_A1_AUTO#2 0.344 | 0 |
+
+> *"Ag-Cu sisteminin ötektik noktası 780 °C (1053 K), ~%28 Cu'da."*
+>
+> *"Not: 40% Cu sonucunda bağımsız doğrulama modeli 'tek fazlı FCC
+> beklenirdi' diye itiraz etmiş, ama bu yanlış — 1000 K ötektik altındadır."*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ~**
+
+**Öncülü doğru düzeltti**: soru "hangisi daha az sıvı" diye sordu, cevap
+"ikisinde de yok".
+
+Gevşeklik: ötektik bu veritabanında **1056.1 K**, ve `%28` **ağırlıkça**
+değer (mol kesrinde 0.41). Sonucu değiştirmiyor.
+
+### Doğrulama
+
+```
+Ag-20Cu   FCC_A1#1 0.8877 + FCC_A1_AUTO#2 0.1123     KatmanB passed=True
+Ag-40Cu   FCC_A1#1 0.656  + FCC_A1_AUTO#2 0.344      KatmanB passed=True
+```
+
+**Katman B iddiası doğrulanamadı.** Benim koşumda ikisi de geçti ve
+*"iki fazlı bölgede olmalıdır"* dedi — itirazın tersi. Ama Katman B her
+çağrıda ayrı bir modele gidiyor ve kararı koşudan koşuya değişebiliyor
+(1.10 bunu gösterdi).
+
+**Ölçüm düzeniyle ilgili sonuç:** Katman B'nin kararını bildiren hiçbir
+cevap sonradan doğrulanamıyor. Soruları sorarken araç çıktısını da
+yakalamak bunu kapatır.
+
+---
+
+## 1.13 · iron4cd'de nikel katmak 1200 K'de faz dengesini değiştirir mi?
+
+*(oturum `mcp-test81`)*
+
+### Ham cevap (özet)
+
+| Fe-%18Cr-%1C | miktar | bileşim |
+|---|---|---|
+| FCC_A1 | 82.4% | Fe-11.3%Cr-0.9%C |
+| M23C6_D84 | 17.6% | Cr 51.6, Fe 27.7, C 20.7 |
+
+| +%8Ni | miktar | bileşim |
+|---|---|---|
+| FCC_A1 | 85.2% | Fe 79.1, Cr 11.8, Ni 8.5, C 0.6 |
+| M23C6_D84 | 6.1% | Cr 54.0, Fe 24.8, C 20.7, Ni 0.6 |
+| M7C3_D101 | 8.8% | Cr 59.2, Fe 10.7, C 30 |
+
+> *"Termodinamik olarak da Gibbs enerjisi −58.5 kJ → −61.2 kJ'ya düşüyor
+> (daha stabil)."*
+>
+> *"Not: Hesaplama %7.3 Ni ile converjans sağlandı; %8 tam olarak converjans
+> vermedi (motor hatası 4204)."*
+
+### Değerlendirme
+
+**Hesap ✓ (iç tutarlılık) · Anlatı ~**
+
+Kontrol edilebilir olanların hepsi tutuyor:
+
+| kontrol | sonuç |
+|---|---|
+| Faz toplamları | 82.4+17.6 = 100 · 85.2+6.1+8.8 = 100.1 |
+| M23C6 karbonu | %20.7 = **6/29**, formülden |
+| M7C3 karbonu | %30.0 = **3/10**, formülden |
+| Nikel kütle dengesi | 0.852×0.085 + 0.061×0.006 = **0.0728** |
+
+Son satır önemli: nikel dengesi **%7.3** veriyor — modelin *"%7.3 ile
+yakınsadı"* açıklaması kendi sayılarıyla doğrulanıyor. Motor sınırını
+dürüstçe raporlamış ve hangi bileşimi hesapladığını söylemiş.
+
+Düşüren: *"Gibbs enerjisi düşüyor (daha stabil)"* — 1.9'da düzelttiğimiz
+hata. Ama bu sefer **çerçeveyi biz vermemiştik**: model `compare_alloys`
+değil iki ayrı `calculate_equilibrium` kullanmış, notumuz orada yok.
+
+**Düzeltmemizin deliği:** not yalnızca `compare_alloys` çıktısında.
+Düzeltilmedi, Blok 1 sonuna bırakıldı.
+
+Küçük tutarsızlık: tablo başlığı `%8Ni` diyor, düzeltme dipnotta.
+
+---
+
+## 1.14 · steel1'de vanadyumlu ve vanadyumsuz halini 1300 K'de kıyasla.
+
+*(oturum `mcp-test82`)*
+
+### Ham cevap (özet)
+
+| | V yok | +%0.5V |
+|---|---|---|
+| Faz | FCC_A1 %100 | FCC_A1 %100 |
+| Gibbs | −66,382 J | −66,774 J |
+| Entalpi | 39,453 J | 39,352 J |
+| Entropi | 81.41 J/K | 81.64 J/K |
+| Hacim | 7.33×10⁻⁶ | 7.29×10⁻⁶ |
+| μ(V) | — | −133,292 J/mol |
+
+> *"Hacim %0.5 azalıyor (V, Fe/CR'dan küçük atom)"*
+>
+> *"V'nin kimyasal potansiyeli çok negatif (−133 kJ/mol) → FCC fazında güçlü
+> bir şekilde çözünmek istiyor"*
+>
+> *"Gibbs enerjisi farkı (−392 J) doğrudan kıyaslanamaz çünkü referans
+> durumlar farklı"*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ~**
+
+Her sayı birebir. **Gibbs'i doğru yaptı** — düzeltmenin üçüncü teyidi.
+
+İki gevşeklik:
+
+1. *"V, Fe/Cr'dan küçük atom"* — hacim gerçekten azalıyor (ölçüldü), ama
+   gerekçe yanlış: **vanadyum demirden büyük** (molar hacim V ~8.3, Fe ~7.1
+   cm³/mol). Doğru gözlemin altına yanlış sebep.
+2. *"μ(V) çok negatif → çözünmek istiyor"* — **Gibbs hatasının aynısı,
+   başka büyüklükte.** Seyreltik bir çözünenin kimyasal potansiyelinin çok
+   negatif olması aktivitesinin düşüklüğünden; bir eğilim değil.
+
+### Bulgu: not özel durumu düzeltti, kafa karışıklığını değil
+
+| büyüklük | not var mı | davranış |
+|---|---|---|
+| Gibbs enerjisi | **var** | doğru |
+| Kimyasal potansiyel | yok | **aynı hata** |
+
+Referans-göreli bir sayıyı yönelim gibi okuma alışkanlığı sürüyor; yalnızca
+kendisine söylenen yerde duruyor.
+
+### Doğrulama
+
+```
+V yok   FCC_A1#1 1.0   G=-66382  H=39453  S=81.41  V=7.3305e-06
++0.5V   FCC_A1   1.0   G=-66774  H=39352  S=81.64  V=7.2935e-06  mu(V)=-133292
+```
+
+---
+
+## 1.16 · agcu'da Ag-%40Cu 800-1400 K arasında nasıl davranır?
+
+*(oturum `mcp-test83`)*
+
+### Ham cevap (özet)
+
+| Sıcaklık | Fazlar |
+|---|---|
+| 800 – ~1056 K | FCC_A1 (~%73) + FCC_A1_AUTO#2 (~%27) |
+| ~1056 – ~1060 K | LIQUID + FCC_A1 |
+| > 1060 K | LIQUID %100 |
+
+> *"Eutektik sıcaklık: ~1056 K (≈783 °C) — literatürdeki ~1052 K (779 °C)
+> ile çok iyi uyumlu."*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ✓**
+
+Geçiş sıcaklıkları doğru (MAP ölçümümüz ötektiği 1056.124 K veriyor).
+
+**Hipotezi destekleyen davranış:** ötektiği hesaptan okuyup literatürle
+*karşılaştırmış*, birini diğerinin yerine koymamış. 1.2 ve 1.7'de tarama
+yokken ezberden vermişti.
+
+`%73/%27` de doğru — **kütle kesri** olarak. Molar miktarlar `0.62/0.38`;
+diyagram aracı kütle kesri döndürüyor. (Kendi ilk kontrolüm yanlış bazda
+yapılmıştı, ölçüm düzeltti.)
+
+### Yan bulgu — motorda
+
+Ötektik civarında tek nokta hesapları monoton değil:
+
+```
+T=1056   LIQUID 1.0
+T=1058   LIQUID 0.9687 + FCC 0.0313    ← katı geri geldi
+T=1060   LIQUID 0.9918 + FCC 0.0082
+T=1070   LIQUID 1.0
+```
+
+Çok düz bir enerji bölgesinde soğuk başlangıçlı çözücünün her seferinde
+biraz farklı çözüme oturması. Mimari bunu karşılıyor — STEP o bölgede yoğun
+ve tutarlı nokta üretiyor, gap-fill oraya girmiyor.
+
+---
+
+## 1.17 · Bu çeliği tavlarken karbürler hangi sıcaklıkta çözünür?
+
+*(oturum `mcp-test83`)*
+
+### Değerlendirme
+
+**Değerlendirilemedi — eline verilen veri bozuktu.**
+
+Bu soru, oturumun en pahalı sistem kusurunu ortaya çıkardı. Model 1200
+K'de sementit bildirdi; hiçbir ölçümümde sementit yoktu. Bakmaya
+başlayınca şu çıktı:
+
+| T | tek nokta (global minimizasyon) | STEP (diyagram) |
+|---|---|---|
+| 1100 K | BCC_A2 0.81 + M23C6 | BCC_A2 0.83 + M23C6 ✓ |
+| **1200 K** | **FCC_A1 0.90** + M23C6 + M6C | **BCC_A2 0.84** + M23C6 ✗ |
+| 1238 K | — | BCC_A2 0.84 + M23C6 ✗ |
+
+STEP 900 K'de kararlı olan ferrit çizgisini süreklilikle 1243 K'ye
+taşıyordu; ~1130 K'den sonra östenit kararlı. **Diyagramın 90 derecesi
+yanlış fazı gösteriyordu.**
+
+Ve `C4` kıyaslama vakası **tam o bileşimi** kullanıyor, geçiyordu — tek
+ölçütü "kaç nokta çözüldü" olduğu için. **Kapsama, doğruluk demek değil.**
+
+**Düzeltildi:** her STEP çizgi parçasının son noktası taze hesapla
+karşılaştırılıyor, uyuşmazsa geriye ikili arama. Kıyaslamaya da belirli
+sıcaklıkta faz ölçütü eklendi.
+
+Bu soru **düzeltilmiş sürümle tekrar sorulmalı.**
+
+---
+
+## 1.18 · alni-4slx'te Al-%50Ni 500 K'den 2000 K'ye ısınırken ne oluyor?
+
+*(oturum `mcp-test84`)*
+
+### Ham cevap (özet)
+
+| Sıcaklık | Fazlar |
+|---|---|
+| 500 – ~1920 K | BCC4 tek faz (B2 sıralı yapı) |
+| ~1920 – ~1926 K | BCC4 + LIQUID (solidus ~1920, liquidus ~1925.8) |
+| ~1926 – 2000 K | LIQUID |
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ✓**
+
+```
+T=500.0    BCC4 1.0
+T=1920.5   LIQUID 0.0038 + BCC4 0.9962
+T=1925.8   LIQUID 1.0
+```
+
+**1925.8 birebir** — bir ondalıkla, yani taramadan okumuş.
+
+Dar erime aralığı yerinde: AlNi stokiyometrik bir bileşik, uyumlu eriyor.
+Faz adını da doğru çerçevelemiş: *"B2 yapısı bu veritabanında BCC4 olarak
+etiketlenmiş"*.
+
+### Yan gözlem: iki kademe de gerekli
+
+```
+tek nokta  T=500   HATA (4204)
+tek nokta  T=1000  HATA (4204)
+STEP       T=500   BCC4 1.0   ✓
+```
+
+1.17'nin tam tersi — orada STEP yanılıyordu, tek nokta düzeltiyordu.
+
+---
+
+## 1.19 · steel1'de Fe-%15Cr-%1C için sigma fazı hangi aralıkta kararlı?
+
+*(oturum `mcp-test86`)*
+
+### Ham cevap (özet)
+
+> *"Bu bileşimde sigma fazı 800-1600 K aralığında kararlı değil."*
+
+| Aralık | Fazlar |
+|---|---|
+| 800–1117 K | BCC_A2 + M23C6 |
+| 1117–1263 K | BCC_A2 + FCC_A1 + M23C6 |
+| 1263–1406 K | FCC_A1 tek faz |
+| 1406–1600 K | FCC_A1 + BCC_A2 |
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ✓**
+
+```
+T=800.0    BCC_A2 + M23C6
+T=1116.9   BCC_A2 + FCC_A1 + M23C6     ← model: 1117
+T=1263.8   FCC_A1 tek faz              ← model: 1263
+T=1406.5   BCC_A2 + FCC_A1             ← model: 1406
+SIGMA görünen nokta: 0    ·    SIGMA dGm/RT = −0.0034 (kararsız)
+```
+
+Üç geçiş sıcaklığı da tam. **Olumsuz cevabı doğru vermek** kolay değil —
+"yok" demek için taramanın tamamına bakmak gerekiyor.
+
+Sigma açıklaması genel bilgi olarak sunulmuş, hesap diye değil.
+
+Küçük basitleştirme: üç fazlı bant gerçekte 1117–1160 arası, 1263'e kadar
+değil.
+
+---
+
+## 1.20 · Ag-Cu lehimi ısıtıldıkça sıvı oranı nasıl artar?
+
+*(oturum `mcp-test86`)*
+
+### Ham cevap (özet)
+
+| Aralık | Sıvı oranı |
+|---|---|
+| 900–1056 K | %0, iki katı faz |
+| ~1056 K | %0 → ~%50 (aniden) |
+| 1056–1102 K | %50 → %100 |
+| 1102–1200 K | %100 |
+
+> *"Ag-Cu sisteminin ötektik bileşimi %28 Cu civarındadır, bu bileşim
+> doğrudan ötektik bileşime yakın"*
+>
+> *"Erime aralığı: ~46 K"*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ~**
+
+Her sayı yerinde, ve sıçramayı **ötektik tepkimesi** diye tanımlaması
+veriden çıkarılmış doğru bir okuma.
+
+Düşüren tek cümle: `%28` **ağırlıkça** ötektik; mol kesrinde 0.41. Soru mol
+kesri veriyor.
+
+**Kendi tablosu yalanlıyor:** ötektik bileşimde erime aralığı sıfıra yakın
+olurdu; kendi verdiği 46 K bunu çürütüyor. İki cümle yan yana ve çelişiyor.
+
+### Doğrulama
+
+| | Ag-%28Cu (soru) | gerçek ötektik (x=0.41) |
+|---|---|---|
+| 1050 K | %0 | %0 |
+| 1056 K | **%52.6** | **%100** |
+| 1105 K | %100 | — |
+
+Ötektik bileşimde erime tek adımda tamamlanıyor. Bu alaşım %50'ye sıçrayıp
+kalan 49 K boyunca yavaşça eriyor.
+
+### Örüntü: birim karışıklığı, üçüncü kez
+
+| soru | karışan |
+|---|---|
+| 1.10 | %1 atomca C ↔ ağırlıkça |
+| 1.12 | %28 Cu ağırlıkça ↔ mol kesri |
+| 1.20 | aynısı |
+
+Üçü de aynı yönde: ders kitabı ağırlıkça, hesap mol kesriyle.
+
+---
+
+## 1.22 · cost507R'de Al-%5Zn-%2Mg 400-900 K arasında nasıl davranır?
+
+*(oturum `mcp-test87`)*
+
+### Ham cevap (özet)
+
+| Aralık | Fazlar |
+|---|---|
+| 400–602 K | FCC_A1 + MGZN2 (%5.8 → %0.14) |
+| ~602 K | MGZN2 çözünür (solvus) |
+| 602–877 K | FCC_A1 tek faz |
+| ~877 K | Solidus |
+| 877–900 K | %32 sıvı, %68 FCC |
+
+> *"işleme sıcaklığı bu sınırın (604 °C) altında tutulmalı"*
+
+### Değerlendirme
+
+**Hesap ✗ · Anlatı ~**
+
+| iddia | model | ölçüm |
+|---|---|---|
+| MGZN2 çözünme | ~602 K | **~660 K** |
+| Solidus | ~877 K | **~850 K** |
+| 900 K'de sıvı | %32 | **%72–73** |
+| MGZN2 @600 K | %0.14 | **%3.0** |
+
+**Nitel resim doğru** — faz sırası, MgZn₂'nin η fazı olduğu, yaşlanma
+sertleştirme yorumu, birim çevrimleri.
+
+**Nicel taraf tutmuyor**, ve üstüne pratik tavsiye kurulmuş.
+
+### Doğrulama: bizim çıktımız değişken değil
+
+Üç koşu, birebir aynı:
+
+```
+tur 1:  solidus 850.384 K   son MGZN2 660.0 K   900 K sıvı 0.7334
+tur 2:  solidus 850.384 K   son MGZN2 660.0 K   900 K sıvı 0.7334
+tur 3:  solidus 850.384 K   son MGZN2 660.0 K   900 K sıvı 0.7334
+```
+
+Son noktalar: `850.4 → %0.11`, `880.0 → %25.76`, `900.0 → %73.34`.
+
+Model'in üç sayısı da bu listede **yok** — yanlış satır okuma bile değil.
+Ve 900 K eksenin ucu; kaç nokta istenirse istensin son değer 73.34%.
+Farklı örnekleme açıklayamaz. Baz farkı da değil (molar %72.4).
+
+### Yeni örüntü: doğru yapı, üretilmiş sayı
+
+| önceki | 1.22 |
+|---|---|
+| doğru sayı, yanlış yorum *(1.9, 1.11)* | doğru yorum, **yanlış sayı** |
+| bir sayı yanlış okunmuş *(1.3)* | üç sayı da veride yok |
+| ezberden **sınır sıcaklığı** *(1.2, 1.7)* | ezberden **ölçüm sonucu** |
+
+1.2 ve 1.7'de eklenen şey hesabın *dışındaki* bilgiydi. Burada eklenen şey
+hesabın **kendi çıktısı olması gereken** sayılar. Bizim tarafta
+kapatılabilir yanı yok: veri doğru, eksiksiz, deterministik, çıktıda.
+Okunmamış.
+
+---
+
+## 1.24 · Sabit 1200 K'de karbon oranını artırdıkça hangi karbürler beliriyor?
+
+*(oturum `mcp-test90`)*
+
+### Ham cevap (özet)
+
+| Karbon | Fazlar |
+|---|---|
+| 0.001–0.0087 | FCC_A1 tek faz |
+| ≥ 0.0113 | FCC_A1 + M₇C₃ |
+
+> *"M₇C₃ tek karbür fazı olarak çıkıyor... İlk çıkışta ~%0.17, %5 C'de %8.2"*
+>
+> *"M₂₃C₆, M₃C, M₆C 1200 K'da bu Cr oranında kararlı değil"*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ✓**
+
+```
+x(C)=0.0075   FCC_A1 1.0
+x(C)=0.0108   FCC_A1 0.9994 + M7C3 0.0006
+x(C)=0.0500   FCC_A1 0.9181 + M7C3 0.0819     ← model: %8.2, birebir
+```
+
+Yapısal iddia da doğru: bu sıcaklıkta **tek karbür M7C3**, M23C6 hiç
+çıkmıyor. Olumsuz iddiayı doğru vermiş.
+
+### 1.23 ile birlikte anlamlı
+
+| | ne artıyor | karbür sırası |
+|---|---|---|
+| 1.23 · 1100 K | krom | M7C3 → **M23C6** |
+| 1.24 · 1200 K | karbon | sadece **M7C3** |
+
+İkisinde de doğru cevap — **ezberlenmiş tek bir sıra** kullanmıyor.
+
+---
+
+## 1.25 · 1100 K'de molibden eklemek hangi yeni fazları getirir?
+
+*(oturum `mcp-test91`)*
+
+### Ham cevap (özet)
+
+| Mo aralığı | Ana fazlar |
+|---|---|
+| %0 | FCC_A1 + M7C3 |
+| %3–%7 | BCC_A2 + M23C6 + M6C |
+| **%8–%9** | **FCC_A1 + M23C6 + M6C — östenit tekrar görünür** |
+| %10–%12 | BCC_A2 + M6C |
+| %13–%15 | BCC_A2 + LAVES_PHASE + M6C |
+
+> *"En dikkat çekici yeni faz LAVES_PHASE — %13 Mo üzerinden devreye
+> giriyor"*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ~**
+
+Sorunun asıl cevabı doğru: molibdenin getirdiği yeni fazlar **M6C ve
+LAVES_PHASE**. M6C'nin ~%3'ten çıkışı, LAVES'in ~%12-13'te belirmesi,
+M23C6'nın geçici olması, ferrit tabanı — hepsi doğru.
+
+Tek yanlış satır: **östenit geri dönmüyor.**
+
+```
+n=15   x=0.0857   BCC_A2 0.788 + M23C6 0.028 + M6C 0.184
+n=16   x=0.0800   BCC_A2 0.795 + M23C6 0.037 + M6C 0.168
+```
+
+Geçiş bir kez oluyor (x≈0.011) ve geri gelmiyor.
+
+### Kendi hatamı düzeltme
+
+İlk bakışta "FCC ve BCC hiçbir noktada birlikte yok" demiştim. `n_points=15`
+ile:
+
+```
+x=0.0107   BCC_A2 0.157 + FCC_A1 0.736 + M23C6 0.107     toplam 1.0000
+```
+
+**Birlikte varlar ve bu doğru fizik** — iki fazlı α+γ alanı. Benim
+`n_points=16` ızgaram o dar bölgenin üstünden atlamış. Ölçüm yanlış
+değildi, örneklemem kördü.
+
+### Yan bulgu: `n_points` motoru etkiliyor
+
+```
+n=15   backend = single_point_scan      ← STEP takıldı
+n=16   backend = native_oc_step_gnuplot
+n=20   backend = native_oc_step_gnuplot
+```
+
+Takılma girdiye bağlı, salt rastgele değil.
+
+### Grafik katmanı temiz
+
+Aynı veriden grafiği ürettim: FCC_A1 yalnızca x=0–0.01 arasında kısa bir
+parça, çizgi boşlukta kopuyor. Boş hücreler doğru işleniyor, uydurma
+bağlantı yok.
+
+---
+
+## 1.26 · 1000 K sabit tutup gümüş-bakır oranını değiştirirsem ne olur?
+
+*(oturum `mcp-test91`)*
+
+### Ham cevap (özet)
+
+> *"İkili sistemlerde calculate_isothermal_section en az 3 element istiyor.
+> calculate_phase_diagram ile faz diagramını çizdirelim."*
+
+| Cu aralığı | Mikroyapı |
+|---|---|
+| x(Cu) < ~0.06 | Tek faz FCC_A1 (Ag-zengin) |
+| ~0.06 < x(Cu) < ~0.99 | İki faz: FCC_A1 + FCC_A1_AUTO#2 |
+| x(Cu) > ~0.99 | Tek faz FCC_A1_AUTO#2 |
+
+> *"Eutektik: 1056 K, x(Cu) ≈ 0.415"*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ~**
+
+Kurtarma davranışı doğru: reddi görüp **başka bir araçla** soruyu
+cevaplamış. Ötektik 1056 K / x(Cu)≈0.415 ✓, `_AUTO#2` açıklaması ✓.
+
+Düşüren: çözünürlük sınırları yanlış.
+
+```
+Ag-zengin FCC:  x(Cu) = 0.1031      model: ~0.06–0.07
+Cu-zengin FCC:  x(Cu) = 0.9663      model: ~0.99
+```
+
+Bağ-çizgisi uçları, iki fazlı bölge boyunca sabit (dört bileşimde aynı
+çıktı). Model'in `0.06` değeri aslında **900 K**'nin değeri — 1.8'de orada
+doğru kullanmıştı. Sayıyı hesaptan değil başka bir sıcaklıktan getirmiş.
+
+### Sistem bulgusu: reddimiz yardımcı değil, kuralımız fazla geniş
+
+PREFLIGHT üç şikâyet döndürdü:
+
+```
+"Scanning CU in a two-element system... needs at least three elements"
+"axis_max must be a mole fraction in [0, 1), got 1.0"
+"axis_max (1.0) leaves nothing for the dependent element"
+```
+
+Hiçbiri ne yapılması gerektiğini söylemiyor, ve son ikisi ikili sistemde
+0→1 taramanın doğal sonucu.
+
+Model doğru alternatifi kendisi buldu ama bunu yaparken **STOP RULE'u
+çiğnedi** (*"Do NOT call this or any other calculation tool again in this
+turn"*). O kural, eksik bilgiyi uydurup yeniden denemeyi engellemek için
+var; burada uydurma yok.
+
+**Kural iki durumu ayırmıyor:**
+
+| durum | doğru davranış |
+|---|---|
+| istek imkânsız (olmayan element) | dur, sor |
+| bu araç yapamaz, başkası yapar | **yönlendir** |
+
+Düzeltilmedi, Blok 1 sonuna bırakıldı.
 
 ---
