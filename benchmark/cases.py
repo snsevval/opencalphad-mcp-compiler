@@ -1197,7 +1197,15 @@ C_FAZ_GECISI = [
         "zorluk": "orta",
         "olcum": "Bes elementli celik, 900-1400 K. Sicaklik arttikca karbur "
                  "cozunup matrise girmeli. B6/B7 ile ayni bilesim -- iki tek "
-                 "nokta ile bir tarama ayni sistemi farkli aciardan gosteriyor.",
+                 "nokta ile bir tarama ayni sistemi farkli aciardan "
+                 "gosteriyor.\n\n"
+                 "1200 K olcutu sonradan eklendi ve sebebi kayda deger: bu "
+                 "vaka, diyagramin doksan derecelik bir bolumu YANLIS FAZI "
+                 "gosterirken geciyordu. STEP, 900 K'de kararli olan ferrit "
+                 "cizgisini surekliligle 1243 K'ye tasiyordu; oysa ~1130 "
+                 "K'den sonra ostenit kararli. Vaka geciyordu cunku tek "
+                 "olcutu 'kac nokta cozuldu' idi ve 45 noktanin hepsi "
+                 "hesaplanabilmisti. Kapsama, dogruluk demek degil.",
         "soru": "steel1.TDB'de Fe=0.879 C=0.04 Cr=0.06 Mo=0.02 V=0.001 icin "
                 "900-1400 K faz diyagrami ciz",
         "tool": "calculate_property_diagram",
@@ -1208,7 +1216,14 @@ C_FAZ_GECISI = [
             "temperature_min_K": 900, "temperature_max_K": 1400,
             "n_points": 20,
         },
-        "expected": {"max_failed_fraction": 0.20},
+        "expected": {
+            "max_failed_fraction": 0.20,
+            # Bagimsiz tek nokta hesaplariyla dogrulandi: 900 K'de ferrit,
+            # 1200 K'de ostenit. Ikisi de global minimizasyon yapan yoldan,
+            # yani surekliligi olcen STEP'ten bagimsiz.
+            "phases_present_at": {900: ["BCC_A2"], 1200: ["FCC_A1"]},
+            "phases_absent_at": {1200: ["BCC_A2"]},
+        },
     },
     {
         "id": "C5_agcu_otektik_bilesim",

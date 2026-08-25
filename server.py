@@ -1083,11 +1083,19 @@ def calculate_isothermal_section(
                 ),
             })
             continue
+        # Same spelling as the native path uses. build_combined_series
+        # strips the default "#1" composition set from every name it
+        # returns; this path did not, so the two ways of answering one
+        # question named the same phase differently -- BCC_A2 from STEP,
+        # BCC_A2#1 from here. A caller comparing the two, or a test
+        # naming a phase, sees a difference that is not in the chemistry.
+        mass_fractions = native_step._phase_mass_fractions_from_moles(
+            result["phase_molar_amounts"], result["phase_element_composition"]
+        )
         combined.append((
             x,
-            native_step._phase_mass_fractions_from_moles(
-                result["phase_molar_amounts"], result["phase_element_composition"]
-            ),
+            {native_step._strip_default_composition_set(name): value
+             for name, value in mass_fractions.items()},
             "native_fallback",
         ))
 

@@ -310,6 +310,40 @@ def judge_result(case, payload):
         if expected.get("phase_order"):
             checks.append("faz sirasi dogru")
 
+        # --- belirli bir konumda hangi fazlar -----------------------
+        # "Kac nokta cozuldu" bir diyagramin DOGRU olup olmadigini
+        # olcmuyor. Olculdu: steel1 Fe-4C-6Cr-2Mo-0.1V icin STEP, 900 K'de
+        # kararli olan ferrit cizgisini surekliligle 1243 K'ye kadar
+        # tasiyordu; oysa ~1130 K'den sonra ostenit kararli. Diyagramin
+        # doksan derecelik bir bolumu yanlis fazi gosteriyordu ve C4 vakasi
+        # geciyordu, cunku 45 noktanin hepsi hesaplanabilmisti.
+        #
+        # Referans motorun kendi ciktisi degil: her biri BAGIMSIZ bir tek
+        # nokta hesabiyla dogrulanmis, ve tek nokta yolu global
+        # minimizasyon yaptigi icin sureklilikten farkli bir sey olcuyor.
+        def _en_yakin_nokta(hedef):
+            return min(solved, key=lambda p: abs(
+                (p.get("x", p.get("temperature_K")) or 0) - hedef))
+
+        for hedef, isimler in (expected.get("phases_present_at") or {}).items():
+            nokta = _en_yakin_nokta(float(hedef))
+            var = nokta.get("phase_molar_amounts") or {}
+            eksik = [n for n in isimler if n not in var]
+            if eksik:
+                return False, (f"{hedef} civarinda beklenen faz(lar) yok: "
+                               f"{eksik} (gelen: {sorted(var)})")
+            checks.append(f"{hedef}: {'+'.join(isimler)}")
+
+        for hedef, isimler in (expected.get("phases_absent_at") or {}).items():
+            nokta = _en_yakin_nokta(float(hedef))
+            var = nokta.get("phase_molar_amounts") or {}
+            fazla = [n for n in isimler if n in var]
+            if fazla:
+                return False, (f"{hedef} civarinda olmamasi gereken faz "
+                               f"var: {fazla} -- surekliligin yari kararli "
+                               "bir dalda kalmis olmasi bu sekilde gorunur")
+            checks.append(f"{hedef}: {'/'.join(isimler)} yok")
+
         # Eksen uclarinda ne olmasi gerektigi. Ucun kendisi hesaplanmadan
         # gecerse bu olcut kalir -- istenen araligin sonu sonucta yoksa
         # soru tam cevaplanmamistir.

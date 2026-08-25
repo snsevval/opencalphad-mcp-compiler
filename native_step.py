@@ -296,17 +296,21 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
                 env=env,
             )
             deadline = time.monotonic() + timeout
+            finished = False
             try:
                 while time.monotonic() < deadline:
                     if proc.poll() is not None:
+                        finished = True
                         break  # exited on its own
                     try:
                         with open(stdout_path, errors="ignore") as probe:
                             if end_marker in probe.read():
+                                finished = True
                                 break
                     except OSError:
                         pass
                     if os.path.isfile(csv_path) and os.path.getsize(csv_path) > 0:
+                        finished = True
                         break
                     time.sleep(0.2)
             finally:
@@ -315,6 +319,28 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
                     proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     pass
+
+        # Reaching the deadline is a failure, not a result.
+        #
+        # Until now the timeout was swallowed and whatever partial CSV
+        # existed got parsed as if the run had finished. What that produces
+        # is a diagram quietly missing points -- and quietly is the problem,
+        # because nothing downstream can tell a truncated scan from a
+        # complete one. Measured: the isothermal section of steel1
+        # Fe-10Cr-C intermittently hangs (roughly one run in four), and on
+        # those runs the first point simply vanished, taking BCC_A2 with
+        # it. The benchmark then reported a missing phase, which is a true
+        # statement about the data and a misleading one about the system.
+        #
+        # Both callers have somewhere better to go: the section tool falls
+        # back to scanning single points, the property diagram to its own
+        # Python loop. Slower and reliable beats fast and unverifiable.
+        if not finished:
+            raise NativeStepError(
+                f"STEP did not finish within {timeout}s and was stopped. "
+                "Whatever it had written by then may be incomplete, so it "
+                "is discarded rather than passed on as a full scan."
+            )
 
 
         if os.path.isfile(csv_path):
@@ -630,6 +656,107 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
 
     nominal_spacing = (span_hi - span_lo) / max(n_points - 1, 1)
     gap_threshold = nominal_spacing * 3
+
+    def _fresh_reading(position):
+        """One globally-minimised equilibrium at this axis position."""
+        point_composition, point_temperature = single_point_args(position)
+        result = native_fallback.run_and_parse(
+            db_path, point_composition, point_temperature, pressure_Pa,
+            timeout=fallback_timeout,
+        )
+        return _phase_mass_fractions_from_moles(
+            result["phase_molar_amounts"], result["phase_element_composition"]
+        )
+
+    def _reading_agrees(step_fractions, fresh_fractions):
+        """Same equilibrium? The fresh reading's names are the full ones, so
+        they serve as the vocabulary STEP's truncated headers resolve
+        against.
+
+        Compared at one per cent, not at the 1e-4 used for a single
+        endpoint. The question here is whether the line is still on the
+        stable phases, and a trace phase present in one reading and absent
+        from the other is not evidence that it left them -- at 1e-4 an
+        HCP_A3 sitting at 0.0014 counted as a disagreement and cost fifty
+        degrees of perfectly good STEP resolution. One per cent still
+        separates the case this exists for by a wide margin: ferrite at
+        0.84 against austenite at 0.90, with different phases entirely.
+        """
+        known = set(fresh_fractions)
+        left = {_canonicalize_phase_name(n, known): v
+                for n, v in step_fractions.items()}
+        right = {_canonicalize_phase_name(n, known): v
+                 for n, v in fresh_fractions.items()}
+        return _fractions_agree(left, right, tol=0.01)
+
+    # Where a STEP line ENDS, check whether it was still on the stable
+    # branch when it got there.
+    #
+    # STEP walks by continuation and never re-minimises globally, so once
+    # the phase set it is following stops being the lowest-energy one it
+    # keeps following it anyway. The endpoint check above catches that at
+    # the ends of the requested range; it does not catch it in the middle,
+    # and the middle is where it actually bit. Measured on steel1
+    # Fe-4C-6Cr-2Mo-0.1V over 900-1500 K: STEP starts at 900 K where
+    # ferrite is stable, and reports BCC_A2+M23C6 all the way to 1243 K.
+    # Fresh single points say austenite takes over around 1150 K --
+    # FCC_A1 0.90 at 1200 K against STEP's BCC_A2 0.84. Roughly ninety
+    # degrees of that diagram named the wrong phase, on a chart that
+    # looked continuous and passed every check the benchmark had.
+    #
+    # The argument that justified checking the endpoints applies here
+    # unchanged, and applying it only to the axis ends was the mistake: a
+    # continuation is least trustworthy where it has travelled furthest
+    # from its start, which is the end of each LINE, not the end of the
+    # axis. A line that stops short of the range is one that struggled,
+    # and its last points are the most suspect.
+    #
+    # So each line's last point is read a second time, and where the two
+    # disagree the divergence is bisected backwards to find where the line
+    # left the stable branch. Everything from there on is dropped and the
+    # region handed to the single-point path, which does re-minimise.
+    # Bisection costs log2(n) calls, against a gap-fill that already runs
+    # dozens.
+    line_end_indices = []
+    for index in range(len(step_points) - 1):
+        if step_points[index + 1][0] - step_points[index][0] > gap_threshold:
+            line_end_indices.append(index)
+    if step_points[-1][0] < span_hi - gap_threshold:
+        line_end_indices.append(len(step_points) - 1)
+
+    untrusted_from = None
+    for end_index in line_end_indices:
+        try:
+            fresh = _fresh_reading(step_points[end_index][0])
+        except Exception:
+            continue  # no second opinion available; STEP's own point stands
+        if not fresh or _reading_agrees(step_points[end_index][1], fresh):
+            continue
+
+        # This line ended off the stable branch. Find where it left it:
+        # the lowest index that already disagrees. Anything at or below
+        # `low` is known good, anything at or above `high` is known bad.
+        low, high = 0, end_index
+        while low < high:
+            middle = (low + high) // 2
+            try:
+                probe = _fresh_reading(step_points[middle][0])
+            except Exception:
+                break
+            if probe and _reading_agrees(step_points[middle][1], probe):
+                low = middle + 1
+            else:
+                high = middle
+        untrusted_from = low if untrusted_from is None else min(untrusted_from, low)
+
+    if untrusted_from is not None:
+        step_points = step_points[:untrusted_from]
+        if not step_points:
+            raise NativeStepError(
+                "Every point STEP produced disagreed with an independent "
+                "equilibrium at the same position -- its line never followed "
+                "the stable phases. The single-point path covers this system."
+            )
 
     gaps = []
     if step_points[0][0] > span_lo + gap_threshold:
