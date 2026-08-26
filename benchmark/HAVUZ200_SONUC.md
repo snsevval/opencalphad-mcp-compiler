@@ -53,16 +53,29 @@ yazılıyor. Değerlendirme hafızaya değil ölçüme dayanmalı.
 
 ## Sayaç
 
-| Blok | Havuz | Soruldu | Hesap ✓ | Anlatı ✓ |
+| Blok | Havuz | Soruldu | Hesap | Anlatı |
 |---|---|---|---|---|
-| 1 Doğru araç | 40 | 23 | 20 | ✓12 ~8 ✗2 |
-| 2 Eksik bilgi | 30 | 0 | 0 | 0 |
-| 3 Yanlış öncül | 25 | 0 | 0 | 0 |
-| 4 Dürüst raporlama | 40 | 0 | 0 | 0 |
-| 5 Ezber tuzağı | 25 | 0 | 0 | 0 |
-| 6 Kapsam ve red | 25 | 0 | 0 | 0 |
-| 7 Zincirleme | 15 | 0 | 0 | 0 |
-| **Toplam** | **200** | **23** | **20/22** | **✓12 ~8 ✗2** |
+| 1 Doğru araç | 40 | 29 | ✓23 ~1 ✗4 | ✓13 ~11 ✗4 |
+| 2 Eksik bilgi | 30 | 0 | — | — |
+| 3 Yanlış öncül | 25 | 0 | — | — |
+| 4 Dürüst raporlama | 40 | 0 | — | — |
+| 5 Ezber tuzağı | 25 | 0 | — | — |
+| 6 Kapsam ve red | 25 | 0 | — | — |
+| 7 Zincirleme | 15 | 0 | — | — |
+| **Toplam** | **200** | **29** | **✓23 ~1 ✗4** | **✓13 ~11 ✗4** |
+
+**Araç seçimi: 29/29.** Blok 1'in kendi ölçütü. Hiç şaşmadı.
+
+30 ölçüm, 29 soru (1.9 iki kez soruldu), 28 notlandı — 1.17
+notlandırılamadı, eline verilen veri bozuktu.
+
+Blok 1'de kalan 11 soru: 1.21, 1.23, 1.29, 1.30, 1.34, 1.35, 1.36,
+1.37, 1.38, 1.39, 1.40.
+
+**Bu 11 sorunun 7'si — 1.21, 1.23, 1.29, 1.30, 1.34, 1.35, 1.36 — tarama
+özeti eklendikten SONRA soruluyor** (bkz. dosya sonu, *Düzeltme 1*). İlk
+29 ile aynı koşulda değiller; özetin işe yarayıp yaramadığının ölçümü
+olarak okunmalılar.
 
 ## Tekrar eden örüntüler
 
@@ -890,6 +903,83 @@ V yok   FCC_A1#1 1.0   G=-66382  H=39453  S=81.41  V=7.3305e-06
 
 ---
 
+## 1.15 · steel1'de Fe-%1C çeliğini 300 K'den 2000 K'ye ısıtırsam fazlar nasıl değişir?
+
+*(oturum `mcp-test999` — sıra dışı, blok sonunda soruldu)*
+
+### Ham cevap (özet)
+
+| Sıcaklık | Faz(lar) | Not |
+|---|---|---|
+| 300 – ~1011 K | BCC_A2 + GRAPHITE | "düşük T'de karbür yerine grafit çöker (veritabanı modeli)" |
+| ~1011 K | BCC_A2 → FCC_A1 başlar | "grafit kaybolur" |
+| ~1011 – 1104.7 K | BCC_A2 + FCC_A1 | |
+| 1104.7 K | BCC_A2 → 0, FCC_A1 → 1.0 | "tam austenitik alan başlar" |
+| 1104.7 – 1794 K | FCC_A1 tek faz | |
+| ~1794 K | FCC_A1 → LIQUID | "erime başlangıcı (solidus)" |
+| 1794 – 2000 K | LIQUID tek faz | |
+
+> *"Yüksek sıcaklıkta FCC_A1 (austenit) → BCC_A2 (delta-ferrit) geçişi de bu
+> veritabanında ~1794 K erimeye kadar görünmüyor (düşük C içeriğinde
+> delta-ferrit alanı dar)."*
+
+Grafik kendi aracımızdan geldi (`steel1.TDB property diagram`), ayrı bir
+görsel üretmedi.
+
+### Değerlendirme
+
+**Hesap ✗ · Anlatı ~ · Araç seçimi ✓**
+
+**Düşük sıcaklık yarısı kusursuz.** Ölçüm:
+
+```
+T=1011   BCC_A2 0.9908 + GRAPHITE 0.0092
+T=1012   BCC_A2 0.6926 + FCC_A1 0.3074     <- otektoid
+T=1104   BCC_A2 0.0123 + FCC_A1 0.9877
+T=1106   FCC_A1 1.0                        <- A3
+```
+
+Ötektoid 1011 K, tam östenit 1104.7 K — ikisi de bağımsız referansımızla
+birebir. Grafit gözlemi de doğru ve veritabanına özgü, ezber değil.
+
+**Yüksek sıcaklık yarısı yanlış.** Ölçüm:
+
+```
+T=1758   FCC_A1 1.0
+T=1762   LIQUID 0.0347 + FCC_A1 0.9653     <- erime burada basliyor
+T=1766   LIQUID 0.0966 + FCC_A1 0.9034
+T=1768   LIQUID 0.2907 + BCC_A2 0.7093     <- peritektik
+T=1780   LIQUID 0.4705 + BCC_A2 0.5295
+T=1791   LIQUID 0.8242 + BCC_A2 0.1758
+T=1792   LIQUID 1.0                        <- likidus
+```
+
+Üç ayrı hata, hepsi aynı bölgede:
+
+| iddia | ölçüm |
+|---|---|
+| erime 1794 K'de başlar | 1760 K'de başlıyor |
+| "solidus" | 1791.5 K likidus, solidus değil |
+| δ-ferrit görünmüyor | 1767–1791.5 K arası var, %71'e kadar çıkıyor |
+
+Sonuncusu ağır olanı: δ-ferrit **modelin kendi grafiğinde** mor bir tepe
+olarak duruyor, 0.7'ye kadar çıkıyor. Model onu görüp yorumlamak yerine
+yokluğunu gerekçelendirmiş ("düşük C içeriğinde delta-ferrit alanı dar").
+
+### Örüntü
+
+Bu, 1.28 ve 1.32'nin sınıfı: **okuduğu değer doğru, satırlar arasından
+çıkarması gereken değer yanlış.** Ötektoid ve A3 tek bir satırda yazılı —
+onları getirdi. Erime bölgesinde faz sırasının FCC → FCC+L → BCC+L → L
+diye değiştiğini görmek birkaç satırı yan yana koymayı gerektiriyor —
+orada uydurdu.
+
+Blok sonu düzeltme listesindeki **`phase_transitions` + `dominant_phase_regions`**
+maddesi tam bunu hedefliyor: tarama sonucuna "hangi sıcaklıkta faz kümesi
+değişti" alanını *hesaplayıp* koymak. Bu soru o maddenin üçüncü kanıtı.
+
+---
+
 ## 1.16 · agcu'da Ag-%40Cu 800-1400 K arasında nasıl davranır?
 
 *(oturum `mcp-test83`)*
@@ -1328,5 +1418,455 @@ var; burada uydurma yok.
 | bu araç yapamaz, başkası yapar | **yönlendir** |
 
 Düzeltilmedi, Blok 1 sonuna bırakıldı.
+
+---
+## 1.27 · saf2507'de 1300 K'de azotu artırmak fazları nasıl etkiler?
+
+*(oturum `mcp-test89`)*
+
+### Ham cevap (özet)
+
+| x(N) | Fazlar | Model notu |
+|---|---|---|
+| ~0 | BCC_A2 %80.6 + FCC_A1 %19.4 | ferrit + östenit |
+| 0.0005 – 0.0068 | BCC ↓ %80.6→%52.8, FCC ↑ %19.4→%47.2 | "N östeniti stabilize ediyor" |
+| **0.00737** | **BCC_A2 %98.5 + HCP_A3 %1.5** | **"hesaplama artefaktı / faz sınırı sorunu olabilir"** |
+| 0.00842 | BCC_A2 %48.4 + FCC_A1 %51.6 | "tekrar BCC+FCC bölgesi" |
+| 0.0089 – | BCC_A2 ~%98 + HCP_A3 ~%2 | "yüksek N'de HCP" |
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ✓ · Araç seçimi ✓**
+
+> **Bu kayıt düzeltildi.** İlk değerlendirmemde "model bir anormallik
+> uydurdu ve bunu bizim mimarimize yükledi" yazmıştım. Ölçüm bunu çürüttü.
+
+Yeniden ölçüm (20 nokta, `native_oc_step_gnuplot`):
+
+```
+x(N)=0.00684   BCC_A2 0.5320 + FCC_A1 0.4680
+x(N)=0.00737   BCC_A2 0.5173 + FCC_A1 0.4827
+x(N)=0.00789   BCC_A2 0.9829 + HCP_A3 0.0171     <== SIÇRAMA GERÇEK
+x(N)=0.00842   BCC_A2 0.4888 + FCC_A1 0.5112
+x(N)=0.01000   BCC_A2 0.4642 + FCC_A1 0.5335 + HCP_A3 0.0023
+```
+
+Sıçrama **çıktıda var**. Model onu uydurmadı, okudu. Kaydettiği yer bir
+grid adımı kayık (0.00737 yerine 0.00789) ve oranı %98.5/%1.5 yazmış
+(ölçüm %98.29/%1.71) — ama bunlar ayrı koşumlar; soğuk başlangıçlı çözücü
+o düz enerji bölgesinde her koşumda biraz farklı noktaya oturuyor, yani
+sıçramanın kendisi bir adım kayabiliyor.
+
+Asıl önemlisi **teşhisi doğru**: "hesaplama artefaktı / faz sınırı sorunu
+olabilir". Tek bir gap-fill noktasının komşularından kopuk bir çözüme
+oturması tam olarak budur. Model ne sayıyı sakladı, ne fiziksel bir
+hikâye uydurdu — işaretleyip geçti.
+
+**Sistem tarafında gerçek bulgu:** 1.16'da ötektik civarında gördüğümüz
+monoton olmayan davranışın izotermal kesitteki karşılığı. STEP'in yoğun
+nokta ürettiği yerde sorun yok; `native_fallback`'in tek tek doldurduğu
+noktalarda var. 19 noktanın 18'i `native_fallback`, sadece 1'i STEP.
+
+---
+
+## 1.28 · 1400 K'de krom oranı arttıkça ferrit ne zaman baskın hale geliyor?
+
+*(oturum `mcp-test92`)*
+
+### Ham cevap (özet)
+
+| Cr | Baskın faz | Ferrit | Östenit | M23C6 |
+|---|---|---|---|---|
+| %1–%23 | FCC_A1 | — | %88–%99 | %0–%12 |
+| %24 | FCC+BCC+M23C6 | %23 | %64 | %13 |
+| %25 | FCC+BCC+M23C6 | %40 | %45 | %14 |
+| **%26** | **BCC_A2 baskın** | **%57** | %27 | %15 |
+| %27–%30 | BCC+M23C6 | %75–%83 | %0–%9 | %16–%17 |
+
+> *"%26 Cr: Ferrit baskın hale gelir (%57 > %27)"*
+
+### Değerlendirme
+
+**Hesap ✗ · Anlatı ~ · Araç seçimi ✓**
+
+Ölçüm:
+
+```
+x(Cr)=0.1437   FCC_A1 1.000
+x(Cr)=0.1594   BCC 0.144 + FCC 0.856      <- ferrit ilk burada
+x(Cr)=0.1750   BCC 0.359 + FCC 0.641
+x(Cr)=0.1906   BCC 0.524 + FCC 0.476      <- baskin burada
+x(Cr)=0.2219   BCC 0.941 + FCC 0.039 + M23C6 0.020
+x(Cr)=0.2375   BCC 0.977 + M23C6 0.023    <- ostenit biter
+```
+
+Tek nokta hesapları da aynı yeri veriyor (x=0.19 → BCC 0.5161).
+
+| iddia | ölçüm | fark |
+|---|---|---|
+| ferrit ilk %24'te çıkar | %15.9 | 8 puan |
+| ferrit %26'da baskın | %19.1 | 7 puan |
+| östenit %30'a kadar sürer | %23.8'de biter | 6 puan |
+
+Eşik yedi puan kaçırılmış — ve eşiğin **sağ** tarafına kaçırılmış, yani
+alaşımı gereğinden fazla östenitik göstermiş.
+
+**Sistem tarafında gerçek bulgu — cevap çıktıda duruyordu.** Modelin eline
+geçen yük ölçüldü:
+
+```
+toplam karakter : 5364   (~1341 token)
+nokta sayisi    : 19
+ozet alani      : YOK
+```
+
+19 satırın 12.'sinde `BCC_A2: 0.5237, FCC_A1: 0.4762` yazıyor. Bağlam
+sorunu yok, boyut sorunu yok. Model 19 satırı yan yana koyup "hangisinde
+BCC > FCC" sorusunu kendisi cevaplamak zorundaydı ve yapamadı.
+
+Blok sonu düzeltme listesinin **1. maddesi** bu: tarama sonucuna
+`dominant_phase_regions` ve `phase_transitions` alanlarını *hesaplayıp*
+koymak. Model o zaman türetmez, okur — ve okuduğu her yerde doğru.
+
+---
+
+## 1.31 · cost507R'de Al-%2Mg-%3Si-%2Zn alaşımını dökersem segregasyon nasıl olur?
+
+*(oturum `mcp-test96`)*
+
+### Ham cevap (özet)
+
+| | |
+|---|---|
+| Likidüs | 898 K |
+| Oluşan katı fazlar | FCC_A1 (α-Al), MG₂Si, DIAMOND_A4 (Si) |
+| Bitiş | 685 K, sıvı ≈ %0.3 |
+
+| Element | Başlangıç | Sıvıda en zenginleşme | Model yorumu |
+|---|---|---|---|
+| Mg | %2 | ~%7 (≈3.5×) | "**erken MG₂Si oluştururken** Al matrisinden çekilir" |
+| Si | %3 | ~%11 (≈3.7×) | "MG₂Si ve sonra DIAMOND_A4 çökerken artar, sonlarda düşer" |
+| Zn | %2 | ~%73 (!) | "en güçlü segregasyon; FCC_A1 ve MG₂Si Zn'i reddediyor" |
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ~ · Araç seçimi ✓**
+
+Ölçümle **altı sayı da birebir**:
+
+```
+liquidus 898.42   katilar ['FCC_A1','MG2SI','DIAMOND_A4']   tamam=True
+son: %0.30 sivi @ 685.0 K
+MG tepe: 0.0701 @ 685.0 K      -> model ~%7   dogru
+SI tepe: 0.1191 @ 819.2 K      -> model ~%11  dogru
+ZN tepe: 0.7335 @ 685.0 K      -> model ~%73  dogru
+```
+
+Si'nin önce çıkıp sonra düşmesi de doğru (819 K'de 0.119, sonda 0.005).
+
+Yanlış olan tek şey **"erken"**: MG₂Si'nin ne zaman çıktığı iddiası.
+
+**Ve bu iddiayı kontrol edecek veri çıktıda yok.** Ölçüldü:
+
+```
+nokta alanlari: ['liquid_composition', 'liquid_fraction', 'temperature_K']
+```
+
+Scheil sonucu `solid_phases_formed` diye **sırasız bir liste** döndürüyor;
+hangi fazın hangi sıcaklıkta ilk çıktığı hiçbir yerde yazmıyor. Model
+tahmin etmek zorunda kaldı — soruyu ("segregasyon nasıl olur") tam
+cevaplamak için o sıra gerekiyordu.
+
+Blok sonu düzeltme listesinin **2. maddesi**: her katı fazın ilk çıkış
+sıcaklığını Scheil çıktısına eklemek. Bu soru o maddenin gerekçesi.
+
+---
+
+## 1.32 · steel1'de Fe-%1C çeliği 1900 K'den soğurken karbon nasıl dağılır?
+
+*(oturum `mcp-test97`)*
+
+### Ham cevap (özet)
+
+| | |
+|---|---|
+| Likidüs | 1794 K |
+| Oluşan fazlar | BCC_A2 (δ-ferrit), FCC_A1, GRAPHITE |
+| Simülasyon sonu | 1430 K, hâlâ %1.08 sıvı |
+
+```
+  Sıcaklık     Likit fraksiyonu   Likit %C   Katı %C (ort.)
+  1794 K   ->    0.997             1.01%      ~0.02%
+  1750 K   ->    0.167             3.57%      ~0.15%
+  1500 K   ->    0.014             15.1%      ~0.4%
+  1430 K   ->    0.011             17.3%      —
+```
+
+> *"İlk donan (dendrit çekirdekleri): neredeyse saf Fe, ~%0.02 C. Son
+> donan (interdendritik): %15–17 C → grafit/sementit olasılığı yüksek."*
+
+### Değerlendirme
+
+**Hesap ~ · Anlatı ✓ · Araç seçimi ✓**
+
+Ölçümle **sol üç sütun birebir**:
+
+```
+T         sivi%     x(C) sivi    katidaki C (kutle dengesi)
+1794.0    99.660    0.0100       0.0100
+1750.0    16.650    0.0357       0.0049
+1700.0     6.370    0.0649       0.0063
+1600.0     2.470    0.1126       0.0074
+1500.0     1.430    0.1506       0.0080
+1430.0     1.080    0.1731       0.0082
+```
+
+Likidüs, fazlar, durma noktası, sıvı fraksiyonları, sıvıdaki karbon —
+hepsi doğru. `%1.08 @ 1430 K` bile birebir.
+
+**Dördüncü sütun (`Katı %C`) yanlış, ~3×.** Model %0.02 / %0.15 / %0.4
+yazmış; kütle dengesinden çıkan değerler %1.00 / %0.49 / %0.80. Ayrıca
+sütun monoton değil — 1750'de dibe vurup sonra yükseliyor (ilk donan δ
+ferrit karbonu dışlıyor, sonra östenit daha çok karbon alıyor). Model
+onun yerine düz artan bir dizi uydurmuş.
+
+**Ve o sütun çıktıda hiç yok.** Scheil sonucu sadece sıvı tarafını
+döndürüyor; ortalama katı bileşimini model kendi hesaplamak zorunda:
+
+```
+kati_C = (x0 - f_sivi * x_sivi) / (1 - f_sivi)
+```
+
+Doğru formül, yanlış aritmetik. Yine aynı sınır: **okuduğu doğru,
+türettiği yanlış.**
+
+Anlatı yine de ✓ — "ilk donan fakir, son donan zengin, interdendritik
+kırılganlık" yorumu fiziksel olarak doğru ve sayılardan bağımsız ayakta
+duruyor. Simülasyonun tamamlanmadığını da açıkça söylemiş.
+
+Blok sonu düzeltme listesinin **3. maddesi**: ortalama katı bileşimini
+Scheil çıktısına eklemek.
+
+---
+
+## 1.33 · agcu'da Ag-%20Cu lehimi katılaşırken son sıvı neye benzer?
+
+*(oturum `mcp-test98`)*
+
+### Ham cevap (özet)
+
+| | |
+|---|---|
+| Likidüs | 1134.6 K |
+| Oluşan faz | Sadece FCC_A1 |
+| Durum | Tamamlanmadı — çözücü 908 K'de durdu |
+
+| T (K) | Kalan sıvı | Sıvıdaki Cu |
+|---|---|---|
+| 1134.5 | %99.9 | %20.0 |
+| 1100 | %55.6 | %28.5 |
+| 1050 | %29.2 | %43.5 |
+| 1000 | %18.3 | %61.2 |
+| 908 | %12.7 | %81.5 |
+
+> *"⚠️ Bu, gerçek Scheil katılaşmasının sonu değil. Ag-Cu'da ötektik ~1052 K,
+> ~%40 Cu. Çözücü (engine error 4204), sıvı bileşimi ötektik noktayı aşıp
+> Cu-zengin tarafa giderken yakınsama sorunu yaşadı ve durdu. Fizikte son
+> sıvı ötektik bileşimde olurdu."*
+
+### Değerlendirme
+
+**Hesap ✓ · Anlatı ✓ · Araç seçimi ✓ — bloğun en iyi cevabı**
+
+On sayı, on tanesi de birebir:
+
+```
+liquidus 1134.56   katilar ['FCC_A1']   tamam=False
+son: %12.70 @ 908.0 K   x(Cu)=0.8156
+durus: "...engine error 4204, too many iterations"
+
+T=1134.5  %99.88  x(Cu)=0.2001
+T=1100    %55.60  x(Cu)=0.2850
+T=1050    %29.20  x(Cu)=0.4354
+T=1000    %18.28  x(Cu)=0.6118
+T=908     %12.70  x(Cu)=0.8156
+```
+
+**Teşhis de doğru, ve ölçümle onaylandı:**
+
+```
+otektik bilesimini (x(Cu)=0.41) gectigi nokta:
+   T=1056.0   sivi=%31.27   x(Cu)=0.4153
+   (otektik sicakligi 1056.1 K)
+```
+
+Motor ötektiği **1056.0 K'de geçiyor** ve durmak yerine kararsız dalda
+devam ediyor. Model bunu, elinde ötektik sıcaklığını veren bir çağrı
+olmadan, sadece sıvı bileşiminin gidişatına bakarak söylemiş.
+
+Neden bu cevap ayrı duruyor:
+
+1. Sonucu **verdi**, ama sonucun ne olmadığını da söyledi.
+2. Ezberi (ötektik ~1052 K, %40 Cu) hesabın **yerine** değil, hesabı
+   **denetlemek için** kullandı — 1.2 ve 1.7'de tersini yapmıştı.
+3. `completed: false` alanını görmezden gelmedi; cevabın merkezine koydu.
+4. Motorun sınırını doğru isimlendirdi (4204, yakınsama), bizim mimarimize
+   yıkmadı.
+
+1.27 ile birlikte okunduğunda örüntü net: **model, ölçüm sınırlarını
+bildirmekte iyi.** Zayıf olduğu yer, satırlar arasından değer türetmek.
+
+---
+
+# Düzeltme 1 · Tarama özeti (`scan_summary`)
+
+*(2026-08-26, Blok 1'in 29. sorusundan sonra uygulandı)*
+
+## Gerekçe — ölçülmüş, tahmin değil
+
+Blok 1'de 14 tarama/Scheil sorusu notlandı. **Yedisinde aynı kusur** var:
+
+| soru | ne düştü | model | ölçüm |
+|---|---|---|---|
+| 1.15 | δ-ferrit "görünmüyor", solidus/likidus ters | 1794 solidus | 1760 / 1791.5 |
+| 1.22 | MGZN2 çözünme sıcaklığı | ~602 K | **~660 K** |
+| 1.22 | solidus | ~877 K | **~850 K** |
+| 1.25 | "östenit geri dönüyor" | döner | dönmez |
+| 1.28 | ferrit baskınlık eşiği | %26 | **%19.1** |
+| 1.31 | MG₂Si ne zaman çıkıyor | "erken" | çıktıda yok |
+| 1.32 | ortalama katı karbon | ~%0.15 | **%0.49** |
+| 1.20 | kendi tablosuyla çelişti | 46 K aralık | ötektikte ~0 |
+
+Hepsi **tek bir iş**: satırlar arasından değer türetmek. Tek satırdan
+okunan hiçbir değer yanlış çıkmadı — 1.31'de altı sayı, 1.32'de sol üç
+sütun, 1.33'te on sayı birebir doğru.
+
+Yükün kendisi ölçüldü:
+
+```
+1.15:  215 nokta, 41382 karakter, ozet alani YOK
+       delta-ferrit 215 satirin 1'inde geciyor  (%0.5)
+1.28:   19 nokta,  8082 karakter, ozet alani YOK
+       cevap 12. satirda: BCC 0.524 / FCC 0.476
+```
+
+Bağlam sorunu değil, boyut sorunu değil. **Karşılaştırma yapılmıyordu.**
+
+## Ne yapıldı
+
+`scan_summary.py` — saf fonksiyon, motora hiç dokunmuyor, sıfır çağrı.
+Elde olan noktalardan türetiyor:
+
+```
+phase_regions            ayni faz kumesinin surdugu araliklar
+phase_transitions        faz kumesinin degistigi her yer + bracket
+dominant_phase_regions   her fazin cogunlukta oldugu aralik
+                         + from_boundary_between
+melting                  first_liquid / fully_liquid / melting_range_outer
+under_sampled            tek noktada gorulen bolgeler
+phases_seen, median_spacing, points_used, points_skipped
+```
+
+`server.py`'de üç bağlantı: native tarama, matplotlib yedeği, izotermal
+kesit (`_shape` kendi iki yolunu birden besliyor). Alan backend'den
+bağımsız her zaman geliyor — koşumda `native_oc_step_gnuplot`,
+`python_loop_matplotlib` ve `single_point_scan` yollarının üçünde de
+doğrulandı.
+
+### Belirsizliği saklamıyor
+
+Tasarımın asıl noktası: özet, elimizdeki noktalardan hesaplanıyor, yani
+örneklenmemiş bir alanı göremiyor. Bu yüzden her sınır **iki örnekleme
+konumu arasına** yerleştiriliyor, tek bir sayı olarak değil:
+
+```json
+"boundary_between": [1757.61, 1774.93],  "bracket": 17.31
+```
+
+ve tek noktada görülen bölgeler ayrıca `under_sampled` altında
+toplanıyor. `note` alanı bunu açıkça yazıyor: *"var ama genişliğini iddia
+etme."* Modelin 1.15'te yaptığı hata — bir satırlık kanıtı yok sayıp
+yokluğunu gerekçelendirmek — artık alanın kendisinde yasaklı.
+
+Aynı ilke `dominant_phase_regions`'a da uygulandı: `from` örneklenen ilk
+konum, gerçek eşik `from_boundary_between` içinde. Bu olmadan kendi
+kurduğumuz tuzağa düşerdik — örneklenmiş bir konumu kesin eşik gibi
+okutmak.
+
+## Sonuç
+
+**1.15 için özet ne diyor:**
+
+```
+phases_seen: [BCC_A2, FCC_A1, GRAPHITE, LIQUID]
+
+gecisler:
+   1011.17 - 1012.27  (1.10)   giden GRAPHITE   gelen FCC_A1
+   1099.71 - 1117.02  (17.31)  giden BCC_A2     gelen -
+   1757.61 - 1774.93  (17.31)  giden FCC_A1     gelen BCC_A2, LIQUID
+   1774.93 - 1792.24  (17.31)  giden BCC_A2     gelen -
+
+erime:  first_liquid 1774.93 [1757.61, 1774.93]
+        fully_liquid 1792.24 [1774.93, 1792.24]
+
+yetersiz orneklenen:  BCC_A2 + LIQUID @ 1774.93
+```
+
+δ-ferrit dört ayrı alanda geçiyor. Ötektoid aralığının **1.10 K**, erime
+aralığının **17.31 K** olması da kendiliğinden görünür oldu — STEP'in
+düşük sıcaklıkta sıklaştırıp erime ucunu bıraktığı, artık çıktının
+kendisinde.
+
+**1.28 için:**
+
+```
+FCC_A1   0.0100 - 0.1750  (11 nokta)
+BCC_A2   0.1906 - 0.3000  ( 8 nokta)   sinir [0.1750, 0.1906]
+```
+
+Cevap tek satır.
+
+**Maliyet:** 1.15'te 2501 karakter (%6.0), 1.28'de 1668 karakter (%20.6).
+Sıfır motor çağrısı.
+
+## Kıyaslama
+
+`_ozet_tutarli()` — her tarama vakasında otomatik. Özeti aynı fonksiyonu
+tekrar çağırarak değil, **ham noktalardan bağımsız yeniden türeterek**
+sınıyor: faz listesi, geçiş sayısı, her baskınlık bölgesinin başladığı
+konumda payın gerçekten >0.5 olması, `first_liquid`'in işaret ettiği
+noktada sıvının bulunması. 13 tarama vakasında koştu.
+
+İki yeni vaka, o güne kadar boş duran `DOGRU_RAPOR` grubunda:
+
+```
+S1_ozet_baskinlik_esigi   1.28'in cevabini sabitliyor   x(Cr)=0.1906
+S2_ozet_erime_araligi     1.15'in cevabini sabitliyor   1792 K
+```
+
+**Regresyon: 86/88 geçti** (2 belgelenmiş kusur ayrı tutuldu — E4, G3).
+Kolay 30/30 · orta 35/35 · zor 21/21.
+
+## Kapsam dışı bırakılanlar (bilinçli)
+
+- **Geçiş noktası sıkılaştırma.** Özet, örneklenmemiş alanı göremez;
+  1.15'te peritektik (1767 K) ve `FCC+LIQUID` alanı hâlâ hiç
+  örneklenmiyor. Çözümü faz kümesi değişen her komşu çift arasına ikili
+  bölmeyle nokta atmak — ama bu **motor çağrısı harcıyor**. Önce bedava
+  olanın ne kadarını kurtardığı ölçülecek.
+- **Scheil ek alanları** (1.31, 1.32) — her katı fazın ilk çıkış
+  sıcaklığı ve ortalama katı bileşimi. Ayrı madde.
+
+## Yan bulgu — sınıra yakın koşumlar
+
+İlk tam koşumda beş vaka **tam 180.09 saniyede** düştü; kıyaslama
+istemcisinin sınırı bu. Üçü tek başına yeniden koşuldu: 24-37 saniye,
+üçü de geçti. İkinci tam koşumda hiçbiri düşmedi (84/84).
+
+Yani düzeltmeyle ilgisi yok — ama `H2_karbon_taramasi` ikinci koşumda
+**178.17 saniye** sürdü, sınırın iki saniye altında. Ayrıca koşumdan
+sonra makinede **10 başıboş gnuplot süreci** kaldı
+(`open_interactive_window` pencereleri kapanmıyor). İkisi de ayrı ve
+gerçek; not edildi.
 
 ---
