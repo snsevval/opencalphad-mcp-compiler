@@ -2009,6 +2009,85 @@ J_FAZ_DIYAGRAMI = [
 DOGRU_HESAP = (A_TEK_FAZ + B_COK_FAZ + C_FAZ_GECISI + D_BILESIM_KUMESI
                + E_YARI_KARARLI + F_KARSILASTIRMA + G_CELIK_DISI
                + H_BILESIM_EKSENI + I_KATILASMA + J_FAZ_DIYAGRAMI)
-DOGRU_RAPOR = []
+# --- S · Ozetin kendisi ---------------------------------------------
+#
+# Buraya kadarki her vaka SAYININ dogru olup olmadigini soruyor. Bu grup
+# ayri bir sey soruyor: sayi dogru geldiginde cagiran taraf ondan dogru
+# CEVABI cikarabiliyor mu.
+#
+# Olculdu: cikarabilmiyor. 215 satirlik bir taramada 24 K genisligindeki
+# delta-ferrit alani "yok" diye bildirildi; 19 satirlik bir kesitte
+# x=0.19'daki baskinlik esigi x=0.26 diye bildirildi. Iki durumda da veri
+# yukun icindeydi ve iki durumda da satirlar arasindan cikarilmasi
+# gerekiyordu. Tek satirdan okunan hicbir deger yanlis cikmadi.
+#
+# Bu yuzden cikarim artik sunucuda, deterministik olarak yapiliyor
+# (scan_summary.py) ve sonuca "scan_summary" olarak ekleniyor. Buradaki
+# vakalar o alanin DOGRU cevabi verdigini sabitliyor -- ayrica her tarama
+# vakasinda ozetin ham veriyle tutarliligi otomatik olarak sinaniyor
+# (run.py, _ozet_tutarli).
+
+DOGRU_RAPOR = [
+    {
+        "id": "S1_ozet_baskinlik_esigi",
+        "zorluk": "orta",
+        "olcum": "Ferrit hangi krom oraninda baskin hale geliyor. Ham "
+                 "noktalarda cevap 12. satirda duruyor (BCC 0.524, FCC "
+                 "0.476, x=0.1906) ve 19 satiri karsilastirmayi "
+                 "gerektiriyor. Elle olculdugunde x=0.26 diye bildirilmisti "
+                 "-- yedi puan sapma, ve esigin yanlis tarafina. Ozet bunu "
+                 "artik hesaplayip veriyor; vaka verdigi degeri sabitliyor.",
+        "soru": "steel1.TDB'de 1400 K'de Fe-%1C bazli alasimda krom "
+                "artarken ferrit ne zaman baskin hale geliyor",
+        "tool": "calculate_isothermal_section",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.89, "CR": 0.10, "C": 0.01},
+            "axis_element": "CR", "axis_min": 0.01, "axis_max": 0.30,
+            "temperature_K": 1400, "n_points": 20,
+        },
+        "expected": {
+            "phases": ["FCC_A1", "BCC_A2", "M23C6"],
+            "summary_dominant_from": {"BCC_A2": 0.1906},
+            # Bir eksen adimi 0.0156; tolerans onun biraz ustunde, cunku
+            # esigin kendisi iki ornekleme noktasinin ARASINDA -- daha dar
+            # bir tolerans olcum hassasiyetinin otesini iddia ederdi.
+            "summary_dominant_tolerance": 0.02,
+            "max_failed_fraction": 0.10,
+        },
+    },
+    {
+        "id": "S2_ozet_erime_araligi",
+        "zorluk": "zor",
+        "olcum": "Fe-%1C isitilirken erimenin nerede baslayip nerede "
+                 "bittigi. Arada delta-ferrit + sivi alani var (~1767-1791 "
+                 "K, BCC %71'e cikiyor) ama ornekleme araligi 17.3 K "
+                 "oldugu icin tek satira dusuyor. Elle olculdugunde o tek "
+                 "satir gozden kacti ve delta-ferrit 'bu veritabaninda "
+                 "gorunmuyor' diye bildirildi. Ozet onu hem phases_seen'de "
+                 "hem under_sampled'da isaretliyor: var, ama cozunurlugu "
+                 "yetersiz -- inkar edilemez ve genisligi de iddia "
+                 "edilemez.",
+        "soru": "steel1.TDB'de Fe-%1C celigi 300 K'den 2000 K'ye "
+                "isitilirken fazlar nasil degisir",
+        "tool": "calculate_property_diagram",
+        "arguments": {
+            "database": "steel1.TDB",
+            "elements_composition": {"FE": 0.99, "C": 0.01},
+            "temperature_min_K": 300, "temperature_max_K": 2000,
+            "n_points": 100,
+        },
+        "expected": {
+            "phases": ["BCC_A2", "FCC_A1", "GRAPHITE", "LIQUID"],
+            "phase_order": [("GRAPHITE", "FCC_A1"), ("FCC_A1", "LIQUID")],
+            # Sistemin tamamen sivi oldugu yer. 1.15'te bu sayi "solidus"
+            # diye etiketlenmisti; erimenin BITTIGI yer, basladigi yer
+            # degil. Tolerans bir ornekleme adimindan (17.3 K) genis.
+            "summary_dominant_from": {"LIQUID": 1792.0},
+            "summary_dominant_tolerance": 25.0,
+            "max_failed_fraction": 0.10,
+        },
+    },
+]
 
 CASES = DOGRU_HESAP + DOGRU_RED + DOGRU_RAPOR

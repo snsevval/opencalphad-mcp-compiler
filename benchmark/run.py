@@ -95,6 +95,63 @@ def _mass_balance(payload, request_composition):
     return problems
 
 
+def _ozet_tutarli(payload, solved):
+    """scan_summary'yi ham noktalardan BAGIMSIZ olarak yeniden turetip
+    karsilastirir.
+
+    Ayni fonksiyonu tekrar cagirmak bir sey kanitlamaz -- kendi ciktisiyla
+    kendini dogrulamis olur. Burada gecisler ve baskinlik esikleri
+    noktalardan bastan hesaplanip ozetin soyledigiyle karsilastiriliyor;
+    ozet ile ham veri ayrisirsa cagiran tarafa yanlis cevap gidiyor
+    demektir ve bu, hicbir yerde hata vermeden olur.
+    """
+    TOL = 1e-4
+    ozet = payload.get("scan_summary")
+    if len(solved) < 2:
+        return []
+    if not ozet:
+        return ["scan_summary alani yok -- tarama sonucu ozetsiz dondu"]
+
+    eksen = ozet.get("axis", "temperature_K")
+
+    def _fazlar(p):
+        return tuple(sorted(k for k, v in (p.get("phase_molar_amounts") or {}).items()
+                            if v is not None and v > TOL))
+
+    sirali = sorted(solved, key=lambda p: p.get(eksen))
+    sorunlar = []
+
+    gorulen = sorted({f for p in sirali for f in _fazlar(p)})
+    if gorulen != sorted(ozet.get("phases_seen", [])):
+        sorunlar.append(f"phases_seen {ozet.get('phases_seen')} != ham veri {gorulen}")
+
+    beklenen_gecis = sum(1 for a, b in zip(sirali, sirali[1:])
+                         if _fazlar(a) != _fazlar(b))
+    if beklenen_gecis != len(ozet.get("phase_transitions", [])):
+        sorunlar.append(f"{len(ozet.get('phase_transitions', []))} gecis bildirildi, "
+                        f"ham veride {beklenen_gecis} var")
+
+    for bolge in ozet.get("dominant_phase_regions", []):
+        faz = bolge.get("phase")
+        if faz is None:
+            continue
+        nokta = min(sirali, key=lambda p: abs(p.get(eksen) - bolge["from"]))
+        pay = (nokta.get("phase_molar_amounts") or {}).get(faz, 0.0)
+        if pay <= 0.5:
+            sorunlar.append(f"{faz} bolgesi {bolge['from']:.4g}'de basliyor deniyor "
+                            f"ama orada payi {pay:.3f} (<= 0.5)")
+
+    erime = ozet.get("melting")
+    if erime:
+        nokta = min(sirali, key=lambda p: abs(p.get(eksen) - erime["first_liquid"]["observed_at"]))
+        sivi = sum(v for k, v in (nokta.get("phase_molar_amounts") or {}).items()
+                   if k.upper().startswith("LIQUID"))
+        if sivi <= TOL:
+            sorunlar.append("first_liquid isaret edilen noktada sivi yok")
+
+    return sorunlar
+
+
 def judge_result(case, payload):
     """Hesap vakalari icin. Olcutlerin hepsi hesap makinesiyle kontrol
     edilebilir; hicbiri uzmanlik gerektirmiyor."""
@@ -275,6 +332,29 @@ def judge_result(case, payload):
         if not solved:
             return False, "hicbir nokta cozulemedi"
         checks.append(f"{len(solved)}/{len(points)} nokta")
+
+        # --- ozet alani ham veriyle tutarli mi ----------------------
+        # Bu olcut her tarama vakasinda kosuyor, vaka ayrica istemese de:
+        # ozet artik cagiran tarafin OKUDUGU sey, dolayisiyla ham veriyle
+        # ayrisirsa yanlis cevap uretir ve bunu sessizce yapar.
+        ozet_sorunlari = _ozet_tutarli(payload, solved)
+        if ozet_sorunlari:
+            return False, "ozet ham veriyle tutmuyor: " + "; ".join(ozet_sorunlari)
+        if payload.get("scan_summary"):
+            checks.append("ozet tutarli")
+
+        # Vakanin kendi bekledigi baskinlik esigi (varsa).
+        for faz, beklenen in (expected.get("summary_dominant_from") or {}).items():
+            bolgeler = [b for b in payload["scan_summary"]["dominant_phase_regions"]
+                        if b.get("phase") == faz]
+            if not bolgeler:
+                return False, f"ozet '{faz}' icin baskin bolge bildirmiyor"
+            bulunan = bolgeler[0]["from"]
+            tolerans = expected.get("summary_dominant_tolerance", 0.02)
+            if abs(bulunan - beklenen) > tolerans:
+                return False, (f"{faz} baskinligi {bulunan:.4g} bildirildi, "
+                               f"beklenen {beklenen:.4g}")
+            checks.append(f"{faz} baskinlik esigi dogru")
         want_max_failed = expected.get("max_failed_fraction")
         if want_max_failed is not None:
             failed = (len(points) - len(solved)) / len(points)

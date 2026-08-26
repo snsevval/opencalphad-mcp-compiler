@@ -8,3 +8,6 @@ __pycache__/
 verification/results/
 preflight_test_sonuc.json
 agcu_combined.csv
+
+# Call log -- payloads written at runtime, not source
+logs/

@@ -294,3 +294,58 @@ def check_property_diagram_request(
             f"temperature_max_K ({temperature_max_K})."
         )
     return problems
+
+
+# --- Reddin yaninda yol gostermek ------------------------------------
+#
+# Olculdu (1.26): iki elementli bir sistemde bilesim taramasi istendi ve
+# PREFLIGHT uc sikayet birden dondurdu -- "needs at least three elements",
+# "axis_max must be a mole fraction in [0,1)", "axis_max leaves nothing for
+# the dependent element". Ucu de dogru, ve hicbiri ne yapilmasi
+# gerektigini soylemiyor. Cagiran taraf dogru alternatifi kendi buldu ama
+# bunu yaparken STOP RULE'u cignemek zorunda kaldi.
+#
+# Iki durum ayni sey degil:
+#
+#   istek imkansiz            (olmayan element, ters aralik)  -> dur, sor
+#   bu arac yapamaz, baskasi  (ikili sistemde bilesim ekseni)  -> YONLENDIR
+#
+# Ikincisinde soru degismiyor, sadece dogru kapiya gidiyor. Reddin bunu
+# soylemesi gerekiyor; soylemezse ya cagiran taraf kurali cigner ya da
+# cevaplanabilir bir soru cevapsiz kalir.
+_ALTERNATIFLER = [
+    (
+        "at least three elements",
+        "Bu ikili sistemde bileşim ekseni taranamaz, ama aynı soruya "
+        "calculate_phase_diagram cevap verir: iki eksende (bileşim ve "
+        "sıcaklık) faz sınırlarını izler, ve istenen sıcaklıktaki kesiti "
+        "oradan okunur.",
+    ),
+    (
+        "leaves nothing for the dependent",
+        "Eksenin üst ucunu, bağımlı elemente yer kalacak şekilde düşürün "
+        "(örneğin 1.0 yerine 0.95); istenen aralığın tamamı gerekiyorsa "
+        "calculate_phase_diagram bu kısıta tabi değildir.",
+    ),
+    (
+        "must be a mole fraction in [0, 1)",
+        "Eksen ucu mol kesri olmalı. Saf uç (1.0) taranamaz; ona kadar "
+        "olan aralık taranabilir, ya da calculate_phase_diagram kullanılır.",
+    ),
+]
+
+
+def suggest(problems):
+    """Reddedilen istegin bilinen bir alternatifi varsa onu dondur.
+
+    Sadece "bu arac yapamaz, baskasi yapar" sinifi icin doner. Imkansiz
+    istekler (olmayan element, ters aralik, negatif sicaklik) icin bos
+    doner -- orada yonlendirilecek bir yer yok ve uydurmasi zararli olur:
+    cagiran tarafi, kullanicinin sormadigi bir hesaba iter.
+    """
+    bulunan = []
+    for problem in problems or []:
+        for kalip, oneri in _ALTERNATIFLER:
+            if kalip in problem and oneri not in bulunan:
+                bulunan.append(oneri)
+    return bulunan

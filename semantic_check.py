@@ -46,16 +46,49 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 # failure to plan for is the reviewer disappearing, not this particular
 # name -- which is what `available` already handles: the chain went dead
 # for two weeks and no calculation was ever reported as wrong for it.
+# 2026-08-26: deepseek-v4-flash-0731 katalogda duruyor ama
+# /chat/completions'a 404 donuyor -- yani zincir her istekte sessizce
+# ikinci siraya, Nemotron ailesine dusuyordu. Olculdu: 46 vakada
+# degerlendiren model HER ZAMAN nemotron-super'di, ve DEBUGGER'in
+# "baska bir modele sor" adimi da bu yuzden gidecek yer bulamiyordu
+# (available=False). Yani "bagimsiz denetim" katmani, aylardir sunucuyu
+# suren modelin akrabasina soruyordu.
+#
+# Bu anahtarda gercekten cevap veren tek YABANCI aile: openai/gpt-oss-120b
+# (olculdu; glm5/kimi/qwen/llama-4/mistral-large hepsi 404 ya da 410).
+#
+# Ama once birinci siraya konuldu ve olculdu -- gercek bir degerlendirme
+# istemine cevap suresi kararsiz:
+#
+#     tek satirlik istem            2.4 s      cevap verdi
+#     gercek degerlendirme istemi   3 denemede 240 s'de zaman asimi
+#     ayni istem, baska bir turda   ~150 s     cevap verdi (5 vakanin 3'u)
+#
+# Yani bagimsiz ama guvenilmez ve yavas. Bloklayan yola konursa her hesaba
+# once bir bekleme, sonra zaten Nemotron'a dusme ekliyor: hem yavas hem
+# yine zayif bagimsiz. Bu yuzden varsayilan hizli ve guvenilir olan;
+# gercek bagimsiz denetim isteniyorsa acikca secilir:
+#
+#     OC_VALIDATOR_MODEL=openai/gpt-oss-120b
+#
+# Zayif bagimsizlik gizlenmiyor -- independence_note her cevaba iliskiyor,
+# ve WEAK_INDEPENDENCE_MODELS bunu makine tarafindan da okunur kiliyor.
 _DEFAULT_MODELS = [
-    "deepseek-ai/deepseek-v4-flash-0731",
     "nvidia/nemotron-3-super-120b-a12b",
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
 ]
+
+# Gercek bagimsizlik icin kullanilabilecek, olculmus calisan model(ler).
+# Zincirde degil, cunku gecikmesi ongorulemiyor; belgede degil, burada,
+# cunku bir dahaki sefere aranacak yer burasi.
+INDEPENDENT_MODELS = ["openai/gpt-oss-120b"]
 _pinned = os.environ.get("OC_VALIDATOR_MODEL", "")
 MODELS = [_pinned] if _pinned else _DEFAULT_MODELS
 
 WEAK_INDEPENDENCE_MODELS = {
     "nvidia/nemotron-3-super-120b-a12b",
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
 }
 
 # 529 is the free tier's shared-capacity signal -- it hit three separate
@@ -81,7 +114,17 @@ def post_once(model, prompt, timeout_s, image_b64=None):
         # correctly classified as unreadable. The two design choices were
         # fighting each other; this settles it in favour of the one that
         # was there for a measured reason.
-        "max_tokens": 1500,
+        # 2026-08-26, ucuncu tur: 1500 de yetmiyordu. Olculdu -- iki ayri
+        # vakada cevap tam ortasinda kesilmisti ("...eutektoid sicakligi
+        # 727C (" ve "...0.812754; "), yani muhakeme butceyi yiyip SONUC
+        # satirina hic varamamisti. Istenen sey son satirda oldugu icin
+        # kesilen tek sey tam da ihtiyac duyulan seydi.
+        #
+        # Butceyi buyutmek tek basina yetmez: bir dahaki sefere daha uzun
+        # dusunen bir model gelir. Asil duzeltme asagida, finish_reason'i
+        # okumak -- boylece "karar okunamadi" ile "hakem butceyi bitirdi"
+        # ayri iki durum olarak raporlanir.
+        "max_tokens": 4000,
     }).encode("utf-8")
     req = urllib.request.Request(
         f"{NVIDIA_BASE_URL}/chat/completions",
@@ -94,11 +137,18 @@ def post_once(model, prompt, timeout_s, image_b64=None):
     )
     with urllib.request.urlopen(req, timeout=timeout_s) as resp:
         body = json.loads(resp.read().decode("utf-8"))
-    return body["choices"][0]["message"]["content"]
+    choice = body["choices"][0]
+    # finish_reason "length" means the reply stopped because the budget
+    # ran out, not because the model was done. Returned alongside the text
+    # so a truncated review is reported as truncated rather than as a
+    # reviewer who had no opinion -- two different problems needing two
+    # different responses.
+    return choice["message"]["content"], choice.get("finish_reason")
 
 
 def call_model_chain(models, prompt, timeout_s=60, image_b64=None, retries=(0, 4, 10)):
-    """Ask the first model that answers. Returns (reply, model_used).
+    """Ask the first model that answers. Returns (reply, model_used,
+    finish_reason).
 
     Raises only when every model exhausted its retries, and then names
     what each one did -- a failure here should be diagnosable, not just
@@ -113,7 +163,8 @@ def call_model_chain(models, prompt, timeout_s=60, image_b64=None, retries=(0, 4
             if delay:
                 time.sleep(delay)
             try:
-                reply = post_once(model, prompt, timeout_s, image_b64=image_b64)
+                reply, finish_reason = post_once(
+                    model, prompt, timeout_s, image_b64=image_b64)
             except urllib.error.HTTPError as exc:
                 attempts.append(f"{model}: HTTP {exc.code}")
                 if exc.code not in _TRANSIENT_HTTP_CODES:
@@ -127,7 +178,7 @@ def call_model_chain(models, prompt, timeout_s=60, image_b64=None, retries=(0, 4
                 # A successful call carrying no text is no review at all.
                 attempts.append(f"{model}: empty response")
                 break
-            return reply, model
+            return reply, model, finish_reason
     raise RuntimeError("all models failed -> " + "; ".join(attempts))
 
 
@@ -278,7 +329,7 @@ def review(request_args, result, context_note=None, timeout_s=60, retries=(0, 4)
 
     prompt = build_prompt(request_args, result, context_note)
     try:
-        reply, model_used = call_model_chain(
+        reply, model_used, finish_reason = call_model_chain(
             models, prompt, timeout_s=timeout_s, retries=retries
         )
     except Exception as exc:
@@ -290,15 +341,31 @@ def review(request_args, result, context_note=None, timeout_s=60, retries=(0, 4)
     note = independence_note(model_used)
     verdict = parse_verdict(reply)
     if verdict is None:
+        # Half-finished reasoning is not a finding, and handing it to the
+        # caller reads as one. What the caller needs is WHY there is no
+        # verdict; the text itself only matters for diagnosis, so it is
+        # carried separately and labelled, never inlined into "reason".
+        if finish_reason == "length":
+            why = (f"Bağımsız denetim tamamlanamadı: değerlendirici model "
+                   f"({model_used}) yanıt bütçesini muhakemeyle doldurdu ve "
+                   f"karar satırına ulaşamadı. Hesap sonucu hakkında bir şey "
+                   f"söylemiyor.")
+        else:
+            why = (f"Bağımsız denetim sonuçsuz: değerlendirici model "
+                   f"({model_used}) okunabilir bir SONUC satırı vermedi. "
+                   f"Hesap sonucu hakkında bir şey söylemiyor.")
         return {
             "available": True,
             "passed": None,  # reviewed, but the verdict couldn't be read
             "model_used": model_used,
-            "reason": "Model cevabından net bir SONUC okunamadı: " + reply.strip()[:500] + note,
+            "finish_reason": finish_reason,
+            "reason": why + note,
+            "unreadable_reply_excerpt": reply.strip()[-300:],
         }
     return {
         "available": True,
         "passed": verdict,
         "model_used": model_used,
+        "finish_reason": finish_reason,
         "reason": reply.strip() + note,
     }

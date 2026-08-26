@@ -41,6 +41,8 @@ import native_scheil  # noqa: E402
 import native_map  # noqa: E402
 import preflight  # noqa: E402
 import result_check  # noqa: E402
+import scan_summary  # noqa: E402
+import call_log  # noqa: E402
 import semantic_check  # noqa: E402
 import failure_classify  # noqa: E402
 
@@ -204,11 +206,41 @@ def _preflight_failure(problems: list) -> dict:
     """Shape a PREFLIGHT rejection the same way every tool reports it, so
     a client can tell "this request was never run" apart from "it ran and
     failed" by the stage field alone."""
-    return {
+    rejection = {
         "error": "Request rejected before calculation: " + "; ".join(problems),
         "stage": "PREFLIGHT",
         "problems": problems,
     }
+    # A refusal that names no way forward leaves the caller two bad
+    # options: hand back nothing, or work around the rule. Measured (1.26):
+    # it chose the second. Where the request is answerable by a DIFFERENT
+    # tool, say so -- routing the same question is not the same thing as
+    # substituting another one, and the stop rule should not have to cover
+    # both with one instruction.
+    alternative = preflight.suggest(problems)
+    if alternative:
+        rejection["alternative"] = alternative
+    return rejection
+
+
+def _attach_scan_summary(result: dict, axis_key: str) -> dict:
+    """Hand over the across-row answers, not only the rows.
+
+    A scan returns every number a caller needs, but the questions asked of
+    it -- where a phase first appears, where one becomes dominant, where
+    melting starts and finishes -- live between rows rather than in any
+    one of them. Measured behaviour is that those derivations go wrong
+    while single-row reads stay exact, so the derivation is done here,
+    once, deterministically, and shipped alongside the points.
+
+    Costs no engine call: it is a pure function of the points already in
+    hand. Omitted entirely when there is too little to summarize, so an
+    empty shell never reads as "nothing happens here".
+    """
+    summary = scan_summary.summarize(result.get("points"), axis_key)
+    if summary:
+        result["scan_summary"] = summary
+    return result
 
 
 def _attach_verification(result: dict, request_args: Optional[dict] = None) -> dict:
@@ -372,6 +404,7 @@ def _calc_one(
 
 
 @mcp.tool()
+@call_log.logged
 def list_databases(directory: Optional[str] = None) -> list[dict]:
     """List available thermodynamic (.TDB) databases with their elements.
 
@@ -383,6 +416,7 @@ def list_databases(directory: Optional[str] = None) -> list[dict]:
 
 
 @mcp.tool()
+@call_log.logged
 def inspect_database(database: str, directory: Optional[str] = None) -> dict:
     """Get the elements and phase names declared inside one .TDB database.
 
@@ -399,6 +433,7 @@ def inspect_database(database: str, directory: Optional[str] = None) -> dict:
 
 
 @mcp.tool()
+@call_log.logged
 def calculate_equilibrium(
     database: str,
     elements_composition: dict[str, float],
@@ -412,7 +447,14 @@ def calculate_equilibrium(
 
     PREFLIGHT REJECTION — STOP RULE
     If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran. When that happens:
+    calculation ran.
+
+    If the rejection carries an "alternative" field, the question IS
+    answerable — just not by this tool. Call the tool it names, with the
+    same question. That is routing, not substitution, and the numbered rule
+    below does not apply to it.
+
+    Otherwise:
       1. Do NOT call this or any other calculation tool again in this turn.
       2. Quote the rejection reason to the user, including any list of valid
          elements or phases it names.
@@ -513,6 +555,7 @@ def _same_elements(composition_a: dict, composition_b: dict) -> bool:
 
 
 @mcp.tool()
+@call_log.logged
 def compare_alloys(
     database: str,
     composition_a: dict[str, float],
@@ -527,7 +570,14 @@ def compare_alloys(
 
     PREFLIGHT REJECTION — STOP RULE
     If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran. Do NOT call this or any other calculation tool again in
+    calculation ran.
+
+    If the rejection carries an "alternative" field, the question IS
+    answerable — just not by this tool. Call the tool it names, with the
+    same question. That is routing, not substitution, and the rule below
+    does not apply to it.
+
+    Otherwise: do NOT call this or any other calculation tool again in
     this turn. Quote the rejection reason to the user (including any list of
     valid elements or phases it names) and ask which corrected request they
     want. Naming options is fine; running one is not.
@@ -676,6 +726,7 @@ def compare_alloys(
 
 
 @mcp.tool()
+@call_log.logged
 def calculate_property_diagram(
     database: str,
     elements_composition: dict[str, float],
@@ -689,7 +740,14 @@ def calculate_property_diagram(
 
     PREFLIGHT REJECTION — STOP RULE
     If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran. Do NOT call this or any other calculation tool again in
+    calculation ran.
+
+    If the rejection carries an "alternative" field, the question IS
+    answerable — just not by this tool. Call the tool it names, with the
+    same question. That is routing, not substitution, and the rule below
+    does not apply to it.
+
+    Otherwise: do NOT call this or any other calculation tool again in
     this turn. Quote the rejection reason to the user (including any list of
     valid elements or phases it names) and ask which corrected request they
     want. Naming options is fine; running one is not.
@@ -801,6 +859,7 @@ def calculate_property_diagram(
                 ),
                 "chart_error": None,
             }
+            _attach_scan_summary(data, "temperature_K")
             return [
                 _attach_verification(data, _diagram_args),
                 Image(data=chart_bytes, format="png"),
@@ -892,6 +951,7 @@ def calculate_property_diagram(
         "native_backend_error": native_backend_error,
         "chart_error": chart_error,
     }
+    _attach_scan_summary(data, "temperature_K")
     _attach_verification(data, _diagram_args)
     if chart_bytes:
         return [data, Image(data=chart_bytes, format="png")]
@@ -899,6 +959,7 @@ def calculate_property_diagram(
 
 
 @mcp.tool()
+@call_log.logged
 def calculate_isothermal_section(
     database: str,
     elements_composition: dict[str, float],
@@ -919,7 +980,14 @@ def calculate_isothermal_section(
 
     PREFLIGHT REJECTION — STOP RULE
     If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran. Do NOT call this or any other calculation tool again in
+    calculation ran.
+
+    If the rejection carries an "alternative" field, the question IS
+    answerable — just not by this tool. Call the tool it names, with the
+    same question. That is routing, not substitution, and the rule below
+    does not apply to it.
+
+    Otherwise: do NOT call this or any other calculation tool again in
     this turn. Quote the rejection reason to the user (including any list of
     valid elements it names) and ask which corrected request they want.
     Naming options is fine; running one is not.
@@ -1015,7 +1083,7 @@ def calculate_isothermal_section(
         }
         data.update(source_counts)
         data.update(extra)
-        return data
+        return _attach_scan_summary(data, "x")
 
     try:
         combined, gap_filled = native_step.build_combined_series(
@@ -1138,6 +1206,7 @@ def calculate_isothermal_section(
 
 
 @mcp.tool()
+@call_log.logged
 def calculate_scheil_solidification(
     database: str,
     elements_composition: dict[str, float],
@@ -1160,7 +1229,14 @@ def calculate_scheil_solidification(
 
     PREFLIGHT REJECTION — STOP RULE
     If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran. Do NOT call this or any other calculation tool again in
+    calculation ran.
+
+    If the rejection carries an "alternative" field, the question IS
+    answerable — just not by this tool. Call the tool it names, with the
+    same question. That is routing, not substitution, and the rule below
+    does not apply to it.
+
+    Otherwise: do NOT call this or any other calculation tool again in
     this turn. Quote the rejection reason to the user and ask which
     corrected request they want.
 
@@ -1297,6 +1373,7 @@ def calculate_scheil_solidification(
 
 
 @mcp.tool()
+@call_log.logged
 def calculate_phase_diagram(
     database: str,
     elements_composition: dict[str, float],
@@ -1322,7 +1399,14 @@ def calculate_phase_diagram(
 
     PREFLIGHT REJECTION — STOP RULE
     If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran. Do NOT call this or any other calculation tool again in
+    calculation ran.
+
+    If the rejection carries an "alternative" field, the question IS
+    answerable — just not by this tool. Call the tool it names, with the
+    same question. That is routing, not substitution, and the rule below
+    does not apply to it.
+
+    Otherwise: do NOT call this or any other calculation tool again in
     this turn. Quote the rejection reason and ask which corrected request
     the user wants.
 
