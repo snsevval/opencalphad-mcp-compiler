@@ -1,5 +1,5 @@
 """EXECUTE step: run a test case through the real MCP protocol (stdio),
-exactly the path an actual AI client (Claude Desktop, OpenClaw/Nemotron)
+exactly the path an actual AI client (OpenClaw/Nemotron)
 uses -- not a direct call into oc_service/server internals. This is what
 makes the loop test the thing users actually experience, not just "does
 the Python function work".

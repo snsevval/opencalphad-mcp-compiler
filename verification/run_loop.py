@@ -3,7 +3,7 @@
 (PASSED | FIX -> RE-VERIFYING) -> COMPLETED orchestrator
 (see the plan file, Faz 9 + Faz 10).
 
-Standalone script: `python3 verification/run_loop.py`. No Claude Code /
+Standalone script: `python3 verification/run_loop.py`. No agent CLI /
 Nemotron session required to run it -- it drives the real MCP server
 (run_server.sh) exactly the way an AI client would, and (for cases
 without a precise numeric reference) asks an independent model to judge

@@ -1,7 +1,7 @@
 """MCP server exposing OpenCalphad (via OCASI/pyOC) as tools for an AI assistant.
 
 See the plan at
-C:\\Users\\sevval\\.claude\\plans\\imd-benim-amac-m-opencalpha-buzzing-pancake.md
+the project plan
 for the wider architecture.
 
 Every equilibrium calculation runs in its own subprocess (see

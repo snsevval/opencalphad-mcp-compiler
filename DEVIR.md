@@ -68,7 +68,7 @@ Kategori 1 ve 2 makineyle koşuluyor. Kategori 3 koşulamıyor, çünkü ölçt�
            verification: VERIFY_A+B passed
 ```
 
-Claude Desktop MCP loglarında (son bağlantı 21 Ağustos) tek hata yok — sunucu bağlanıyor, altı aracı listeliyor.
+İstemci MCP loglarında (son bağlantı 21 Ağustos) tek hata yok — sunucu bağlanıyor, altı aracı listeliyor.
 
 ### Süre dağılımı — dikkat edilecek nokta
 
@@ -114,7 +114,7 @@ Makale (`OpenCalphad_MCP_Paper_FINAL_Aug7.pdf`) 7 Ağustos tarihli. Kod 14–21 
 ## 5. Açık kalan sorunlar
 
 1. **VERIFY B gecikmesi.** Her hesaba 37–56 s ekliyor. Öneri: `calculate_equilibrium`'a `verify: bool = False` parametresi; denetimi ayrı bir araç yap; `timeout_s` 60 → 20; `_retry_review`'ü kaldır. Karar verilmedi.
-2. **İki farklı 529'u karıştırmamak.** (a) Sohbette görülen `API Error: 529 Overloaded` → Anthropic sunucu tarafı. (b) `semantic_check.py:64`'te kendi yorumumuzun yazdığı 529 → NVIDIA ücretsiz katmanının kapasite sinyali. Aynı kod, farklı kaynak.
+2. **İki farklı 529'u karıştırmamak.** (a) Sohbette görülen `API Error: 529 Overloaded` → istemci sağlayıcısının sunucu tarafı. (b) `semantic_check.py:64`'te kendi yorumumuzun yazdığı 529 → NVIDIA ücretsiz katmanının kapasite sinyali. Aynı kod, farklı kaynak.
 3. **`alni-4slx` yakınsama sorunu çözülmedi.** Al(0.75)Ni(0.25), 800–1700 K taramasında 30 noktanın 7'si (%23) yakınsamıyor — hep aynı sıcaklıklarda: 893.1 / 1420.7 / 1544.8 / 1575.9 / 1606.9 / 1669.0 / 1700.0 K. Tespit ediliyor ve sayısal olarak raporlanıyor, giderilmiyor.
 4. **Katman C (görsel denetim) varsayılan yolda değil.** `OC_ENABLE_VISION_CHECK=1` ile açılıyor. Okuma yeteneği ölçüldü (3/3 doğru); karar kuralı — "modelden gözlem iste, yargı değil" — tasarlandı, yazılmadı.
 5. **Kapsam dışı:** MAP (iki boyutlu faz diyagramı), Scheil–Gulliver katılaşma, para-denge.
@@ -155,4 +155,4 @@ openclaw
 
 **Ortam değişkenleri:** `OC_BUILD_DIR`, `OC_BINARY`, `NVIDIA_API_KEY` (Katman B için), `OC_SEMANTIC_CHECK=0` (Katman B kapat), `OC_VALIDATOR_MODEL` (tek modele sabitle), `OC_ENABLE_VISION_CHECK=1`, `LD_PRELOAD` (launch script kuruyor).
 
-**İstemciler:** Claude Desktop (`claude_desktop_config.json` içinde `opencalphad` olarak, `wsl.exe -u root -e /root/projects/oc-mcp/run_server.sh`) ve OpenClaw TUI (model `nvidia/nemotron-3-ultra-550b-a55b`). Sunucu kodunda istemciye özgü hiçbir şey yok.
+**İstemciler:** OpenClaw TUI (model `nvidia/nemotron-3-ultra-550b-a55b`). Sunucu kodunda istemciye özgü hiçbir şey yok.

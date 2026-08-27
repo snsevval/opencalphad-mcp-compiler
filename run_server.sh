@@ -7,7 +7,7 @@ export OC_BUILD_DIR=/root/projects/opencalphad
 export LD_LIBRARY_PATH="$OC_BUILD_DIR/.libs"
 export LD_PRELOAD="$OC_BUILD_DIR/.libs/libOC.so.0:$OC_BUILD_DIR/.libs/libOPENCALPHAD.so.0"
 
-# VERIFY B needs NVIDIA_API_KEY. MCP clients (Claude Desktop, OpenClaw)
+# VERIFY B needs NVIDIA_API_KEY. MCP clients (OpenClaw and others)
 # launch this script with a bare environment, so the key has to be read
 # here rather than inherited from a shell. Missing .env is not fatal --
 # semantic_check reports the review as unavailable and the calculation

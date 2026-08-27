@@ -2,7 +2,7 @@
 
 An MCP (Model Context Protocol) server that connects OpenCalphad, an
 open-source CALPHAD thermodynamics calculation engine, to AI assistants
-such as Claude and NVIDIA Nemotron. It exposes thermodynamic equilibrium
+such as NVIDIA Nemotron. It exposes thermodynamic equilibrium
 and property-diagram calculations as tools an AI model can call directly,
 with the underlying calculations performed by the real OpenCalphad engine.
 
@@ -68,7 +68,7 @@ is answerable by a different tool says which one.
 Set `OC_BUILD_DIR` to the OpenCalphad build directory, then run
 `run_server.sh`, which sets the required `LD_LIBRARY_PATH`/`LD_PRELOAD`
 and starts the MCP server over stdio. Point an MCP-compatible client
-(Claude Desktop, OpenClaw, etc.) at this script.
+(OpenClaw, or any stdio MCP client) at this script.
 
 ## Files
 
