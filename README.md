@@ -1,10 +1,26 @@
-# opencalphad-mcp-server
+# opencalphad-mcp-compiler
 
 An MCP (Model Context Protocol) server that connects OpenCalphad, an
 open-source CALPHAD thermodynamics calculation engine, to AI assistants
-such as NVIDIA Nemotron. It exposes thermodynamic equilibrium
-and property-diagram calculations as tools an AI model can call directly,
-with the underlying calculations performed by the real OpenCalphad engine.
+such as NVIDIA Nemotron. It exposes thermodynamic equilibrium, phase
+diagram and solidification calculations as tools a model can call
+directly, with every number produced by the real OpenCalphad engine.
+
+The pipeline is compiler-shaped, and the name says so. A question in
+natural language becomes a typed request; a static check rejects the
+impossible ones before any engine runs; a cascade of backends produces
+the numbers; and the result is checked on the way out and summarised
+into the answers it implies. Each stage can refuse, and says why.
+
+    question  ->  typed request  ->  PREFLIGHT  ->  engine cascade
+                                                         |
+                          answer  <-  summary  <-  verification
+
+The reason for the shape is that the engine is not uniformly reliable and
+a model reading raw output is not uniformly careful. Both failure modes
+are quiet ones: a solver that stops early still returns well-formed
+numbers, and a reader that skips a row still writes a confident
+paragraph. The stages exist to make each of those loud.
 
 ## What it does
 
