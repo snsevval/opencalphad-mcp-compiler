@@ -15,6 +15,7 @@
 ## Every rule carries a `because`. Each was written after something
 ## specific went wrong, and a rule whose reason has been forgotten is a
 ## rule nobody can safely delete.
+##
 ## Anything without a `status` line is live today. `status = "planned"`
 ## marks a setting that is designed and not yet wired -- it is here so the
 ## design stays in one place, and marked so the file never claims the
@@ -93,10 +94,16 @@ check   = "subset_of_database_elements"
 field   = "composition"
 message = "Element(s) {missing} not declared in {database} (database has: {available})"
 because = """
-The engine does not reject an undeclared element; it leaves that element's
-degree of freedom undefined and then segfaults inside the minimiser. Naming
-what the database does have is what lets the caller repair the request
-instead of guessing."""
+Measured, with this check bypassed: asking steel1 for Fe-10Ni returns a
+clean success. Exit zero, no error, no warning. The engine drops the
+element it does not know and computes pure iron -- BCC_A2 1.0, G = -42272 --
+and the `composition` field echoes the request back, so the payload looks
+like an answer to the question that was asked. The only tell is
+`component_mole_fractions`, which reads {FE: 1.0}.
+
+Not a crash, then. A wrong answer wearing the shape of a right one, which
+is worse: a crash announces itself. Naming what the database does have is
+also what lets the caller repair the request instead of guessing."""
 
 [[reject]]
 id      = "at-least-two-elements"
