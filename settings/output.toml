@@ -1,0 +1,310 @@
+## =====================================================================
+## output.toml -- how a result is assembled and stated.
+##
+## INVARIANT FOR THIS FILE
+##     Nothing here may change a physical result. Units and presentation
+##     only. If a setting in this file alters a number's meaning, it is
+##     in the wrong file.
+##
+##     Testable, and tested: permute every setting here, and the physics
+##     must come back byte for byte identical.
+##
+##     Because of that invariant, this file can be reviewed safely. A
+##     reader can go through it knowing that nothing they find can break
+##     a calculation. input.toml carries the opposite guarantee.
+##
+## Two exceptions are written down rather than assumed, at the bottom:
+## rounding and basis conversion both touch numbers, and both are allowed
+## only under conditions this file states.
+## Anything without a `status` line is live today. `status = "planned"`
+## marks a setting that is designed and not yet wired -- it is here so the
+## design stays in one place, and marked so the file never claims the
+## system does something it does not.
+##
+## =====================================================================
+
+schema_version = 1
+
+
+## ---------------------------------------------------------------------
+## REPORT -- units and representation
+## ---------------------------------------------------------------------
+
+[report]
+energy_unit          = "J/mol"
+include_backend_used = true
+include_verification = true
+include_potentials   = true
+
+# Nothing rounds today: values come back as full floats
+# (gibbs_energy_J = -62632.0305776248). Written down as designed rather
+# than asserted as done -- see [conversion.rounding], which depends on it.
+[report.precision]
+status = "planned"
+digits = 6
+
+[report.basis]
+status = "planned"
+mode = "as_computed"
+label_per_point = true
+because = """
+NOT YET WIRED. Today a scan point carries `source` (which engine produced
+it) but no `basis` field, and a single-point result carries neither. The
+basis is knowable from the source and is not stated.
+
+The mirror of input.toml's basis problem, and the one that actually bit us.
+Native STEP reports phase MASS fractions; the single-point path reports
+MOLAR amounts. A combined scan carries both. They once disagreed by 26 per
+cent and the difference was read as a physical effect until it was traced.
+
+Converting is allowed -- see [conversion] below -- but the basis of every
+point is stated, never assumed."""
+
+
+## ---------------------------------------------------------------------
+## FLOOR -- what cannot be switched off
+##
+## The one place an output setting can do real damage: not by changing a
+## number, but by removing what tells the reader how to read it.
+## `include_verification = false` leaves every value intact and drops the
+## flag saying a value is suspect.
+## ---------------------------------------------------------------------
+
+[floor]
+always_present         = ["verification.passed", "backend_used"]
+always_present_planned = ["basis", "source"]
+because = """
+These decide how a number should be read: whether it passed its checks,
+which engine produced it, what it is a fraction of, and whether it came
+from the line or from a gap-filled point. Removing them does not change a
+result; it removes the reader's ability to judge one.
+
+The first two hold today. `source` is present on scan points and absent
+from single-point results; `basis` is absent everywhere. Both are listed
+separately rather than claimed, because this file is read as a statement
+of what the system does."""
+
+[floor.raw_values]
+status   = "planned"
+retained = true
+because = """
+Rounding is presentation, but our own checks -- mass balance, fractions
+summing to one -- must run on the unrounded values. The displayed number is
+rounded; the verified number is not."""
+
+
+## ---------------------------------------------------------------------
+## DERIVE -- what is computed from a scan before handing it over
+##
+## These are the questions a scan is actually asked, and none of them is
+## answerable from a single row.
+## ---------------------------------------------------------------------
+
+[derive]
+enabled = [
+  "phase_regions",
+  "phase_transitions",
+  "dominant_phase_regions",
+  "melting_landmarks",
+  "under_sampled",
+]
+presence_tolerance  = 1e-4
+dominance_threshold = 0.5
+because = """
+Measured: seven of fourteen graded scan questions failed the same way. A
+delta-ferrite field 24 K wide reported as absent; a dominance threshold at
+x=0.19 reported as x=0.26; a phase dissolution at 660 K reported as 602 K.
+In every case the evidence was in the payload and the comparison across
+rows was not performed. Single-row reads, in the same answers, were exact.
+
+So the comparison is done here, once, deterministically, at no engine cost.
+
+presence_tolerance is 1e-4 because STEP and the single-point path disagree
+in the fifth decimal on trace phases, and a 1e-6 sliver flickering in and
+out would otherwise produce a transition at every other point.
+
+dominance_threshold is 0.5 because that is the threshold the questions
+themselves use -- "when does ferrite become dominant" -- not a modelling
+choice of ours."""
+
+
+## ---------------------------------------------------------------------
+## HONESTY -- how a derived number is allowed to be stated
+##
+## Settings about language. They are settings, and not style, because
+## getting them wrong produces a confident wrong answer rather than a
+## visible error.
+## ---------------------------------------------------------------------
+
+[honesty.boundaries_as_brackets]
+enabled = true
+because = """
+A boundary lies between two sampled positions and is at neither of them.
+Reported as one number it reads as a measurement; reported as the pair it
+is one. Every boundary carries `boundary_between` and the width of that
+interval."""
+
+[honesty.flag_single_point_regions]
+enabled = true
+because = """
+A phase field seen at one position only has an unknown extent. It exists,
+and its width is not known, and both halves of that have to survive into
+the answer -- which is what `under_sampled` is for. The failure it guards
+against is real: a field seen once was reported as absent."""
+
+[honesty.never_hide_flagged_results]
+enabled = true
+because = """
+A result that fails a check is still returned, flagged rather than
+replaced. The caller asked for a calculation and the engine produced one;
+hiding it would remove the evidence needed to judge what went wrong."""
+
+[honesty.absent_review_is_not_disapproval]
+enabled = true
+because = """
+An unreachable reviewer says nothing about the chemistry. Absence of an
+opinion is never reported as a negative one -- the provider's capacity must
+not turn into a false alarm about the user's alloy."""
+
+[honesty.no_invented_points]
+enabled = true
+because = """
+A position the engine could not solve is left out, never interpolated. A
+gap in a scan is a fact about the calculation; filling it with a plausible
+value would hide exactly the thing worth knowing."""
+
+
+## ---------------------------------------------------------------------
+## NOTES -- text that travels with the numbers
+##
+## Collected here because these are read as findings, and a sentence that
+## can be read two ways becomes a wrong finding.
+## ---------------------------------------------------------------------
+
+[[note]]
+id   = "phase-name-is-structure-not-composition"
+when = "phase_dominant_element_differs_from_alloy"
+text = """
+In this phase the dominant element is {phase_major} ({phase_major_fraction} \
+of this phase). The alloy as a whole is dominated by {alloy_major}. A phase \
+name in this database denotes crystal structure, not composition -- the \
+same name covers chemically different phases."""
+because = """
+The earlier wording put two different quantities in one sentence with a
+single number between them, and could be read as stating the alloy's
+composition when it was stating the phase's. Rewritten so each number sits
+next to the thing it measures."""
+
+[[note]]
+id   = "gibbs-difference-is-not-a-ranking"
+when = "two_results_compared"
+text = """
+Lower Gibbs energy means more stable only between states of the SAME \
+system. Two different compositions are different systems, so this \
+difference does not rank them."""
+because = """
+Handed over unframed once, and read as "alloy B is more stable than alloy
+A" -- a comparison the number does not support."""
+
+[[note]]
+id   = "composition-was-rescaled"
+when = "input_sum_far_from_one"
+text = """
+Note: composition amounts summed to {total}; they have been normalised. \
+Double-check this is the intended composition."""
+because = """
+The counterpart to input.toml's `normalise_to_one`. Normalising is right;
+doing it without saying so is not."""
+
+[[note]]
+id   = "mixed-basis-in-combined-scan"
+when = "scan_has_mixed_sources"
+text = """
+Values from native STEP are phase mass fractions; positions its line did \
+not reach come from single-point equilibrium calls converted to the same \
+basis. See each point's 'source' field."""
+because = "the two engines report in different bases and once disagreed by 26%"
+
+[[note]]
+id     = "scan-coverage-incomplete"
+status = "planned"
+when   = "solved_positions_below_requested"
+text = """
+{solved} of {requested} requested positions were solved; the scan covers \
+{covered_range} of the range asked for. The rest did not converge."""
+because = """
+Found while checking a scan by hand: a twenty-position request came back
+with one position, reported as verified and carrying no warning at all.
+Every layer passed it, because one point is a perfectly well-formed result.
+What was missing was not a check on the numbers but a count of the ones
+that never arrived."""
+
+
+## ---------------------------------------------------------------------
+## STOP RULE -- what a caller should do with a refusal
+##
+## One rule, stated once. Today it is six hand-copied paragraphs in six
+## docstrings, and correcting it meant editing all six by hand.
+## ---------------------------------------------------------------------
+
+[stop_rule]
+on_route_present = """
+The question IS answerable, just not by this tool. Call the tool named in \
+`alternative`, with the same question. This is routing, not substitution, \
+and the rule below does not apply to it."""
+
+on_no_route = """
+Do NOT call this or any other calculation tool again in this turn. Quote \
+the rejection reason, including any list of valid elements or phases it \
+names, and ask which corrected request the user wants. Naming options is \
+fine; running one is not."""
+
+on_precondition = """
+A precondition result DOES invite a retry: the request is shaped correctly \
+and its starting point is in the wrong place. It names the repair. Suggest \
+it and ask before re-running."""
+
+because = """
+The user asked a specific question. Computing a different one -- even a
+near-identical one, even while announcing the change -- hands them a result
+they did not ask for.
+
+But a request that is merely at the wrong door is not a different question,
+and the rule used to forbid both with one sentence. Measured (1.26): the
+caller found the right alternative and had to break the rule to use it."""
+
+
+## ---------------------------------------------------------------------
+## CONVERSION -- the two places this file is allowed to touch numbers
+##
+## Written down rather than left as an exception, because an unstated
+## exception to an invariant is how invariants stop being true.
+## ---------------------------------------------------------------------
+
+[conversion.units]
+status    = "planned"
+allowed   = true
+condition = "reversible"
+because = """
+J/mol to kJ/mol loses nothing and can be undone exactly. Permitted, because
+the invariant is about content and this changes none."""
+
+[conversion.basis]
+status    = "planned"
+allowed   = true
+condition = "phase_compositions_also_reported"
+because = """
+Mole to mass conversion is arithmetic on the numbers, and it is reversible
+ONLY if the phase compositions travel with them. Without those, the
+conversion is one-way and the original content cannot be recovered -- which
+would make it a change of content, not of presentation, and it would belong
+in input.toml instead."""
+
+[conversion.rounding]
+status    = "planned"
+allowed   = true
+condition = "raw_retained"
+because = """
+Rounding destroys information. Permitted for display because the unrounded
+value stays in the result and is what our own checks run against. See
+[floor.raw_values]."""

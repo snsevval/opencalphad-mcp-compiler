@@ -1,0 +1,221 @@
+## =====================================================================
+## execution.toml -- how the answer gets computed, not what it is.
+##
+## INVARIANT FOR THIS FILE
+##     Nothing here may change the ANSWER. It may only change whether an
+##     answer is obtained at all.
+##
+##     Strictest of the three files. input.toml may legitimately change
+##     the numbers; output.toml may change how they are written; this one
+##     may change neither. Switching tiers must give the same result
+##     within tolerance, or no result.
+##
+##     Measured: steel1 Fe-C at 1000 K gives G = -41981.578 through OCASI
+##     and through the native binary alike. At 1200 K OCASI does not
+##     converge and the native binary returns -56563.789 in eleven
+##     iterations. Same answer, or no answer -- never a different one.
+##
+## This is the part of the system that used to be invisible: ten fallback
+## decisions spread across five files as nested try/except, with nothing
+## anywhere stating what the cascade actually was.
+## Anything without a `status` line is live today. `status = "planned"`
+## marks a setting that is designed and not yet wired -- it is here so the
+## design stays in one place, and marked so the file never claims the
+## system does something it does not.
+##
+## =====================================================================
+
+schema_version = 1
+
+
+## ---------------------------------------------------------------------
+## SIGNALS
+##
+## What may move a request from one tier to the next. Each name is a
+## predicate implemented once in code.
+##
+## Named on purpose. Today most of these are `except Exception`, which is
+## not a signal but "something happened" -- and it absorbs our own bugs:
+## a typo in native_step.py is caught, the request quietly drops to the
+## slower path, and the result comes back looking like a success.
+## ---------------------------------------------------------------------
+
+[signals]
+did_not_converge     = "solver hit its iteration limit (engine error 4204)"
+engine_crashed       = "subprocess exited non-zero, or segfaulted"
+no_stable_phases     = "converged, but returned an empty phase list"
+timed_out            = "exceeded the tier's time budget"
+line_terminated      = "STEP stopped following its line before the axis ended"
+endpoint_disagrees   = "a line's own end disagreed with a fresh calculation"
+unsupported_request  = "this tier cannot express the request at all"
+no_boundaries_traced = "MAP found no phase boundaries from this seed"
+
+[policy]
+status          = "planned"
+unnamed_failure = "surface"
+because = """
+A failure that matches no signal above does NOT advance a tier. Today
+`except Exception` catches everything -- engine faults and our own typos
+alike -- and the second kind degrades silently into a slower path that
+still returns a result. If it is not a named signal, show it."""
+
+
+## ---------------------------------------------------------------------
+## CASCADES
+##
+## Which handler runs, in what order, on what signal. The handlers are
+## code; which handler and when is decided here.
+## ---------------------------------------------------------------------
+
+[[cascade]]
+operation = "equilibrium"
+tiers = [
+  { handler = "ocasi",         start = true },
+  { handler = "native_single", on = ["did_not_converge", "engine_crashed", "no_stable_phases"] },
+]
+exhausted = "fail"
+because = """
+OCASI is faster and hands back structured values directly, with no text to
+parse. It also fails to converge from a cold start on cases the native
+binary solves easily -- steel1 Fe-C at 1200 K is the one this was built
+for, and the reason the second tier exists at all."""
+
+[[cascade]]
+operation = "compare"
+tiers = [
+  { handler = "ocasi",         start = true },
+  { handler = "native_single", on = ["did_not_converge", "engine_crashed", "no_stable_phases"] },
+]
+because = "two equilibria, each cascading on its own"
+
+[[cascade]]
+operation = "property_diagram"
+tiers = [
+  { handler = "native_step", start = true },
+  { handler = "gap_fill", on = ["line_terminated", "endpoint_disagrees"], mode = "complete" },
+  { handler = "python_loop", on = ["unsupported_request", "engine_crashed"] },
+]
+exhausted = "fail"
+because = """
+STEP follows a line by continuation, which is what makes it fast and what
+makes it stop early: where its solver stalls, it abandons the line rather
+than re-minimising. The gaps are filled by independent single-point calls.
+
+`mode = "complete"` marks gap_fill as a COMPLETER, not a fallback: it adds
+the positions STEP never reached and never overwrites the ones it did. The
+distinction is invisible today because both live in the same except block."""
+
+[[cascade]]
+operation = "isothermal_section"
+tiers = [
+  { handler = "native_step",       start = true },
+  { handler = "gap_fill", on = ["line_terminated", "endpoint_disagrees"], mode = "complete" },
+  { handler = "single_point_scan", on = ["unsupported_request", "engine_crashed"] },
+]
+exhausted = "fail"
+because = """
+The composition-axis twin of property_diagram, with the same three tiers.
+Its last tier is a plain loop of single-point calls rather than the
+matplotlib path, because a section has no temperature to plot against."""
+
+[[cascade]]
+operation = "scheil"
+tiers = [{ handler = "native_scheil", start = true }]
+step_ladder_K = [5.0, 2.0, 1.0]
+keep = "least_liquid_remaining"
+exhausted = "fail"
+because = """
+A coarser step finishes where a finer one stalls; a finer one resolves what
+a coarser one steps over. Tried in order, keeping whichever run left the
+least liquid behind. Not a fallback -- all three are the same handler at
+different resolutions."""
+
+[[cascade]]
+operation = "phase_diagram"
+tiers = [{ handler = "native_map", start = true }]
+exhausted  = "fail_with_route"
+route_to   = "isothermal_section"
+because = """
+MAP has no second tier: nothing else in this engine traces boundaries. When
+it fails, the honest answer is to say so and name what can be done instead,
+which is why its exhaustion carries a route rather than a bare error."""
+
+
+## ---------------------------------------------------------------------
+## CORRECTIONS
+##
+## Not fallbacks -- these run against a tier's own output to catch a
+## failure mode that tier cannot see in itself.
+## ---------------------------------------------------------------------
+
+[endpoint_recheck]
+enabled   = true
+applies   = ["property_diagram", "isothermal_section"]
+tolerance = 0.01
+on_disagreement = "bisect_backward"
+because = """
+STEP follows a line by continuation and never re-minimises, so it can carry
+a metastable phase set a long way without any sign of trouble. Measured: it
+held a ferrite line across ninety degrees of a diagram, and the benchmark
+case covering that exact composition passed, because coverage was the only
+criterion. Each line's own end is now re-read from the global minimiser and
+disagreement triggers a backward bisection to find where the line went bad.
+
+Tolerance is 0.01, not 1e-4: at the tighter value a trace HCP_A3 phase at
+0.0014 cost fifty degrees of otherwise good resolution."""
+
+[gap_detection]
+threshold_multiple = 3
+because = """
+A gap wider than three times the nominal spacing is where STEP stopped, not
+where it sampled sparsely. Below that it is ordinary spacing variation."""
+
+
+## ---------------------------------------------------------------------
+## ENGINE BINARY
+## ---------------------------------------------------------------------
+
+[binary]
+prefer   = "bundled_6058"
+fallback = "built_6120"
+because = """
+The bundled 6.058 build solves steel1 Fe-C at 1200 K from a cold start in
+eleven iterations. The 6.120 build we compiled ourselves does not converge
+there in either grid-minimiser mode. Same engine family, measurably
+different solver -- so the older one is preferred where it is present."""
+
+
+## ---------------------------------------------------------------------
+## REVIEWER CHAIN
+##
+## The independent review is optional and never decides correctness. It
+## is listed here because it cascades like everything else.
+## ---------------------------------------------------------------------
+
+[[reviewer]]
+model = "nvidia/nemotron-3-super-120b-a12b"
+independence = "weak"
+because = "same family as the model driving the server; flagged on every verdict"
+
+[[reviewer]]
+model = "nvidia/nemotron-3.5-lightning-30b-a3b"
+independence = "weak"
+
+[reviewer_budget]
+max_tokens = 4000
+truncation_is_not_a_verdict = true
+because = """
+Measured: at 1500 tokens the reviewer spent its whole budget reasoning and
+never reached the verdict line it was asked for last, on 21 of 46 cases.
+Raising the budget helped; reading `finish_reason` is what fixed it, so
+"ran out of budget" stopped being reported as "had no opinion". Unreadable
+fell to 2 of 46."""
+
+[reviewer_note]
+independent_but_slow = "openai/gpt-oss-120b"
+because = """
+The one genuinely independent model that answers on this key, and the only
+one outside the Nemotron family that does. Not in the chain: its latency on
+a real review prompt is unusable -- three probes timed out at 240 s, other
+rounds answered near 150 s. Selectable by hand via OC_VALIDATOR_MODEL when
+a genuinely independent audit is wanted."""

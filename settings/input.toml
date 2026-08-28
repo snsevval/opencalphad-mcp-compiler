@@ -1,0 +1,387 @@
+## =====================================================================
+## input.toml -- what we accept, and what we turn it into.
+##
+## INVARIANT FOR THIS FILE
+##     A setting here MAY change the answer. That is what it is for.
+##     Read it carefully: this file decides which physics gets computed.
+##
+##     Its counterpart is output.toml, where the invariant is the
+##     opposite -- nothing there may change a number.
+##
+## Adding, changing or removing a rule happens HERE. `check` names a
+## predicate implemented once in code; adding another rule of a kind
+## already listed below is a change to this file alone.
+##
+## Every rule carries a `because`. Each was written after something
+## specific went wrong, and a rule whose reason has been forgotten is a
+## rule nobody can safely delete.
+## Anything without a `status` line is live today. `status = "planned"`
+## marks a setting that is designed and not yet wired -- it is here so the
+## design stays in one place, and marked so the file never claims the
+## system does something it does not.
+##
+## =====================================================================
+
+schema_version = 1
+
+
+## ---------------------------------------------------------------------
+## ACCEPT -- what a caller may send, and what it means
+## ---------------------------------------------------------------------
+
+[accept]
+operations = ["equilibrium", "compare", "property_diagram",
+              "isothermal_section", "scheil", "phase_diagram"]
+
+[accept.defaults]
+pressure_Pa = 100000.0
+because = "one atmosphere; the engine needs P conditioned and callers rarely say"
+
+[accept.composition]
+normalise_to_one = true
+because = """
+A percent-scaled composition (AL=93, ZN=5) is a normal thing to send and
+normalising it is the right behaviour. Saying nothing about having done so
+is not -- see output.toml, note `composition-was-rescaled`."""
+
+# The setting that did not exist and should have.
+#
+# Measured twice: a caller asked about "1% C" and sent 0.05, then about
+# "3% C" and sent 0.003. Both passed every check here, because both are
+# valid numbers -- they were simply not the alloy in the question. The
+# basis was being decided silently, inside the caller, with no record of
+# which one it chose.
+#
+# Declared, the conversion becomes ours and stops being arithmetic the
+# caller has to get right.
+[accept.composition.basis]
+status  = "planned"
+values  = ["mole_fraction", "mass_fraction", "weight_percent"]
+default = "mole_fraction"
+because = "1.15 and 1.25 -- composition silently reinterpreted by the caller"
+
+
+## ---------------------------------------------------------------------
+## REJECT -- checked before the engine is touched
+##
+## A request that fails here never reaches a solver, so a rejection costs
+## nothing and means exactly one thing: this request cannot be run as
+## written.
+## ---------------------------------------------------------------------
+
+## ---- applies to every operation --------------------------------------
+
+[[reject]]
+id      = "database-exists"
+applies = "*"
+check   = "file_exists"
+field   = "database"
+message = "Database not found: {path}"
+because = "nothing further is checkable without the file"
+
+[[reject]]
+id      = "database-readable"
+applies = "*"
+check   = "database_parses"
+message = "Could not read database: {error}"
+because = "a file that exists but will not parse fails later and less clearly"
+
+[[reject]]
+id      = "elements-declared"
+applies = "*"
+check   = "subset_of_database_elements"
+field   = "composition"
+message = "Element(s) {missing} not declared in {database} (database has: {available})"
+because = """
+The engine does not reject an undeclared element; it leaves that element's
+degree of freedom undefined and then segfaults inside the minimiser. Naming
+what the database does have is what lets the caller repair the request
+instead of guessing."""
+
+[[reject]]
+id      = "at-least-two-elements"
+applies = "*"
+check   = "min_nonzero_count"
+minimum = 2
+message = """
+At least two elements with a nonzero amount are required (a pure \
+single-element composition is a known unstable condition state for this \
+engine)."""
+because = """
+Found live: a pure {FE: 1.0} composition puts OpenCalphad's condition
+system into "One component without condition" and crashes it, at every
+temperature tried between 900 and 1700 K. A limit of the engine's
+condition model, not of our code, so it is refused rather than attempted."""
+
+[[reject]]
+id      = "phases-declared"
+applies = "*"
+check   = "subset_of_database_phases"
+field   = "phase_status"
+message = "Phase(s) {unknown} not declared in {database} (database has: {available})"
+because = """
+Suspending a phase the database never declares is a silent no-op: the
+calculation runs and returns the STABLE equilibrium, which answers a
+different question than the metastable one that was asked. Observed on
+agcu.TDB, which contains no GRAPHITE -- the request was swallowed and the
+caller then reported graphite as having been suppressed."""
+
+[[reject]]
+id      = "composition-non-negative"
+applies = "*"
+check   = "all_non_negative"
+field   = "composition"
+message = "Composition amount for '{element}' is negative ({value})."
+because = "a negative amount is not a composition"
+
+[[reject]]
+id      = "composition-sum-positive"
+applies = "*"
+check   = "sum_positive"
+field   = "composition"
+message = "Composition amounts sum to zero or less."
+because = "nothing to normalise, and nothing to compute"
+
+[[reject]]
+id       = "composition-scale-plausible"
+applies  = "*"
+check    = "sum_within"
+low      = 0.5
+high     = 2.0
+severity = "note"          # surfaces, does not reject; normalisation still runs
+message  = """
+Note: composition amounts sum to {total}, which is far from a typical ~1.0 \
+scale -- values will still be normalized, but double-check this is the \
+intended composition."""
+because = """
+Not a hard failure: amounts are normalised either way. But a total this far
+from a reasonable scale is worth surfacing rather than silently normalising
+without comment -- the difference between "93 parts" and "93 percent" is
+the caller's to confirm."""
+
+[[reject]]
+id      = "pressure-positive"
+applies = "*"
+check   = "positive"
+field   = "pressure_Pa"
+message = "Pressure must be positive, got {value}."
+because = "the engine conditions on P; a non-positive value is not a state"
+
+
+## ---- temperature ------------------------------------------------------
+
+[[reject]]
+id      = "temperature-positive"
+applies = ["equilibrium", "compare", "isothermal_section"]
+check   = "positive"
+field   = "temperature_K"
+message = "Temperature must be positive (Kelvin), got {value}."
+because = "Kelvin, not Celsius -- a negative value is usually the wrong unit"
+
+[[reject]]
+id      = "temperature-bounds-positive"
+applies = ["property_diagram"]
+check   = "positive"
+fields  = ["temperature_min_K", "temperature_max_K"]
+message = "{field} must be positive, got {value}."
+because = """
+Same unit slip as above, at both ends of a range. Worded without "(Kelvin)"
+here and WITH it under phase_diagram, because that is what the two paths
+say today -- see `map-temperatures-positive`. The inconsistency is real and
+is preserved deliberately: unifying the wording would change what a caller
+sees, and that is a decision to take on purpose, not as a side effect of
+moving rules into this file."""
+
+[[reject]]
+id      = "map-temperatures-positive"
+applies = ["phase_diagram"]
+check   = "positive"
+fields  = ["temperature_min_K", "temperature_max_K", "seed_temperature_K"]
+message = "{field} must be positive (Kelvin), got {value}."
+because = """
+MAP conditions on all three, and its wording carries the unit where the
+property-diagram path does not. Kept as written."""
+
+[[reject]]
+id      = "seed-temperature-positive"
+applies = ["scheil"]
+check   = "positive"
+field   = "seed_temperature_K"
+message = "seed_temperature_K must be positive (Kelvin), got {value}."
+because = """
+Kelvin, not Celsius -- the same unit slip, at the seed. Scheil spells the
+field name out; the phase-diagram path covers its own seed inside
+`map-temperatures-positive`."""
+
+[[reject]]
+id      = "temperature-range-ordered"
+applies = ["property_diagram", "phase_diagram"]
+check   = "range_ordered"
+low     = "temperature_min_K"
+high    = "temperature_max_K"
+message = "temperature_min_K ({low}) must be less than temperature_max_K ({high})."
+because = "a reversed range is scanned as an empty one, silently"
+
+
+## ---- composition axis -------------------------------------------------
+
+[[reject]]
+id      = "axis-element-present"
+applies = "phase_diagram"
+check   = "axis_element_present"
+message = "axis_element '{axis}' is not in the composition ({symbols})."
+because = """
+Otherwise the axis condition is written, binds to nothing, and the scan
+returns the same fixed alloy at every position -- a well-formed answer to
+a question nobody asked."""
+
+[[reject]]
+id      = "axis-element-present-section"
+applies = "isothermal_section"
+check   = "axis_element_present"
+message = """
+axis_element '{axis}' is not in the composition ({symbols}). The scanned \
+element must be one of the elements the alloy is made of."""
+because = "same check as above; the section's wording says what to do about it"
+
+[[reject]]
+id      = "axis-bounds-closed"
+applies = "phase_diagram"
+check   = "fraction_within"
+low     = 0.0
+high    = 1.0
+closed  = true             # [0, 1] -- the pure end IS mappable here
+fields  = ["axis_min", "axis_max"]
+message = "{field} must be a mole fraction in [0, 1], got {value}."
+because = """
+MAP traces boundaries outward and can reach a pure end, so the interval is
+closed here. The section below cannot, and its interval is half-open --
+the difference is real, not an inconsistency."""
+
+[[reject]]
+id      = "axis-bounds-half-open"
+applies = "isothermal_section"
+check   = "fraction_within"
+low     = 0.0
+high    = 1.0
+closed  = false            # [0, 1) -- the pure end leaves no dependent element
+fields  = ["axis_min", "axis_max"]
+message = "{field} must be a mole fraction in [0, 1), got {value}."
+because = """
+At exactly 1.0 the scanned element is the whole alloy and the macro has no
+dependent element left to balance against."""
+
+[[reject]]
+id      = "axis-range-ordered"
+applies = ["isothermal_section", "phase_diagram"]
+check   = "range_ordered"
+low     = "axis_min"
+high    = "axis_max"
+message = "axis_min ({low}) must be less than axis_max ({high})."
+because = "a reversed range is scanned as an empty one, silently"
+
+[[reject]]
+id      = "dependent-element-has-room"
+applies = "isothermal_section"
+check   = "dependent_element_has_room"
+message = """
+axis_max ({axis_max}) leaves nothing for the dependent element: the other \
+fixed elements already take {held} of the total."""
+because = """
+The macro holds the other elements fixed and lets one absorb the balance.
+If the axis reaches far enough, that one is driven negative -- an equation
+with no solution, reached only after the engine has been started."""
+
+
+## ---- seed placement ---------------------------------------------------
+
+[[reject]]
+id      = "seed-inside-mapped-range"
+applies = "phase_diagram"
+check   = "value_within_range"
+value   = "seed_temperature_K"
+low     = "temperature_min_K"
+high    = "temperature_max_K"
+message = """
+seed_temperature_K ({value}) is outside the temperature range being mapped \
+({low} to {high}). The diagram is traced outward from the seed, so it has \
+to start inside."""
+because = """
+MAP starts from that equilibrium and traces outward. A seed outside the box
+produces a diagram of something other than what was asked for."""
+
+[[reject]]
+id      = "scheil-cools-downward"
+applies = "scheil"
+check   = "range_ordered"
+low     = "temperature_min_K"
+high    = "seed_temperature_K"
+message = """
+temperature_min_K ({low}) must be below seed_temperature_K ({high}) -- \
+solidification is simulated by cooling from the seed."""
+because = "Scheil is a path, and the path runs one way"
+
+[[reject]]
+id      = "scheil-min-temperature-positive"
+applies = "scheil"
+check   = "positive"
+field   = "temperature_min_K"
+message = "temperature_min_K must be positive, got {value}."
+because = "Kelvin, not Celsius -- the same unit slip, at the floor"
+
+
+## ---------------------------------------------------------------------
+## ROUTE -- refusals that name a way forward
+##
+## A refusal naming no alternative leaves the caller two bad options:
+## hand back nothing, or work around the rule. Measured (1.26): it chose
+## the second, and was right to. Routing the same question to the right
+## tool is not substituting a different question -- so it is allowed, and
+## said out loud.
+## ---------------------------------------------------------------------
+
+[[route]]
+id       = "section-needs-three-elements"
+applies  = "isothermal_section"
+check    = "min_element_count"
+minimum  = 3
+message  = """
+Scanning {axis} in a two-element system leaves only one other element, \
+which the macro needs as the dependent one. A composition scan needs at \
+least three elements."""
+route_to = "phase_diagram"
+route_note = """
+This binary cannot be scanned on a composition axis, but the same question \
+is answerable by calculate_phase_diagram, which traces phase boundaries in \
+composition and temperature together; read the isotherm off that. It needs \
+a temperature RANGE, not a single temperature."""
+because = """
+A binary has nothing left to balance against once one element is put on an
+axis. The request is not wrong, it is asked of the wrong tool. The range
+note is there because the caller's first retry sent min == max and was
+rejected again -- measured, not anticipated."""
+
+
+## ---------------------------------------------------------------------
+## PRECONDITION -- costs one calculation to check
+##
+## Runs after the free checks. Unlike a rejection, this names a repair and
+## invites a retry: the request is shaped correctly, its starting point is
+## in the wrong place.
+## ---------------------------------------------------------------------
+
+[[precondition]]
+id      = "scheil-seed-is-liquid"
+applies = "scheil"
+check   = "single_phase_liquid_at_seed"
+message = """
+Solidification must start from a melt, but at {seed} K this alloy is not \
+fully liquid: {phases} are already stable there. Try a higher seed \
+temperature."""
+retryable = true
+because = """
+Cannot be settled without an engine: it is a question about the alloy, not
+about the request. Checked here rather than left to fail obscurely inside a
+simulation -- starting in the mushy zone produces a path that looks like a
+result and is not one, because the fraction removed at the first step is
+already wrong and every step after inherits it."""
