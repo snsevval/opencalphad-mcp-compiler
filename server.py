@@ -283,6 +283,10 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None) -> d
                 problems = problems + correspondence["problems"]
                 verification["problems"] = problems
 
+    # Defined even when the review does not run: the DEBUGGER block
+    # below has its own condition and would otherwise reference a name
+    # that only exists on one path.
+    stage_deadline = None
     if passed and SEMANTIC_CHECK_ENABLED and request_args is not None:
         # One deadline for the whole stage, shared with the DEBUGGER's
         # retry below. Read from settings/execution.toml so the number
@@ -291,7 +295,6 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None) -> d
             "reviewer_budget"]["stage_deadline_s"]
         review = semantic_check.review(request_args, result,
                                        deadline=stage_deadline)
-        verification["_stage_deadline"] = stage_deadline
         verification["layer_b"] = review
         _apply_review(verification, review, problems)
 
@@ -310,7 +313,8 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None) -> d
         if failure is not None:
             result["failure"] = failure
             if failure.get("strategy") == failure_classify.STRATEGY_RETRY_REVIEWER:
-                _retry_review(result, verification, request_args, problems)
+                _retry_review(result, verification, request_args,
+                              problems, deadline=stage_deadline)
 
     return result
 
@@ -332,7 +336,7 @@ def _apply_review(verification: dict, review: dict, problems: list) -> None:
 
 
 def _retry_review(result: dict, verification: dict, request_args: dict,
-                  problems: list) -> None:
+                  problems: list, deadline=None) -> None:
     """Ask the rest of the reviewer chain, skipping whoever already failed
     to produce a usable verdict. Records the attempt either way, so a
     result never silently gains (or loses) an independent review."""
@@ -342,7 +346,7 @@ def _retry_review(result: dict, verification: dict, request_args: dict,
     # ninety-second budgets in sequence is a three-minute stage, which is
     # the thing being bounded.
     retry = semantic_check.review(request_args, result, skip_models=tried,
-                                  deadline=verification.pop("_stage_deadline", None))
+                                  deadline=deadline)
 
     attempt = {
         "stage": "DEBUGGER",
