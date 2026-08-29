@@ -276,6 +276,15 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None) -> d
     reported as unavailable, never as disapproval: NVIDIA's capacity must
     not turn into a false alarm about the user's chemistry.
     """
+    # Say which basis the composition arrived in, and give both.
+    # Steel is quoted by weight by convention and this engine conditions on
+    # mole fractions; the payload used to say neither, and three separate
+    # readers each assumed a different one.
+    if isinstance(result, dict) and result.get('composition'):
+        rapor = settings_engine.composition_report(result['composition'])
+        if rapor:
+            result['composition_basis'] = rapor
+
     passed, problems = result_check.verify_result(result)
     verification = {
         "stage": "VERIFY_A",

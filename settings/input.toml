@@ -56,10 +56,24 @@ is not -- see output.toml, note `composition-was-rescaled`."""
 # Declared, the conversion becomes ours and stops being arithmetic the
 # caller has to get right.
 [accept.composition.basis]
-status  = "planned"
 values  = ["mole_fraction", "mass_fraction", "weight_percent"]
 default = "mole_fraction"
-because = "1.15 and 1.25 -- composition silently reinterpreted by the caller"
+report_both = true
+because = """
+Three failures, one root. A caller asked about "1% C" and sent 0.05; asked
+about "3% C" and sent 0.003; and the independent reviewer read our
+x(C)=0.01 as one weight per cent and objected that the result was
+inconsistent with the Fe-C diagram.
+
+The reviewer was not wrong about its alloy. x(C)=0.01 is 0.217 wt%, which
+is hypoeutectoid and sits five degrees below A3 at 1100 K, so a little
+ferrite is exactly right. One weight per cent is x(C)=0.045, which is
+hypereutectoid and gives austenite plus carbide -- precisely what it
+described. It computed the right answer to a question nobody asked.
+
+Steel compositions are quoted by weight by convention, and the payload
+never said which convention it was using. `report_both` puts both in every
+result so nobody has to assume."""
 
 
 ## ---------------------------------------------------------------------

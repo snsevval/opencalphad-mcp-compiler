@@ -601,3 +601,44 @@ def _signal_listed(exc, signal_names):
     if not signal_names:
         return True
     return is_engine_failure(exc)
+
+def composition_report(composition, basis=None):
+    """State the composition in both bases, and say which one arrived.
+
+    Steel is quoted by weight by convention and this engine conditions on
+    mole fractions, and until now the payload said neither. Measured three
+    times: a caller sent 0.05 for "1% C", sent 0.003 for "3% C", and the
+    independent reviewer read x(C)=0.01 as one weight per cent and
+    objected to a result that was correct. The reviewer's objection was
+    right about the alloy it had in mind -- 1 wt% is x(C)=0.045, which is
+    hypereutectoid -- and that alloy was not the one being computed.
+
+    Nobody involved was being careless. The number had no unit attached.
+    """
+    ayarlar = INPUT["accept"]["composition"].get("basis", {})
+    basis = basis or ayarlar.get("default", "mole_fraction")
+    if not composition:
+        return None
+    try:
+        import native_step
+        kutle = native_step.ATOMIC_MASS
+    except Exception:                                    # noqa: BLE001
+        return {"basis": basis}
+
+    bilinmeyen = [el for el in composition if el.upper() not in kutle]
+    if bilinmeyen:
+        # Better to say nothing than to convert with a guessed mass.
+        return {"basis": basis, "unconvertible": sorted(bilinmeyen)}
+
+    toplam = sum(composition.values())
+    if toplam <= 0:
+        return {"basis": basis}
+    mol = {el: v / toplam for el, v in composition.items()}
+    agirlik = {el: mol[el] * kutle[el.upper()] for el in mol}
+    ag_toplam = sum(agirlik.values())
+    return {
+        "basis": basis,
+        "mole_fraction": {el: round(v, 6) for el, v in mol.items()},
+        "weight_percent": {el: round(100.0 * v / ag_toplam, 4)
+                           for el, v in agirlik.items()},
+    }
