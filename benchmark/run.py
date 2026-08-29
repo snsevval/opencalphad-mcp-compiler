@@ -542,6 +542,12 @@ async def run_all(selected, semantic_check=True):
     # kimyaya dair hicbir sey soylemez. Kosum bunu ayrica kaydeder.
     env = dict(os.environ)
     env["OC_SEMANTIC_CHECK"] = "1" if semantic_check else "0"
+    # No one watches a benchmark run, and the interactive gnuplot windows
+    # do not close: eighteen of them accumulated over four runs and turned
+    # a 1.1 s scan into a 156 s one, timing out three cases whose failure
+    # was then blamed on load. A measurement harness must not degrade the
+    # thing it measures.
+    env["OC_INTERACTIVE_WINDOW"] = "0"
     params = StdioServerParameters(command=RUN_SERVER_SH, args=[], env=env)
     devnull = open(os.devnull, "w")
     results = []

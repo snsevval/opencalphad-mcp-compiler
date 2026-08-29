@@ -963,7 +963,22 @@ def open_interactive_window(combined_points, title, x_label="Temperature (K)"):
     PNG, not a replacement for it. Returns immediately without waiting for
     the user to close the window; never raises (best-effort only, a failed
     window must not break the main tool call).
+
+    Set OC_INTERACTIVE_WINDOW=0 to skip it. Automated callers should:
+    nobody watches a benchmark run, and the windows are what make one
+    unwatchable.
+
+    Measured, after four benchmark runs had left eighteen of these open:
+    the same scan that took 1.1 s on a clean machine took 156 s, and a
+    second took 180 s and timed out. The windows never close, they
+    accumulate, and the engine's own gnuplot `render` step goes through
+    the same WSLg path they are congesting -- so native STEP times out,
+    the request drops to the slower fallback, and a database with known
+    convergence trouble then fails outright. Three benchmark cases were
+    failing this way and the cause had been written off as machine load.
     """
+    if os.environ.get("OC_INTERACTIVE_WINDOW", "1") == "0":
+        return False
     try:
         phase_names = []
         for _, fractions, _ in combined_points:

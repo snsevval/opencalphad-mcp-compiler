@@ -203,8 +203,22 @@ independence = "weak"
 
 [reviewer_budget]
 max_tokens = 4000
+stage_deadline_s = 90
 truncation_is_not_a_verdict = true
 because = """
+`stage_deadline_s` bounds the WHOLE review stage -- every model in the
+chain, every retry, and the DEBUGGER's second opinion together. Each of
+those had its own timeout and their sum had none, so the stage could take
+four minutes on its own.
+
+Measured, after max_tokens went to 4000: a single-point equilibrium that
+computes in 0.81 s came back at 180 s and was recorded as a timeout. The
+calculation was never the slow part. The reviewer runs inside the tool
+call, so the caller waits for both.
+
+Running out of time is not disapproval. The result returns unreviewed and
+says so -- see output.toml, absent_review_is_not_disapproval.
+
 Measured: at 1500 tokens the reviewer spent its whole budget reasoning and
 never reached the verdict line it was asked for last, on 21 of 46 cases.
 Raising the budget helped; reading `finish_reason` is what fixed it, so

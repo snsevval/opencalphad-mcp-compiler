@@ -146,7 +146,8 @@ def post_once(model, prompt, timeout_s, image_b64=None):
     return choice["message"]["content"], choice.get("finish_reason")
 
 
-def call_model_chain(models, prompt, timeout_s=60, image_b64=None, retries=(0, 4, 10)):
+def call_model_chain(models, prompt, timeout_s=60, image_b64=None,
+                     retries=(0, 4, 10), deadline=None):
     """Ask the first model that answers. Returns (reply, model_used,
     finish_reason).
 
@@ -160,11 +161,26 @@ def call_model_chain(models, prompt, timeout_s=60, image_b64=None, retries=(0, 4
     attempts = []
     for model in models:
         for delay in retries:
+            # Every attempt had its own timeout and their sum had none.
+            # Checked before sleeping and before dialling, so a stage that
+            # has run out of time stops rather than starting one more
+            # sixty-second wait it cannot afford.
+            if deadline is not None and time.time() >= deadline:
+                attempts.append("deadline reached")
+                raise RuntimeError("review deadline reached -> "
+                                   + "; ".join(attempts))
             if delay:
+                if deadline is not None and time.time() + delay >= deadline:
+                    attempts.append("deadline would pass during backoff")
+                    raise RuntimeError("review deadline reached -> "
+                                       + "; ".join(attempts))
                 time.sleep(delay)
             try:
+                budget = timeout_s
+                if deadline is not None:
+                    budget = max(1, min(timeout_s, int(deadline - time.time())))
                 reply, finish_reason = post_once(
-                    model, prompt, timeout_s, image_b64=image_b64)
+                    model, prompt, budget, image_b64=image_b64)
             except urllib.error.HTTPError as exc:
                 attempts.append(f"{model}: HTTP {exc.code}")
                 if exc.code not in _TRANSIENT_HTTP_CODES:
@@ -298,7 +314,7 @@ def independence_note(model_used):
 
 
 def review(request_args, result, context_note=None, timeout_s=60, retries=(0, 4),
-           skip_models=()):
+           skip_models=(), deadline=None):
     """Ask an independent model to judge a result's physical plausibility.
 
     Returns a dict. `available` says whether a review was actually
@@ -330,7 +346,8 @@ def review(request_args, result, context_note=None, timeout_s=60, retries=(0, 4)
     prompt = build_prompt(request_args, result, context_note)
     try:
         reply, model_used, finish_reason = call_model_chain(
-            models, prompt, timeout_s=timeout_s, retries=retries
+            models, prompt, timeout_s=timeout_s, retries=retries,
+            deadline=deadline,
         )
     except Exception as exc:
         return {

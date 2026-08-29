@@ -28,6 +28,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP, Image
@@ -42,6 +43,7 @@ import native_map  # noqa: E402
 import preflight  # noqa: E402
 import result_check  # noqa: E402
 import scan_summary  # noqa: E402
+import settings_engine  # noqa: E402
 import call_log  # noqa: E402
 import semantic_check  # noqa: E402
 import failure_classify  # noqa: E402
@@ -282,7 +284,14 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None) -> d
                 verification["problems"] = problems
 
     if passed and SEMANTIC_CHECK_ENABLED and request_args is not None:
-        review = semantic_check.review(request_args, result)
+        # One deadline for the whole stage, shared with the DEBUGGER's
+        # retry below. Read from settings/execution.toml so the number
+        # sits next to the measurement that produced it.
+        stage_deadline = time.time() + settings_engine.EXECUTION[
+            "reviewer_budget"]["stage_deadline_s"]
+        review = semantic_check.review(request_args, result,
+                                       deadline=stage_deadline)
+        verification["_stage_deadline"] = stage_deadline
         verification["layer_b"] = review
         _apply_review(verification, review, problems)
 
@@ -329,7 +338,11 @@ def _retry_review(result: dict, verification: dict, request_args: dict,
     result never silently gains (or loses) an independent review."""
     first = verification.get("layer_b") or {}
     tried = [m for m in [first.get("model_used")] if m]
-    retry = semantic_check.review(request_args, result, skip_models=tried)
+    # Shares the stage deadline rather than getting a fresh one: two
+    # ninety-second budgets in sequence is a three-minute stage, which is
+    # the thing being bounded.
+    retry = semantic_check.review(request_args, result, skip_models=tried,
+                                  deadline=verification.pop("_stage_deadline", None))
 
     attempt = {
         "stage": "DEBUGGER",

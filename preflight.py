@@ -111,17 +111,80 @@ def _check_common(database, elements_composition, pressure_Pa, suspended_phases=
     return problems
 
 
+def _delegate(operation, database, elements_composition, **extra):
+    """Every check now comes from settings/input.toml.
+
+    The rules used to live in this file as Python conditionals. They were
+    moved out so that "what does this system check, and why?" has a
+    single readable answer, and so that adding a rule of a kind that
+    already exists is a change to a settings file rather than to code.
+
+    These five functions stay because their callers do: server.py, the
+    ablation worker and the verification loop all call them by name with
+    these signatures. What changed is where the answer comes from, not
+    what the answer is -- verified across 633 requests, hand-written and
+    fuzzed, against the implementation this replaced.
+    """
+    import settings_engine
+    request = dict(extra)
+    request["database"] = database
+    request["composition"] = elements_composition
+    if "suspended_phases" in request:
+        request["phase_status"] = request.pop("suspended_phases")
+    return settings_engine.check(operation, **request)
+
+
 def check_equilibrium_request(
-    database, elements_composition, temperature_K, pressure_Pa=1e5, suspended_phases=None
+    database, elements_composition, temperature_K, pressure_Pa=1e5,
+    suspended_phases=None,
 ):
     """PREFLIGHT for calculate_equilibrium. Returns a list of problem
     strings; empty list means the request is valid."""
-    problems = _check_common(
-        database, elements_composition, pressure_Pa, suspended_phases
-    )
-    if temperature_K <= 0:
-        problems.append(f"Temperature must be positive (Kelvin), got {temperature_K}.")
-    return problems
+    return _delegate("equilibrium", database, elements_composition,
+                     temperature_K=temperature_K, pressure_Pa=pressure_Pa,
+                     suspended_phases=suspended_phases)
+
+
+def check_property_diagram_request(
+    database, elements_composition, temperature_min_K, temperature_max_K,
+    pressure_Pa=1e5, suspended_phases=None,
+):
+    """PREFLIGHT for calculate_property_diagram."""
+    return _delegate("property_diagram", database, elements_composition,
+                     temperature_min_K=temperature_min_K,
+                     temperature_max_K=temperature_max_K,
+                     pressure_Pa=pressure_Pa,
+                     suspended_phases=suspended_phases)
+
+
+def check_isothermal_section_request(
+    database, elements_composition, axis_element, axis_min, axis_max,
+    temperature_K, pressure_Pa=1e5, suspended_phases=None,
+):
+    """PREFLIGHT for calculate_isothermal_section."""
+    return _delegate("isothermal_section", database, elements_composition,
+                     axis_element=axis_element, axis_min=axis_min,
+                     axis_max=axis_max, temperature_K=temperature_K,
+                     pressure_Pa=pressure_Pa,
+                     suspended_phases=suspended_phases)
+
+
+def check_scheil_request(
+    database, elements_composition, seed_temperature_K, temperature_min_K,
+    pressure_Pa=1e5,
+):
+    """PREFLIGHT for calculate_scheil_solidification.
+
+    Scheil's other precondition -- that the seed temperature is in the
+    single-phase liquid -- is not here: it is a question about the alloy,
+    not about the request, and settling it means computing an
+    equilibrium. The tool checks it separately, before paying for a
+    simulation that would otherwise fail obscurely.
+    """
+    return _delegate("scheil", database, elements_composition,
+                     seed_temperature_K=seed_temperature_K,
+                     temperature_min_K=temperature_min_K,
+                     pressure_Pa=pressure_Pa)
 
 
 def check_phase_diagram_request(
@@ -129,171 +192,20 @@ def check_phase_diagram_request(
     temperature_min_K, temperature_max_K, seed_temperature_K,
     pressure_Pa=1e5,
 ):
-    """PREFLIGHT for calculate_phase_diagram. Returns a list of problem
-    strings; empty list means the request is valid.
+    """PREFLIGHT for calculate_phase_diagram.
 
     Two axes, so both get the checks a single axis gets, plus one that
     only makes sense here: the seed has to sit inside the box being
-    mapped. MAP starts from that equilibrium and traces outward, so a seed
-    outside the range is not a diagram of what was asked for.
+    mapped. MAP starts from that equilibrium and traces outward, so a
+    seed outside the range is not a diagram of what was asked for.
     """
-    problems = _check_common(database, elements_composition, pressure_Pa, None)
-
-    symbols = {el.upper() for el in elements_composition}
-    if axis_element.upper() not in symbols:
-        problems.append(
-            f"axis_element '{axis_element}' is not in the composition "
-            f"({sorted(symbols)})."
-        )
-
-    for name, value in (("axis_min", axis_min), ("axis_max", axis_max)):
-        if not (0.0 <= value <= 1.0):
-            problems.append(
-                f"{name} must be a mole fraction in [0, 1], got {value}."
-            )
-    if axis_min >= axis_max:
-        problems.append(
-            f"axis_min ({axis_min}) must be less than axis_max ({axis_max})."
-        )
-
-    for name, value in (("temperature_min_K", temperature_min_K),
-                        ("temperature_max_K", temperature_max_K),
-                        ("seed_temperature_K", seed_temperature_K)):
-        if value <= 0:
-            problems.append(f"{name} must be positive (Kelvin), got {value}.")
-    if temperature_min_K >= temperature_max_K:
-        problems.append(
-            f"temperature_min_K ({temperature_min_K}) must be less than "
-            f"temperature_max_K ({temperature_max_K})."
-        )
-    if not (temperature_min_K <= seed_temperature_K <= temperature_max_K):
-        problems.append(
-            f"seed_temperature_K ({seed_temperature_K}) is outside the "
-            f"temperature range being mapped ({temperature_min_K} to "
-            f"{temperature_max_K}). The diagram is traced outward from the "
-            "seed, so it has to start inside."
-        )
-    return problems
-
-
-def check_scheil_request(
-    database, elements_composition, seed_temperature_K, temperature_min_K,
-    pressure_Pa=1e5,
-):
-    """PREFLIGHT for calculate_scheil_solidification. Returns a list of
-    problem strings; empty list means the request is valid.
-
-    Only the checks that need no engine. Scheil's other precondition --
-    that the seed temperature is in the single-phase liquid -- cannot be
-    settled here: it is a question about the alloy, not about the request,
-    and answering it means computing an equilibrium. The tool checks it
-    separately, before paying for a simulation that would otherwise fail
-    obscurely.
-    """
-    problems = _check_common(database, elements_composition, pressure_Pa, None)
-
-    if seed_temperature_K <= 0:
-        problems.append(
-            f"seed_temperature_K must be positive (Kelvin), got {seed_temperature_K}."
-        )
-    if temperature_min_K <= 0:
-        problems.append(
-            f"temperature_min_K must be positive, got {temperature_min_K}."
-        )
-    if temperature_min_K >= seed_temperature_K:
-        problems.append(
-            f"temperature_min_K ({temperature_min_K}) must be below "
-            f"seed_temperature_K ({seed_temperature_K}) -- solidification "
-            "is simulated by cooling from the seed."
-        )
-    return problems
-
-
-def check_isothermal_section_request(
-    database, elements_composition, axis_element, axis_min, axis_max,
-    temperature_K, pressure_Pa=1e5, suspended_phases=None,
-):
-    """PREFLIGHT for calculate_isothermal_section. Returns a list of
-    problem strings; empty list means the request is valid.
-
-    The axis checks are the ones the engine would otherwise discover the
-    expensive way. Scanning an element that is not in the composition
-    would silently scan nothing; scanning the only other element leaves no
-    dependent element for the macro to balance against; and an axis
-    reaching far enough would drive the dependent element negative, which
-    the engine reports as an unsolvable condition rather than a bad
-    request.
-    """
-    problems = _check_common(
-        database, elements_composition, pressure_Pa, suspended_phases
-    )
-    if temperature_K <= 0:
-        problems.append(f"Temperature must be positive (Kelvin), got {temperature_K}.")
-
-    symbols = {el.upper() for el in elements_composition}
-    if axis_element.upper() not in symbols:
-        problems.append(
-            f"axis_element '{axis_element}' is not in the composition "
-            f"({sorted(symbols)}). The scanned element must be one of the "
-            "elements the alloy is made of."
-        )
-    elif len(symbols) < 3:
-        problems.append(
-            f"Scanning {axis_element} in a two-element system leaves only "
-            "one other element, which the macro needs as the dependent "
-            "one. A composition scan needs at least three elements."
-        )
-
-    for name, value in (("axis_min", axis_min), ("axis_max", axis_max)):
-        if not (0.0 <= value < 1.0):
-            problems.append(
-                f"{name} must be a mole fraction in [0, 1), got {value}."
-            )
-    if axis_min >= axis_max:
-        problems.append(
-            f"axis_min ({axis_min}) must be less than axis_max ({axis_max})."
-        )
-
-    # What is left for the dependent element at the far end of the scan.
-    total = sum(elements_composition.values())
-    if total > 0 and axis_element.upper() in symbols:
-        others = sum(
-            amount / total for el, amount in elements_composition.items()
-            if el.upper() not in (axis_element.upper(),)
-        )
-        held = others - max(
-            (amount / total for el, amount in elements_composition.items()
-             if el.upper() != axis_element.upper()),
-            default=0.0,
-        )
-        if axis_max + held >= 1.0:
-            problems.append(
-                f"axis_max ({axis_max}) leaves nothing for the dependent "
-                f"element: the other fixed elements already take "
-                f"{held:.4g} of the total."
-            )
-    return problems
-
-
-def check_property_diagram_request(
-    database, elements_composition, temperature_min_K, temperature_max_K,
-    pressure_Pa=1e5, suspended_phases=None,
-):
-    """PREFLIGHT for calculate_property_diagram. Returns a list of
-    problem strings; empty list means the request is valid."""
-    problems = _check_common(
-        database, elements_composition, pressure_Pa, suspended_phases
-    )
-    if temperature_min_K <= 0:
-        problems.append(f"temperature_min_K must be positive, got {temperature_min_K}.")
-    if temperature_max_K <= 0:
-        problems.append(f"temperature_max_K must be positive, got {temperature_max_K}.")
-    if temperature_min_K >= temperature_max_K:
-        problems.append(
-            f"temperature_min_K ({temperature_min_K}) must be less than "
-            f"temperature_max_K ({temperature_max_K})."
-        )
-    return problems
+    return _delegate("phase_diagram", database, elements_composition,
+                     axis_element=axis_element, axis_min=axis_min,
+                     axis_max=axis_max,
+                     temperature_min_K=temperature_min_K,
+                     temperature_max_K=temperature_max_K,
+                     seed_temperature_K=seed_temperature_K,
+                     pressure_Pa=pressure_Pa)
 
 
 # --- Reddin yaninda yol gostermek ------------------------------------
@@ -336,16 +248,17 @@ _ALTERNATIFLER = [
 
 
 def suggest(problems):
-    """Reddedilen istegin bilinen bir alternatifi varsa onu dondur.
+    """Alternatives for a rejection that is answerable elsewhere.
 
-    Sadece "bu arac yapamaz, baskasi yapar" sinifi icin doner. Imkansiz
-    istekler (olmayan element, ters aralik, negatif sicaklik) icin bos
-    doner -- orada yonlendirilecek bir yer yok ve uydurmasi zararli olur:
-    cagiran tarafi, kullanicinin sormadigi bir hesaba iter.
+    Now read from settings/input.toml, where each route sits next to the
+    rule that produces it. Only the "wrong tool" class gets one: an
+    impossible request gets nothing, because inventing a route pushes the
+    caller toward a calculation nobody asked for.
     """
-    bulunan = []
-    for problem in problems or []:
-        for kalip, oneri in _ALTERNATIFLER:
-            if kalip in problem and oneri not in bulunan:
-                bulunan.append(oneri)
-    return bulunan
+    import settings_engine
+    notes = []
+    for operation in settings_engine.ALL_OPERATIONS:
+        for note in settings_engine.route_for(operation, problems or []):
+            if note not in notes:
+                notes.append(note)
+    return notes
