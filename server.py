@@ -191,15 +191,11 @@ def _phase_notes(result: dict, elements_composition: dict) -> Optional[dict]:
         phase_major = max(composition, key=composition.get)
         if phase_major.upper() == alloy_major:
             continue
-        notes[phase] = (
-            f"In this phase the dominant element is {phase_major} "
-            f"({composition[phase_major]:.4g}), while the alloy's dominant "
-            f"element is {alloy_major} ({composition.get(alloy_major, 0.0):.4g} "
-            f"here). A phase name in this database denotes crystal "
-            f"structure, not composition -- the same name covers "
-            f"chemically different phases. If you give this phase a name "
-            f"of your own, say which feature of the composition supports "
-            f"that name."
+        notes[phase] = settings_engine.note(
+            "phase-name-is-structure-not-composition",
+            phase_major=phase_major,
+            phase_major_fraction=format(composition[phase_major], ".4g"),
+            alloy_major=alloy_major,
         )
     return notes or None
 
@@ -223,6 +219,26 @@ def _preflight_failure(problems: list) -> dict:
     if alternative:
         rejection["alternative"] = alternative
     return rejection
+
+
+def _attach_coverage(result: dict, axis_key: str, requested_n,
+                     span_low, span_high) -> dict:
+    """Say how much of the requested scan came back.
+
+    The other checks ask whether the numbers are sound. This one asks how
+    many are missing -- a question none of them was posing, and the reason
+    a one-point answer to a twenty-point request came back marked as
+    verified.
+    """
+    cov = settings_engine.coverage(result.get("points"), axis_key,
+                                   requested_n, span_low, span_high)
+    if not cov:
+        return result
+    result["coverage"] = cov
+    warning = settings_engine.coverage_note(cov)
+    if warning:
+        result["coverage_warning"] = warning
+    return result
 
 
 def _attach_scan_summary(result: dict, axis_key: str) -> dict:
@@ -420,6 +436,22 @@ def _calc_one(
         }
 
 
+def _with_stop_rule(function):
+    """Fill {STOP_RULE} in a tool's docstring from settings/output.toml.
+
+    Applied BELOW @mcp.tool() so it runs first and the framework reads the
+    finished text. The docstring is what the calling model actually sees,
+    which is why this rule was copied into six of them by hand -- and why
+    correcting it once meant editing all six. It has one home now.
+    """
+    text = settings_engine.stop_rule_block()
+    if function.__doc__:
+        function.__doc__ = function.__doc__.replace("{STOP_RULE}", text)
+    return function
+
+
+
+
 @mcp.tool()
 @call_log.logged
 def list_databases(directory: Optional[str] = None) -> list[dict]:
@@ -450,6 +482,7 @@ def inspect_database(database: str, directory: Optional[str] = None) -> dict:
 
 
 @mcp.tool()
+@_with_stop_rule
 @call_log.logged
 def calculate_equilibrium(
     database: str,
@@ -462,9 +495,7 @@ def calculate_equilibrium(
 ) -> dict:
     """Calculate a single-point thermodynamic equilibrium with OpenCalphad.
 
-    PREFLIGHT REJECTION — STOP RULE
-    If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran.
+    {STOP_RULE}
 
     If the rejection carries an "alternative" field, the question IS
     answerable — just not by this tool. Call the tool it names, with the
@@ -572,6 +603,7 @@ def _same_elements(composition_a: dict, composition_b: dict) -> bool:
 
 
 @mcp.tool()
+@_with_stop_rule
 @call_log.logged
 def compare_alloys(
     database: str,
@@ -585,9 +617,7 @@ def compare_alloys(
 ) -> dict:
     """Calculate equilibrium for two compositions at the same T/P and compare them.
 
-    PREFLIGHT REJECTION — STOP RULE
-    If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran.
+    {STOP_RULE}
 
     If the rejection carries an "alternative" field, the question IS
     answerable — just not by this tool. Call the tool it names, with the
@@ -743,6 +773,7 @@ def compare_alloys(
 
 
 @mcp.tool()
+@_with_stop_rule
 @call_log.logged
 def calculate_property_diagram(
     database: str,
@@ -755,9 +786,7 @@ def calculate_property_diagram(
 ):
     """Sweep temperature and calculate a phase diagram over that range.
 
-    PREFLIGHT REJECTION — STOP RULE
-    If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran.
+    {STOP_RULE}
 
     If the rejection carries an "alternative" field, the question IS
     answerable — just not by this tool. Call the tool it names, with the
@@ -877,6 +906,8 @@ def calculate_property_diagram(
                 "chart_error": None,
             }
             _attach_scan_summary(data, "temperature_K")
+            _attach_coverage(data, "temperature_K", n_points,
+                             temperature_min_K, temperature_max_K)
             return [
                 _attach_verification(data, _diagram_args),
                 Image(data=chart_bytes, format="png"),
@@ -969,6 +1000,8 @@ def calculate_property_diagram(
         "chart_error": chart_error,
     }
     _attach_scan_summary(data, "temperature_K")
+    _attach_coverage(data, "temperature_K", n_points,
+                     temperature_min_K, temperature_max_K)
     _attach_verification(data, _diagram_args)
     if chart_bytes:
         return [data, Image(data=chart_bytes, format="png")]
@@ -976,6 +1009,7 @@ def calculate_property_diagram(
 
 
 @mcp.tool()
+@_with_stop_rule
 @call_log.logged
 def calculate_isothermal_section(
     database: str,
@@ -995,9 +1029,7 @@ def calculate_isothermal_section(
     an isothermal section. Use it for questions phrased as adding,
     increasing, or varying an element rather than heating or cooling.
 
-    PREFLIGHT REJECTION — STOP RULE
-    If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran.
+    {STOP_RULE}
 
     If the rejection carries an "alternative" field, the question IS
     answerable — just not by this tool. Call the tool it names, with the
@@ -1100,7 +1132,8 @@ def calculate_isothermal_section(
         }
         data.update(source_counts)
         data.update(extra)
-        return _attach_scan_summary(data, "x")
+        _attach_scan_summary(data, "x")
+        return _attach_coverage(data, "x", n_points, axis_min, axis_max)
 
     try:
         combined, gap_filled = native_step.build_combined_series(
@@ -1223,6 +1256,7 @@ def calculate_isothermal_section(
 
 
 @mcp.tool()
+@_with_stop_rule
 @call_log.logged
 def calculate_scheil_solidification(
     database: str,
@@ -1244,9 +1278,7 @@ def calculate_scheil_solidification(
     segregation, or why the last part of a melt to freeze differs from the
     first.
 
-    PREFLIGHT REJECTION — STOP RULE
-    If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran.
+    {STOP_RULE}
 
     If the rejection carries an "alternative" field, the question IS
     answerable — just not by this tool. Call the tool it names, with the
@@ -1321,11 +1353,10 @@ def calculate_scheil_solidification(
                  if amount > 1e-6 and not name.upper().startswith("LIQUID")]
         if solid:
             return {
-                "error": (
-                    f"Solidification must start from a melt, but at "
-                    f"{seed_temperature_K:g} K this alloy is not fully "
-                    f"liquid: {sorted(solid)} {'is' if len(solid) == 1 else 'are'} "
-                    "already stable there. Try a higher seed temperature."
+                "error": settings_engine.precondition(
+                    "scheil-seed-is-liquid",
+                    seed=format(seed_temperature_K, "g"),
+                    phases=sorted(solid),
                 ),
                 "stage": "PRECONDITION",
                 "phases_at_seed": {k: float(f"{v:.6g}") for k, v in amounts.items()},
@@ -1390,6 +1421,7 @@ def calculate_scheil_solidification(
 
 
 @mcp.tool()
+@_with_stop_rule
 @call_log.logged
 def calculate_phase_diagram(
     database: str,
@@ -1414,9 +1446,7 @@ def calculate_phase_diagram(
     asks for "the phase diagram" of a system rather than the behaviour of
     one alloy.
 
-    PREFLIGHT REJECTION — STOP RULE
-    If the result has stage="PREFLIGHT", the request was refused before any
-    calculation ran.
+    {STOP_RULE}
 
     If the rejection carries an "alternative" field, the question IS
     answerable — just not by this tool. Call the tool it names, with the

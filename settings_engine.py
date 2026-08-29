@@ -351,9 +351,118 @@ def route_for(operation, problems):
             notes.append(rule["route_note"].strip())
     return notes
 
+def stop_rule_block(indent="    "):
+    """The stop rule as one block, ready to drop into a tool docstring.
 
-def stop_rule(has_route):
-    """What a caller should do with a refusal. One rule, stated once --
-    it used to be six hand-copied paragraphs."""
+    Assembled from settings/output.toml. It used to be six paragraphs
+    typed out by hand in six docstrings, which is how a correction to it
+    turned into six separate edits.
+    """
     rule = OUTPUT["stop_rule"]
-    return rule["on_route_present"] if has_route else rule["on_no_route"]
+    lines = ["PREFLIGHT REJECTION — STOP RULE",
+             "If the result has stage=\"PREFLIGHT\", the request was refused",
+             "before any calculation ran. Two cases, and they call for",
+             "opposite actions:",
+             ""]
+    for baslik, anahtar in (
+        ("(a) The rejection carries an \"alternative\" field.", "on_route_present"),
+        ("(b) No \"alternative\" field.", "on_no_route"),
+        ("(c) stage=\"PRECONDITION\" is different again.", "on_precondition"),
+    ):
+        lines.append(baslik)
+        lines.extend("    " + satir for satir in rule[anahtar].strip().split("\n"))
+        lines.append("")
+    return ("\n" + indent).join(lines).rstrip()
+
+
+# ---------------------------------------------------------------------
+# Output side.
+#
+# The rules above decide what runs. These decide what comes back and how
+# it is worded -- which matters more than it sounds: a sentence that can
+# be read two ways becomes a wrong finding, and one of these was read
+# the wrong way in a live session.
+# ---------------------------------------------------------------------
+
+def note(note_id, **fields):
+    """The text for one output note, filled in.
+
+    Returns None when the note is not declared or is still `planned`, so
+    a caller can leave the field out rather than emit an empty string.
+    """
+    for entry in OUTPUT.get("note", []):
+        if entry.get("id") != note_id:
+            continue
+        if entry.get("status") == "planned":
+            return None
+        try:
+            return entry["text"].strip().format(**fields)
+        except KeyError:
+            # A template asking for a field the caller did not supply is a
+            # settings bug, not a calculation failure. Hand back the
+            # unfilled text rather than raising into someone's chemistry.
+            return entry["text"].strip()
+    return None
+
+
+def derive_settings():
+    """Tolerances the scan summary derives with."""
+    d = OUTPUT["derive"]
+    return {
+        "presence_tolerance": d["presence_tolerance"],
+        "dominance_threshold": d["dominance_threshold"],
+        "enabled": list(d["enabled"]),
+    }
+
+
+def precondition(check_id, **fields):
+    """The message for a precondition that costs a calculation to test."""
+    for entry in INPUT.get("precondition", []):
+        if entry.get("id") == check_id:
+            return entry["message"].strip().format(**fields)
+    return None
+
+
+def coverage(points, axis_key, requested_n, span_low, span_high):
+    """How much of the requested scan actually came back.
+
+    Every other check asks whether the numbers that arrived are sound.
+    None of them asks how many never did -- and one point is a perfectly
+    well-formed result. Measured: a twenty-position request returned a
+    single position, passed every layer, and carried no warning at all.
+
+    Returns None when there is nothing to compare against.
+    """
+    if not points or requested_n in (None, 0) or span_low is None or span_high is None:
+        return None
+    solved = [p for p in points if "error" not in p and p.get(axis_key) is not None]
+    if not solved:
+        return None
+    span = abs(span_high - span_low)
+    if span <= 0:
+        return None
+    lo = min(p[axis_key] for p in solved)
+    hi = max(p[axis_key] for p in solved)
+    covered = abs(hi - lo) / span
+    return {
+        "requested_positions": requested_n,
+        "solved_positions": len(solved),
+        "requested_range": [span_low, span_high],
+        "covered_range": [lo, hi],
+        "covered_fraction": round(min(covered, 1.0), 4),
+    }
+
+
+def coverage_note(cov, minimum_fraction=0.9):
+    """The warning text when a scan came back short, or None when it did
+    not. `planned` in the settings suppresses it, as for any note."""
+    if not cov:
+        return None
+    if cov["covered_fraction"] >= minimum_fraction:
+        return None
+    return note(
+        "scan-coverage-incomplete",
+        solved=cov["solved_positions"],
+        requested=cov["requested_positions"],
+        covered_range="%.4g to %.4g" % tuple(cov["covered_range"]),
+    )

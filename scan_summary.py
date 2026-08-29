@@ -37,12 +37,24 @@ precise fact. Under-sampled regions are also collected separately under
 # single-point path disagree in the fifth decimal on trace phases, and a
 # 1e-6 sliver flickering in and out of the list would otherwise produce a
 # transition at every other point.
-PRESENCE_TOLERANCE = 1e-4
+def _settings():
+    """Tolerances come from settings/output.toml, where each sits next to
+    the measurement that produced it. Falls back to the values below if
+    the settings cannot be read: a missing file must not stop a
+    calculation, and these are the numbers the file states anyway."""
+    try:
+        import settings_engine
+        return settings_engine.derive_settings()
+    except Exception:                                    # noqa: BLE001
+        return {"presence_tolerance": 1e-4, "dominance_threshold": 0.5}
+
+
+PRESENCE_TOLERANCE = _settings()["presence_tolerance"]
 
 # A phase is "dominant" when it holds more than half of the system. This
 # is the threshold the questions themselves use ("when does ferrite
 # become dominant") -- not a modelling choice.
-DOMINANCE_THRESHOLD = 0.5
+DOMINANCE_THRESHOLD = _settings()["dominance_threshold"]
 
 
 def _present_phases(amounts):
