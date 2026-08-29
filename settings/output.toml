@@ -159,6 +159,27 @@ A result that fails a check is still returned, flagged rather than
 replaced. The caller asked for a calculation and the engine produced one;
 hiding it would remove the evidence needed to judge what went wrong."""
 
+[honesty.review_is_advisory_not_a_verdict]
+enabled = true
+because = """
+The independent review reports; it does not decide. Its objection is
+recorded and framed as an objection, and it never flips a result to
+failed.
+
+It is a second model, and it is weak in exactly the place a model is weak:
+it reaches for a remembered generality before it reads the numbers.
+Measured -- steel1 Fe-1at%C at 1100 K returned 7.5% ferrite with 92.5%
+austenite, which is correct five degrees below A3, and the reviewer called
+it inconsistent with the Fe-C diagram because above the eutectoid it
+expected austenite alone. The caller relayed that objection as settled,
+disowned its own eight exact numbers, and told the user the real diagram
+forbids what the engine had computed.
+
+What it is good at is turning up things nobody was looking for: the
+LIQUID/LIQUID#1 naming split and the alni-4slx convergence rate both came
+from here. That is a lead, and a lead is worth having. It is not a
+verdict, and presenting it as one costs more than it returns."""
+
 [honesty.absent_review_is_not_disapproval]
 enabled = true
 because = """
@@ -194,6 +215,23 @@ The earlier wording put two different quantities in one sentence with a
 single number between them, and could be read as stating the alloy's
 composition when it was stating the phase's. Rewritten so each number sits
 next to the thing it measures."""
+
+[[note]]
+id   = "independent-review-objected"
+when = "layer_b_returned_false"
+text = """
+An independent model was asked to look at this result and objected: \
+{reason}
+
+This objection is NOT a finding. It was not checked against anything, and \
+the reviewer is a language model reasoning from memory, not a second \
+calculation. The result below passed its own structural checks. Treat the \
+objection as a question worth asking, not as a correction -- and if you \
+repeat it to the user, say which of the two it is."""
+because = """
+The framing is the whole point. Reported as a verdict, a wrong objection
+propagates with authority: the caller abandoned eight correct numbers and
+told the user the real phase diagram forbade them."""
 
 [[note]]
 id   = "gibbs-difference-is-not-a-ranking"

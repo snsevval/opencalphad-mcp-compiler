@@ -341,14 +341,26 @@ def _apply_review(verification: dict, review: dict, problems: list) -> None:
     whose verdict could not be read, leaves Layer A's decision standing --
     an absent opinion is not a negative one."""
     if review.get("available") and review.get("passed") is False:
-        verification["passed"] = False
+        # Recorded, framed, and not acted on. The review reports; it does
+        # not decide. See output.toml, honesty.review_is_advisory_not_a_verdict:
+        # a wrong objection presented as a verdict cost a caller eight
+        # correct numbers and produced a claim that the real phase diagram
+        # forbade what the engine had computed.
         verification["stage"] = "VERIFY_A+B"
-        verification["problems"] = problems + [
-            "Bağımsız model denetimi sonucu makul bulmadı: "
-            + review.get("reason", "")[:500]
-        ]
+        verification["independent_review"] = {
+            "objected": True,
+            "advisory_only": True,
+            "framing": settings_engine.note(
+                "independent-review-objected",
+                reason=review.get("reason", "")[:500],
+            ),
+        }
     elif review.get("available"):
         verification["stage"] = "VERIFY_A+B"
+        verification["independent_review"] = {
+            "objected": False,
+            "advisory_only": True,
+        }
 
 
 def _retry_review(result: dict, verification: dict, request_args: dict,
