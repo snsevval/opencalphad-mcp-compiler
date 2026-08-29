@@ -83,7 +83,36 @@ _DEFAULT_MODELS = [
 # cunku bir dahaki sefere aranacak yer burasi.
 INDEPENDENT_MODELS = ["openai/gpt-oss-120b"]
 _pinned = os.environ.get("OC_VALIDATOR_MODEL", "")
-MODELS = [_pinned] if _pinned else _DEFAULT_MODELS
+def _chain_from_settings():
+    """The reviewer chain, from settings/execution.toml.
+
+    It changes: the model that used to sit first in this list is still in
+    NVIDIA's catalogue and returns 404 to /chat/completions, so every
+    review had been falling silently through to the next one for weeks.
+    Which models are asked is exactly the kind of thing that should be
+    editable without touching code.
+    """
+    try:
+        import settings_engine
+        chain = [r["model"] for r in
+                 settings_engine.EXECUTION.get("reviewer", [])]
+        return chain or _DEFAULT_MODELS
+    except Exception:                                    # noqa: BLE001
+        return _DEFAULT_MODELS
+
+
+MODELS = [_pinned] if _pinned else _chain_from_settings()
+
+
+def _max_tokens():
+    """Reply budget. Raised from 1500 after 21 of 46 reviews spent the
+    whole of it reasoning and never reached the verdict line."""
+    try:
+        import settings_engine
+        return settings_engine.execution_setting(
+            "reviewer_budget", "max_tokens", default=4000)
+    except Exception:                                    # noqa: BLE001
+        return 4000
 
 WEAK_INDEPENDENCE_MODELS = {
     "nvidia/nemotron-3-super-120b-a12b",
@@ -124,7 +153,7 @@ def post_once(model, prompt, timeout_s, image_b64=None):
         # dusunen bir model gelir. Asil duzeltme asagida, finish_reason'i
         # okumak -- boylece "karar okunamadi" ile "hakem butceyi bitirdi"
         # ayri iki durum olarak raporlanir.
-        "max_tokens": 4000,
+        "max_tokens": _max_tokens(),
     }).encode("utf-8")
     req = urllib.request.Request(
         f"{NVIDIA_BASE_URL}/chat/completions",

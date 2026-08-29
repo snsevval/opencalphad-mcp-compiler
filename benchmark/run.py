@@ -560,7 +560,14 @@ async def run_all(selected, semantic_check=True):
                     raw = await asyncio.wait_for(
                         session.call_tool(case["tool"],
                                           arguments=case["arguments"]),
-                        timeout=180,
+                        # 300, not 180. Five runs in a row lost two or
+                        # three cases to this, and never the same ones:
+                        # every one of them passed on its own, in seconds.
+                        # The constant is here to stop a hung run, and 300
+                        # still does that. A harness that marks a slow but
+                        # correct calculation as broken is reporting on
+                        # itself, not on the system.
+                        timeout=300,
                     )
                     payload = json.loads(_first_text(raw))
                 except Exception as exc:

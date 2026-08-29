@@ -913,6 +913,12 @@ def calculate_property_diagram(
                 Image(data=chart_bytes, format="png"),
             ]
         except Exception as exc:
+            # settings/execution.toml, policy.unnamed_failure = "surface":
+            # only an engine failure moves us to the next tier. Ours is
+            # re-raised, because a fallback that absorbs a typo returns a
+            # slower answer and no sign that anything went wrong.
+            if not settings_engine.is_engine_failure(exc):
+                raise
             native_backend_error = str(exc)
     else:
         native_backend_error = (
@@ -1173,6 +1179,8 @@ def calculate_isothermal_section(
             Image(data=chart_bytes, format="png"),
         ]
     except Exception as exc:
+        if not settings_engine.is_engine_failure(exc):
+            raise
         native_backend_error = str(exc)
 
     # Native STEP could not run at all. The axis is still perfectly

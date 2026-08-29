@@ -655,7 +655,15 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
             return elements_composition, position
 
     nominal_spacing = (span_hi - span_lo) / max(n_points - 1, 1)
-    gap_threshold = nominal_spacing * 3
+    # A gap wider than this many spacings is where STEP stopped, not
+    # where it sampled sparsely. From settings/execution.toml.
+    try:
+        import settings_engine
+        _multiple = settings_engine.execution_setting(
+            "gap_detection", "threshold_multiple", default=3)
+    except Exception:                                    # noqa: BLE001
+        _multiple = 3
+    gap_threshold = nominal_spacing * _multiple
 
     def _fresh_reading(position):
         """One globally-minimised equilibrium at this axis position."""
@@ -687,7 +695,15 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
                 for n, v in step_fractions.items()}
         right = {_canonicalize_phase_name(n, known): v
                  for n, v in fresh_fractions.items()}
-        return _fractions_agree(left, right, tol=0.01)
+        # 0.01, not 1e-4: at the tighter value a trace HCP_A3 phase at
+        # 0.0014 cost fifty degrees of otherwise good resolution.
+        try:
+            import settings_engine
+            _tol = settings_engine.execution_setting(
+                "endpoint_recheck", "tolerance", default=0.01)
+        except Exception:                                # noqa: BLE001
+            _tol = 0.01
+        return _fractions_agree(left, right, tol=_tol)
 
     # Where a STEP line ENDS, check whether it was still on the stable
     # branch when it got there.

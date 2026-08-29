@@ -466,3 +466,47 @@ def coverage_note(cov, minimum_fraction=0.9):
         requested=cov["requested_positions"],
         covered_range="%.4g to %.4g" % tuple(cov["covered_range"]),
     )
+
+
+def execution_setting(*path, default=None):
+    """One value out of settings/execution.toml, by path.
+
+    Falls back rather than raising: a settings file that cannot be read
+    must not stop a calculation, and every default here is the number the
+    file states anyway. The point of moving them was to make them
+    readable in one place, not to add a way for the server to fail.
+    """
+    node = EXECUTION
+    for key in path:
+        if not isinstance(node, dict) or key not in node:
+            return default
+        node = node[key]
+    return node
+
+
+# Failures that are the engine's, and may move a request to the next
+# tier. Anything else -- NameError, TypeError, AttributeError, KeyError --
+# is ours, and falling back on it hides a bug behind a slower answer.
+_ENGINE_FAILURES = (
+    "NativeStepError", "NativeScheilError", "NativeMapError",
+    "EquilibriumError", "TimeoutExpired", "CalledProcessError",
+)
+
+
+def is_engine_failure(exc):
+    """Does this exception name a signal the cascade is allowed to act on?
+
+    settings/execution.toml declares `unnamed_failure = "surface"`: a
+    failure matching no named signal does NOT advance a tier.
+
+    The reason is measured in kind rather than in one incident: today a
+    bare `except Exception` catches an engine fault and a typo in our own
+    code alike, and the second one degrades quietly into the slower path
+    and comes back looking like a success. A programming error should be
+    loud. An engine limit is what the second tier exists for.
+    """
+    if isinstance(exc, (NameError, TypeError, AttributeError, KeyError,
+                        IndexError, ImportError, SyntaxError,
+                        ZeroDivisionError, UnboundLocalError)):
+        return False
+    return type(exc).__name__ in _ENGINE_FAILURES or isinstance(exc, OSError)
