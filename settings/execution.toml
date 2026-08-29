@@ -71,7 +71,7 @@ still returns a result. If it is not a named signal, show it."""
 operation = "equilibrium"
 tiers = [
   { handler = "ocasi",         start = true },
-  { handler = "native_single", on = ["did_not_converge", "engine_crashed", "no_stable_phases"] },
+  { handler = "native_single", on = ["did_not_converge", "engine_crashed", "no_stable_phases"], cannot_serve = ["phase_status"] },
 ]
 exhausted = "fail"
 because = """

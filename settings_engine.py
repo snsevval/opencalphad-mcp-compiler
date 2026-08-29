@@ -489,7 +489,8 @@ def execution_setting(*path, default=None):
 # is ours, and falling back on it hides a bug behind a slower answer.
 _ENGINE_FAILURES = (
     "NativeStepError", "NativeScheilError", "NativeMapError",
-    "EquilibriumError", "TimeoutExpired", "CalledProcessError",
+    "NativeEquilibriumError", "EquilibriumError",
+    "TimeoutExpired", "CalledProcessError",
 )
 
 
@@ -510,3 +511,93 @@ def is_engine_failure(exc):
                         ZeroDivisionError, UnboundLocalError)):
         return False
     return type(exc).__name__ in _ENGINE_FAILURES or isinstance(exc, OSError)
+
+
+class CascadeExhausted(Exception):
+    """Every tier for this operation was tried and none produced a result."""
+
+
+def tiers_for(operation):
+    """The tier list for one operation, in file order."""
+    for entry in EXECUTION.get("cascade", []):
+        if entry.get("operation") == operation:
+            return list(entry.get("tiers", [])), entry
+    return [], {}
+
+
+def run_cascade(operation, handlers, request=None):
+    """Walk the tiers for `operation` in the order settings/execution.toml
+    gives them, and return the first result.
+
+    `handlers` maps a tier's `handler` name to a callable of no arguments.
+    Each one keeps its own post-processing -- which fields it stamps on the
+    result is its business, not this function's.
+
+    Three rules, all read from the file rather than written here:
+
+      order         the sequence of tiers
+      on            which signals from the previous tier let us enter this
+                    one; a failure naming no listed signal is re-raised,
+                    because falling back on an unrecognised error is how a
+                    bug in our own code turns into a slower answer that
+                    looks like a success
+      cannot_serve  a request field this tier is unable to honour at all.
+                    Not a signal: a signal says why the last tier stopped,
+                    this says what the next one cannot do.
+
+    Reordering, adding or removing a tier is a change to the settings file.
+    What a tier DOES stays in code, because that part is work rather than
+    rule.
+    """
+    tiers, entry = tiers_for(operation)
+    if not tiers:
+        raise CascadeExhausted("no tiers declared for %r" % operation)
+
+    request = request or {}
+    ilk_hata = None
+    denenen = []
+
+    for index, tier in enumerate(tiers):
+        ad = tier.get("handler")
+        if ad not in handlers:
+            continue
+
+        if index > 0:
+            # Entering this tier at all: is the previous failure one it
+            # lists, and can it serve this request?
+            izinli = tier.get("on") or []
+            if ilk_hata is not None and not _signal_listed(ilk_hata, izinli):
+                raise ilk_hata
+            engel = [alan for alan in (tier.get("cannot_serve") or [])
+                     if request.get(alan)]
+            if engel:
+                raise ilk_hata if ilk_hata else CascadeExhausted(
+                    "%s cannot serve a request with %s" % (ad, engel))
+
+        try:
+            return handlers[ad]()
+        except Exception as exc:                          # noqa: BLE001
+            if not is_engine_failure(exc):
+                raise
+            denenen.append("%s: %s" % (ad, exc))
+            if ilk_hata is None:
+                ilk_hata = exc
+
+    if entry.get("exhausted") == "fail_with_route" and entry.get("route_to"):
+        raise CascadeExhausted("%s -> try %s instead"
+                               % ("; ".join(denenen), entry["route_to"]))
+    raise CascadeExhausted("; ".join(denenen) or "no handler ran")
+
+
+def _signal_listed(exc, signal_names):
+    """Does this failure match one of the signals a tier accepts?
+
+    The signals are declared in the file and the mapping to exception
+    types is here, because a type is a code fact. Today the engine layer
+    does not distinguish "did not converge" from "crashed" -- both arrive
+    as one error type -- so any engine failure matches any engine signal.
+    Written this way rather than pretending to a precision we do not have.
+    """
+    if not signal_names:
+        return True
+    return is_engine_failure(exc)

@@ -164,24 +164,31 @@ def calculate_equilibrium(
         })
         return native_result
 
-    try:
-        result = _calculate_equilibrium_ocasi(
-            db_path, composition, temperature_K, pressure_Pa, suspended_phases
-        )
+    # Which engine runs first, what makes us move to the next one, and
+    # which requests the second one cannot serve at all: all three are
+    # read from settings/execution.toml rather than written here. What
+    # each tier DOES stays below, because that part is work, not rule.
+    import settings_engine
+
+    hatalar = {}
+
+    def _ocasi():
+        try:
+            result = _calculate_equilibrium_ocasi(
+                db_path, composition, temperature_K, pressure_Pa,
+                suspended_phases
+            )
+        except EquilibriumError as exc:
+            # Kept so the native tier can name what it is standing in for.
+            hatalar["ocasi"] = exc
+            raise
         result["backend_used"] = "ocasi"
         return result
-    except EquilibriumError as ocasi_error:
-        if suspended_phases:
-            raise
-        try:
-            native_result = native_fallback.run_and_parse(
-                db_path, composition, temperature_K, pressure_Pa
-            )
-        except Exception as native_error:
-            raise EquilibriumError(
-                f"OCASI failed ({ocasi_error}); native OC fallback also "
-                f"failed ({native_error})"
-            ) from native_error
+
+    def _native_single():
+        native_result = native_fallback.run_and_parse(
+            db_path, composition, temperature_K, pressure_Pa
+        )
         native_result.update(
             {
                 "database": os.path.basename(db_path),
@@ -190,10 +197,25 @@ def calculate_equilibrium(
                 "composition": composition,
                 "suspended_phases": [],
                 "backend_used": "native_oc",
-                "fallback_reason": str(ocasi_error),
+                "fallback_reason": str(hatalar.get("ocasi", "")),
             }
         )
         return native_result
+
+    try:
+        return settings_engine.run_cascade(
+            "equilibrium",
+            {"ocasi": _ocasi, "native_single": _native_single},
+            request={"phase_status": suspended_phases},
+        )
+    except settings_engine.CascadeExhausted as exc:
+        # Same sentence the hand-written version produced: which engine
+        # failed first, and what the one behind it said.
+        ilk = hatalar.get("ocasi")
+        raise EquilibriumError(
+            f"OCASI failed ({ilk}); native OC fallback also failed "
+            f"({exc})" if ilk else str(exc)
+        ) from exc
 
 
 def _scalar_or_none(symbol):
