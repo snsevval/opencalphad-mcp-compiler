@@ -595,7 +595,21 @@ async def run_all(selected, semantic_check=True):
     return results
 
 
+def _ayar_denetimi():
+    # Kural bir dosyaya tasindiginda geride kalan kopya davranisi
+    # degistirmez, dolayisiyla hicbir olcut onu yakalamaz. Uc kez oldu ve
+    # ucunu de birinin sormasi ortaya cikardi. Kosumun basinda, ucuz.
+    import subprocess, sys, os
+    kok = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    p = subprocess.run([sys.executable, os.path.join(kok, 'settings_audit.py')],
+                       capture_output=True, text=True, cwd=kok)
+    if p.returncode != 0:
+        print(p.stdout.strip())
+        print()
+
+
 def main(argv):
+    _ayar_denetimi()
     # Bayraklar secici degil: "run.py --hizli" butun vakalari kosmali.
     secim = [a for a in argv[1:] if not a.startswith("--")]
     if not secim or secim == ["hepsi"]:
