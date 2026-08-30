@@ -87,7 +87,18 @@ def generate_macro(db_path, elements_composition, temperature_K, pressure_Pa,
     macro = (
         "new Y\n"
         f"r t ./{db_stem}\n"
+        # Four, not one. A database that warns while loading makes the
+        # engine stop and wait for RETURN, and the next macro line answers
+        # that prompt instead of being read as a command -- so `set c`
+        # never arrives and the calculation runs with no conditions at
+        # all, returning G=0 and NaN. From outside that looks like an
+        # alloy the solver could not handle. Measured on iron4cd, where it
+        # cost a whole question and was written up as an engine limit.
+        # Spare blank lines at a command prompt are harmless.
         f"{elements_line}\n"
+        "\n"
+        "\n"
+        "\n"
         "\n"
         f"{status_block}"
         f"set c t={temperature_K:.10g} p={pressure_Pa:.10g} n=1 {x_conditions}\n"
