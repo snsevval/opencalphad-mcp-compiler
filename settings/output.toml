@@ -23,6 +23,17 @@
 ##
 ## =====================================================================
 
+## Her bolumun bir `status` alani olabilir. Uc deger, uc ayri anlam:
+##
+##   yok         kod bunu okuyor, calisiyor
+##   "code"      asla tasinmayacak -- burada BELGE, karar kodun
+##   "todo"      tasinabilir, henuz yapilmadi
+##   "planned"   tasima degil, once yazilmasi gereken YENI IS
+##
+## Ayrimin sebebi: bunlar olmadan bir bolumun okunmuyor olmasi, unutulmus
+## mu yoksa kasitli mi oldugunu soylemiyor. `settings_audit.py` de bu
+## alandan okuyor -- elle tutulan bir "bunlar sessiz olmali" listesi yok.
+
 schema_version = 1
 
 
@@ -31,6 +42,12 @@ schema_version = 1
 ## ---------------------------------------------------------------------
 
 [report]
+status = "todo"
+status_because = """
+None of these flags is implemented. Results always carry backend_used,
+verification and the chemical potentials; energy is always J/mol and
+nothing converts. Turning them into real switches is work that has not
+been done, not work that was decided against."""
 energy_unit          = "J/mol"
 include_backend_used = true
 include_verification = true
@@ -71,6 +88,11 @@ point is stated, never assumed."""
 ## ---------------------------------------------------------------------
 
 [floor]
+status = "planned"
+status_because = """
+Two of the four fields it names do not exist yet: `basis` is on no result
+and `source` only on scan points. Cannot be enforced before the fields it
+protects are written -- see [report.basis]."""
 always_present         = ["verification.passed", "backend_used"]
 always_present_planned = ["basis", "source"]
 because = """
@@ -135,6 +157,20 @@ choice of ours."""
 ## getting them wrong produces a confident wrong answer rather than a
 ## visible error.
 ## ---------------------------------------------------------------------
+
+[honesty]
+status = "todo"
+status_because = """
+All six rules below are obeyed in the code today -- boundaries are
+reported as brackets, single-point regions are flagged, a failing result
+is returned rather than hidden, an absent review is not disapproval, no
+point is invented, and the review advises rather than decides. None of
+them is read from here.
+
+Marked `todo` rather than `code` because they COULD be read. But note what
+that would buy: making them switches makes them switchable off, and these
+are invariants, not preferences. If they are wired it should be as
+assertions the code checks itself against, not as flags."""
 
 [honesty.boundaries_as_brackets]
 enabled = true
@@ -318,6 +354,15 @@ caller found the right alternative and had to break the rule to use it."""
 ## Written down rather than left as an exception, because an unstated
 ## exception to an invariant is how invariants stop being true.
 ## ---------------------------------------------------------------------
+
+[conversion]
+status = "planned"
+status_because = """
+All three depend on fields that do not exist yet: basis conversion needs
+[report.basis], rounding needs [report.precision] and [floor.raw_values].
+Written now because an unstated exception to an invariant is how
+invariants stop being true -- output.toml claims it never touches a
+number, and these are the three places it eventually will."""
 
 [conversion.units]
 status    = "planned"

@@ -230,8 +230,8 @@ def _attach_coverage(result: dict, axis_key: str, requested_n,
     a one-point answer to a twenty-point request came back marked as
     verified.
     """
-    cov = settings_engine.coverage(result.get("points"), axis_key,
-                                   requested_n, span_low, span_high)
+    cov = result_check.measure_requested_positions(
+        result.get("points"), axis_key, requested_n, span_low, span_high)
     if not cov:
         return result
     result["coverage"] = cov

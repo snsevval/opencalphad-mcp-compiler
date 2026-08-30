@@ -69,6 +69,11 @@ yazılıyor. Değerlendirme hafızaya değil ölçüme dayanmalı.
 30 ölçüm, 29 soru (1.9 iki kez soruldu), 28 notlandı — 1.17
 notlandırılamadı, eline verilen veri bozuktu.
 
+**Bu tablo ilk turu gösteriyor.** On düzeltmeden sonra yedi soru yeniden
+soruldu ve altısı düzeldi; ayrıntısı dosya sonunda, *Yeniden ölçüm*
+bölümünde. Bu turun toplamı: düzeltmelerden önce o yedi soruda on bir
+yanlış sayı vardı, sonra bir kaldı.
+
 Blok 1'de kalan 11 soru: 1.21, 1.23, 1.29, 1.30, 1.34, 1.35, 1.36,
 1.37, 1.38, 1.39, 1.40.
 
@@ -76,6 +81,11 @@ Blok 1'de kalan 11 soru: 1.21, 1.23, 1.29, 1.30, 1.34, 1.35, 1.36,
 özeti eklendikten SONRA soruluyor** (bkz. dosya sonu, *Düzeltme 1*). İlk
 29 ile aynı koşulda değiller; özetin işe yarayıp yaramadığının ölçümü
 olarak okunmalılar.
+
+`1.23` soruldu ve kaydedildi. `1.29` da soruldu, ama önce **bizde bir
+hata çıktı**: uyarı veren bir veritabanında motor RETURN bekliyor ve
+makronun koşul satırı o istemi cevaplamış oluyordu. Düzeltildi, tarama
+2/20 noktadan 20/20'ye çıktı — ayrıntısı *Yeniden ölçüm* bölümünde.
 
 ## Tekrar eden örüntüler
 
@@ -1870,3 +1880,337 @@ sonra makinede **10 başıboş gnuplot süreci** kaldı
 gerçek; not edildi.
 
 ---
+
+# Yeniden ölçüm — düzeltmelerden sonra (2026-08-29/30)
+
+Blok 1'in ilk 29 sorusu ölçüldükten sonra on düzeltme yapıldı. Bu bölüm,
+o düzeltmelerin **aynı sorular yeniden sorulduğunda** ne değiştirdiğini
+kaydediyor. Model aynı (`nemotron-3-ultra-550b`), sorular aynı, tek fark
+sistemin kendisi.
+
+---
+
+## 1.28 · Krom arttıkça ferrit ne zaman baskın olur? — düzeldi
+
+```
+once   %26        yedi puan sapma, ve esigin YANLIS tarafina
+sonra  %18.99     olcum: 0.1906
+```
+
+Özetin `dominant_phase_regions` alanı cevabı tek satırda veriyor:
+`BCC_A2  0.1906 - 0.3000`. Model artık türetmiyor, okuyor.
+
+**Hesap ✓ · Anlatı ✓**
+
+Küçük kusur: tablo sütununu `≈ wt%` diye etiketledi, oysa mol kesri.
+Fe-Cr'de ikisi yakın olduğu için sayılar yanlış değil, başlık yanlış.
+
+---
+
+## 1.22 · cost507R Al-%5Zn-%2Mg, 400-900 K — düzeldi
+
+```
+iddia              once      sonra     olcum
+MGZN2 cozunme      ~602 K    ~662 K    661.97
+solidus            ~877 K    ~855 K    850-860
+900 K'de sivi      %32       %73       0.7334
+400 K'de MGZN2     —         %10.7     0.1073
+```
+
+Üç yanlış sayının üçü de düzeldi. Ayrıca bileşimi yüzde olarak gönderip
+(`AL:93, ZN:5`) PREFLIGHT'tan geri döndü, düzeltip yeniden çağırdı — ret
+mekanizması da çalıştı.
+
+**Hesap ✓ · Anlatı ✓**
+
+---
+
+## 1.15 · Fe-%1C, 300→2000 K — düzeldi, tam tersine döndü
+
+İlk soruluşta **δ-ferriti inkâr etmişti** ve 1794 K'yi "solidus" diye
+etiketlemişti. Bileşim sabitlenerek (`FE=0.99 C=0.01 mol kesri`) tekrar
+soruldu.
+
+Özetin verdiği:
+
+```
+1011.17 - 1012.27 (0.22)  giden GRAPHITE   gelen FCC_A1
+1100.00 - 1104.73 (4.73)  giden BCC_A2     gelen -
+1759.40 - 1759.60 (0.20)  giden -          gelen LIQUID
+1767.76 - 1767.98 (0.22)  giden FCC_A1     gelen BCC_A2   <- PERITEKTIK
+1780.00 - 1794.00 (14.0)  giden BCC_A2     gelen -
+```
+
+Model altı bölgeyi ve beş geçişi aynen aktardı, üstüne tepkimeyi adıyla
+koydu: *"Peritektik tepki: sıvı + FCC → BCC (δ)"*.
+
+```
+iddia            once              sonra
+delta-ferrit     "gorunmuyor"      1768-1794, peritektik adiyla
+FCC+LIQUID       hic yok           1759-1768 ✓
+1794 K           "solidus"         likidus ✓
+solidus          yok               1759 ✓
+```
+
+**Hesap ✓ · Anlatı ✓**
+
+İki küçük kusur: `%1` atomik C'yi *"≈%0.012 ağırlık"* dedi (doğrusu
+~%0.216, 18 kat sapma, cevabın hiçbir yerine değmiyor), ve 1759-1768
+arasına *"ötektik benzeri"* dedi — orası erimenin başlangıcı.
+
+**Dürüst pay:** iki şey birden değişti. `n_points=20` ile STEP geçişlerin
+etrafını sıklaştırdı (δ-ferrit alanında 7 nokta; ilk seferde `n_points=100`
+düz ızgarayla 1 nokta düşmüştü). Ama ilk seferde model **grafikte mor bir
+tepe** görüyordu ve yine "yok" demişti; bu sefer
+`BCC_A2+LIQUID 1767.98 - 1780.00 (7 nokta)` satırını birebir aktardı.
+
+---
+
+## 1.23 · 1100 K'de krom %1→%30 — bloğun en temiz cevaplarından
+
+Beş bölgenin beşi de birebir:
+
+```
+ozet                                model
+FCC_A1              0.0100-0.0500   "%1 - ~%5 tek fazli ostenit"
+FCC_A1+M7C3         0.0600-0.0900   "~%5 - ~%9 M7C3 cikiyor"
+FCC_A1+M23C6        0.1000-0.1100   "~%9 - ~%11 M23C6, M7C3 kayboluyor"
+BCC+FCC+M23C6       0.1200 (1 nokta) "~%11 - ~%13 uc fazli bolge (DAR)"
+BCC_A2+M23C6        0.1300-0.3000   "~%13 - %30 ferrit + M23C6"
+```
+
+Karbür sırası da doğru: **M₇C₃ → M₂₃C₆**.
+
+En dikkat çekeni: üç fazlı bölge özet alanında tek noktada görünüyor ve
+`under_sampled` altında işaretli. Model onu *"üç fazlı bölge **(dar)**"*
+diye yazdı — işareti okudu ve **genişlik iddiasında bulunmadı.** 1.15'te
+aynı durumda δ-ferriti inkâr etmişti.
+
+**Hesap ✓ · Anlatı ✓**
+
+---
+
+## 1.25 · Molibden %0→%15 — faz sırası doğru, bileşim yanlış
+
+Beş bölge, dört geçiş, iki baskınlık — hepsi özetten birebir. Ve aranan
+hata gitti: **"östenit geri dönüyor" cümlesi yok.**
+
+Ama çağrı kaydı başka bir şey gösterdi:
+
+```
+istenen    : Fe - %10Cr - %3C
+gonderilen : {FE: 1.0, CR: 0.1, C: 0.003, MO: 0.0}
+```
+
+Karbon **0.003** — istenen %3'ün onda biri. Ne mol kesri ne ağırlıkça bir
+okumayla 0.003 çıkmaz (%3 ağırlıkça ≈ 0.13 mol kesri); basamak kayması.
+Normalize edilince gerçek bileşim `Fe-%9.1Cr-%0.27C` oluyor.
+
+Yani cevap doğru — **sorulan alaşımın cevabı değil.**
+
+**Hesap ✓ · Anlatı ✓ · Bileşim ✗**
+
+Yeni bir hata sınıfı: **bileşimi araca aktarırken bozmak.** PREFLIGHT'tan
+geçiyor çünkü sayılar geçerli, sadece sorulanla aynı değil. Hiçbir katman
+yakalamıyordu; çağrı kaydından görüldü.
+
+---
+
+## 1.26 · agcu, x(Cu) 0→1 — yönlendirme çalıştı, baskınlık ters kaldı
+
+Çağrı kaydı saniye saniye gösterdi:
+
+```
+11:53:54  calculate_isothermal_section  -> PREFLIGHT + alternative alani
+11:53:58  calculate_phase_diagram       <- DORT SANIYE SONRA
+11:54:03  calculate_phase_diagram       -> EXECUTION: MAP sinir izleyemedi
+11:55:15  calculate_equilibrium x4      <- tek noktalara dustu
+```
+
+**Açık soru kapandı: düz yazı yetti.** Model `alternative` alanını okuyup
+doğru araca geçti, ve kuralı çiğnemedi — kural artık buna izin veriyor.
+
+Sayılar da düzeldi:
+
+```
+Ag-zengin FCC:  once ~0.06    sonra %89.7 Ag -> x(Cu)=0.103   olcum 0.1031
+Cu-zengin FCC:  once ~0.99    sonra %96.6 Cu -> x(Cu)=0.966   olcum 0.9663
+```
+
+Ama baskınlığı ters çevirdi. Kayıt aracın ne döndürdüğünü yazıyor:
+
+```
+x(Cu)=0.1  ->  FCC_A1 1.0                              TEK FAZ
+x(Cu)=0.9  ->  FCC_A1#1 0.0768 + FCC_A1_AUTO#2 0.9232
+```
+
+| x(Cu) | model | araç ne dedi |
+|---|---|---|
+| 0.10 | "iki FCC · ağırlıklı Cu-zengin" | **tek faz**, Ag-zengin |
+| 0.90 | "iki FCC · ağırlıklı Ag-zengin" | %92.3 Cu-zengin |
+
+**Hesap ✓ · Anlatı ✗**
+
+Ve bu, o güne kadar kurduğum açıklamanın **karşı örneği**. Cevap aynı
+yanıtın içinde dört ayrı yerde yazılıydı — `phase_molar_amounts`,
+`phase_element_composition`, `element_distribution`, hatta düz cümleyle
+`phase_notes`. Türetilecek bir şey yoktu. Yine de ters aktarıldı.
+
+Tarama özeti burada devreye girmiyor: dört ayrı **tek nokta** hesabı var,
+özetlenecek bir satır dizisi yok.
+
+---
+
+## 1.10 · %1C ile %2C çeliği karşılaştır — iki kez soruldu
+
+### Birinci soruluş — Katman B hüküm verirken
+
+Sekiz sayının sekizi de birebir doğru:
+
+```
+BCC_A2 %7.5 + FCC %92.5    0.0753 / 0.9247
+FCC_A1 %100                1.0
+-49.05 kJ / -48.83 kJ      -49049.47 / -48830.25
+mu(C) -30.6 / -24.1        -30614.8 / -24127.6
+```
+
+Ama Katman B `%1C` sonucunu **reddetti**, ve model ona uydu:
+
+> *"Bağımsız doğrulama bunu fiziksel olarak şüpheli buldu... steel1
+> veritabanının sınırlaması olabilir... gerçek diyagram buna izin vermez."*
+
+**Hesap ✓ · Anlatı ✗** — kendi doğru sekiz sayısını sahiplenmedi.
+
+### Katman B neden yanıldı
+
+Hakem şöyle demişti: *"1100 K'de %1 C'lik çelikte sadece FCC beklenir."*
+
+Ölçüm:
+
+```
+bizim gonderdigimiz : x(C) = 0.01 MOL KESRI  =  agirlikca %0.217
+hakemin okudugu     : "%1 karbon" AGIRLIKCA  =  x(C) = 0.0449
+
+x(C)=0.0100  ->  BCC_A2 0.0753 + FCC_A1 0.9247
+x(C)=0.0449  ->  FCC_A1 0.9973 + GRAPHITE 0.0027   <- aynen dedigi gibi
+```
+
+**Hakem yanlış hesaplamıyordu — başka bir alaşımı doğru hesaplıyordu.**
+`x(C)=0.01` hipoötektoid ve 1100 K, A3'ün (1105 K) beş derece altında;
+orada ferrit kalması doğru. `%1 ağırlıkça` ise hiperötektoid.
+
+Çelik bileşimleri gelenek olarak ağırlıkça yazılır, ve yük hangi baz
+olduğunu **söylemiyordu.**
+
+### İkinci soruluş — Katman B danışman olduktan sonra
+
+On sayının onu birebir (G, H, S, fazlar). Ve çerçeve aynen geçti:
+
+> *"Bu itiraz bir ikinci hesaplama değil, modelin belleğinden fiziksel
+> beklenti kontrolü. Sonuç yapısal olarak geçerli, ama faz seçimi ...
+> çelişiyor **olabilir**."*
+
+**Hesap ✓ · Anlatı ~**
+
+Ana tabloyu çekincesiz verdi, itirazı ayrı kutuya aldı. Eksik kalan:
+itirazın **içeriğini sınamadı** — hakem "sementit olmalı" demişti,
+`steel1` sementit içermiyor ve `inspect_database` bunu bir saniyede
+söylerdi.
+
+### Ve `basis` alanı eklendikten sonra
+
+Aynı hesap, aynı hakem, tek fark yükte ağırlıkça karşılığın yazması:
+
+```
+once   itiraz VAR   "%7.5 ferrit Fe-C diyagramiyla tutarsiz"
+sonra  itiraz YOK   "faz miktarlari ... uyumlu"
+```
+
+---
+
+## 1.29 · iron4cd, nikel %0→%20 — cevaplanamaz sanılıyordu, bizim hatamızmış
+
+Bu soru ilk ölçüldüğünde tarama **2/20 nokta** döndürdü ve şöyle
+yazmıştım:
+
+> *"Motor bu alaşımı hiçbir noktada çözemiyor. Bizim katmanımızda
+> düzeltilecek bir şey yok."*
+
+**Yanlıştı.** Motor alaşımı hiç denemedi.
+
+`iron4cd` yüklenirken uyarı veriyor (`Parameter reference missing 4154`)
+ve motor duruyor:
+
+```
+There were warnings, check them carefully
+and press RETURN if you wish to continue.
+```
+
+Makro üretecimiz bu istemi bilmiyordu. Bir sonraki satır —
+`set c t=1200 ...` — RETURN cevabı olarak yutuluyordu:
+
+```
+Error codes: 4143
+Message: No conditions at all
+Degrees of freedom are 6
+G = 0.0   G/N = NaN
+```
+
+Motor *"yakınsamadım"* demiyor — *"bana hiç koşul verilmedi"* diyor, ve
+boş bir hesap döndürüyor. Dışarıdan bakınca çözülememiş bir alaşım gibi
+görünüyor. `steel1` uyarı vermediği için bu hiç görünmemişti.
+
+**Düzeltme:** dört makro üretecinde de element seçiminden sonraki boş
+satır sayısı dörde çıkarıldı. `native_step` zaten ikisini kullanıyordu —
+STEP'in tek nokta yolunun dokunamadığı veritabanlarında çalışmasının
+sebebi buymuş, ve bu fark kodda açıklanmamış duruyordu.
+
+```
+steel1  Fe-C 1200 K        -56564.000  FCC_A1 1.0            degismedi
+iron4cd Fe-18Cr-0.5C       -58508.000  BCC 0.94 + FCC + M23C6
+iron4cd +%10Ni             -62062.000  FCC 0.99 + M23C6
+```
+
+Tarama artık **20/20 nokta**. Ve sorunun cevabı:
+
+```
+x(Ni)=0.0000   BCC 0.9404 + FCC 0.046     ferritik
+x(Ni)=0.0105   BCC 0.4311 + FCC 0.5625    ostenit BASKIN  ~%1 Ni
+x(Ni)=0.0316   BCC 0.0066 + FCC 0.989     ferrit bitiyor
+x(Ni)=0.0421   FCC 0.9949 + M23C6         TAM OSTENITIK   ~%4 Ni
+```
+
+Ders kitabı davranışı — nikel östenit yapıcı.
+
+**Modelin cevabı alınamadı:** NVIDIA `nemotron-3-ultra-550b-a55b`'yi
+servis vermeyi durdurdu (yedi denemede yedi kez cevap yok; aynı anahtarla
+`super-120b` 1.4 saniyede cevap veriyor). Araç tarafı çalıştı ve 20/20
+nokta döndürdü; anlatacak taraf düştü.
+
+**Bu kaydın maliyeti:** bir soru "cevaplanamaz" diye yazıldı, bir kapsama
+uyarısı çözücünün yakınsamasına yüklendi, ve teşhis motorun sınırına
+atfedildi. Üçü de yanlıştı.
+
+---
+
+## Bu turun toplamı
+
+```
+1.15  duzeldi    delta-ferrit, peritektik, solidus/likidus
+1.22  duzeldi    uc gecis sicakligi da
+1.23  duzeldi    bes bolge, karbur sirasi, "dar" isareti okundu
+1.25  duzeldi    ostenit donmuyor      -- ama bilesim yanlis aktarildi
+1.26  kismen     yonlendirme calisti   -- baskinlik hala ters
+1.28  duzeldi    %26 -> %19
+1.10  duzeldi    Katman B artik hukum vermiyor
+```
+
+Düzeltmelerden önce bu sorularda **on bir yanlış sayı** vardı. Sonra
+**bir** — o da ağırlıkça çevrimi, hesapla ilgisi yok.
+
+Düşmeye devam eden iki şey, ikisi de tarama özetinin kapsamı dışında:
+
+- **1.26 baskınlık** — tek nokta hesabı, özetlenecek satır dizisi yok
+- **1.25 bileşim** — istekle motor arasında bozuluyor, hiçbir katman
+  bakmıyordu; `composition_basis` alanı artık en azından **görünür**
+  kılıyor

@@ -23,6 +23,17 @@
 ##
 ## =====================================================================
 
+## Her bolumun bir `status` alani olabilir. Uc deger, uc ayri anlam:
+##
+##   yok         kod bunu okuyor, calisiyor
+##   "code"      asla tasinmayacak -- burada BELGE, karar kodun
+##   "todo"      tasinabilir, henuz yapilmadi
+##   "planned"   tasima degil, once yazilmasi gereken YENI IS
+##
+## Ayrimin sebebi: bunlar olmadan bir bolumun okunmuyor olmasi, unutulmus
+## mu yoksa kasitli mi oldugunu soylemiyor. `settings_audit.py` de bu
+## alandan okuyor -- elle tutulan bir "bunlar sessiz olmali" listesi yok.
+
 schema_version = 1
 
 

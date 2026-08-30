@@ -34,19 +34,29 @@ import tomllib
 HERE = os.path.dirname(os.path.abspath(__file__))
 SETTINGS = os.path.join(HERE, "settings")
 
-# Sections that are documentation for a reader rather than values the code
-# consumes. Listed by name so that a section going quiet by accident is not
-# mistaken for one that was always meant to be quiet.
-BEKLENEN_SESSIZ = {
-    "reviewer_note",     # which model to reach for by hand, and why
-    "conversion",        # conditions under which output may touch a number
-    "honesty",           # invariants the code obeys; not switches
-    "floor",             # what may never be turned off
-    "report",            # units and inclusion flags, not yet implemented
-    "policy",            # enforced by is_engine_failure, not read by key
-    "signals",           # names for what the exception types already say
-    "binary",            # engine preference, still a constant
-}
+# A section may declare `status`, and that is what says whether the code
+# is expected to read it:
+#
+#   yok         wired, and read
+#   "code"      never moving -- documentation here, the decision is code
+#   "todo"      could move, has not
+#   "planned"   not a move at all; something has to be written first
+#
+# Read from the files rather than kept as a list here. The list this
+# replaces had to be edited by hand every time a section changed state,
+# which is the same failure this whole module exists to catch: two places
+# saying what should be said once.
+TASINMAYACAK = {"code", "todo", "planned"}
+
+
+def _durum(bolum_degeri):
+    if isinstance(bolum_degeri, dict):
+        return bolum_degeri.get("status")
+    if isinstance(bolum_degeri, list) and bolum_degeri:
+        ilk = bolum_degeri[0]
+        if isinstance(ilk, dict):
+            return ilk.get("status")
+    return None
 
 
 def _kaynak():
@@ -78,8 +88,11 @@ def yon_bir(hepsi):
     for ad in ("input", "execution", "output"):
         d = tomllib.load(open(os.path.join(SETTINGS, ad + ".toml"), "rb"))
         for bolum in d:
-            if bolum == "schema_version" or bolum in BEKLENEN_SESSIZ:
+            if bolum == "schema_version":
                 continue
+            durum = _durum(d[bolum])
+            if durum in TASINMAYACAK:
+                continue          # neden okunmadigini kendisi soyluyor
             if not _okunuyor(bolum, hepsi):
                 sorunlar.append(
                     "%s.toml [%s] dosyada var, kodda okuyan yok" % (ad, bolum))

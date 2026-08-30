@@ -423,39 +423,13 @@ def precondition(check_id, **fields):
     return None
 
 
-def coverage(points, axis_key, requested_n, span_low, span_high):
-    """How much of the requested scan actually came back.
-
-    Every other check asks whether the numbers that arrived are sound.
-    None of them asks how many never did -- and one point is a perfectly
-    well-formed result. Measured: a twenty-position request returned a
-    single position, passed every layer, and carried no warning at all.
-
-    Returns None when there is nothing to compare against.
-    """
-    if not points or requested_n in (None, 0) or span_low is None or span_high is None:
-        return None
-    solved = [p for p in points if "error" not in p and p.get(axis_key) is not None]
-    if not solved:
-        return None
-    span = abs(span_high - span_low)
-    if span <= 0:
-        return None
-    lo = min(p[axis_key] for p in solved)
-    hi = max(p[axis_key] for p in solved)
-    covered = abs(hi - lo) / span
-    return {
-        "requested_positions": requested_n,
-        "solved_positions": len(solved),
-        "requested_range": [span_low, span_high],
-        "covered_range": [lo, hi],
-        "covered_fraction": round(min(covered, 1.0), 4),
-    }
-
-
 def coverage_note(cov, minimum_fraction=0.9):
-    """The warning text when a scan came back short, or None when it did
-    not. `planned` in the settings suppresses it, as for any note."""
+    """The reader-facing sentence for a scan that came back short.
+
+    The measurement itself lives in result_check.measure_requested_positions
+    -- it is a check, and checks belong in that layer. What stays here is
+    the wording, which comes from output.toml like every other note.
+    """
     if not cov:
         return None
     if cov["covered_fraction"] >= minimum_fraction:

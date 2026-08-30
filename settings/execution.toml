@@ -25,6 +25,17 @@
 ##
 ## =====================================================================
 
+## Her bolumun bir `status` alani olabilir. Uc deger, uc ayri anlam:
+##
+##   yok         kod bunu okuyor, calisiyor
+##   "code"      asla tasinmayacak -- burada BELGE, karar kodun
+##   "todo"      tasinabilir, henuz yapilmadi
+##   "planned"   tasima degil, once yazilmasi gereken YENI IS
+##
+## Ayrimin sebebi: bunlar olmadan bir bolumun okunmuyor olmasi, unutulmus
+## mu yoksa kasitli mi oldugunu soylemiyor. `settings_audit.py` de bu
+## alandan okuyor -- elle tutulan bir "bunlar sessiz olmali" listesi yok.
+
 schema_version = 1
 
 
@@ -41,6 +52,13 @@ schema_version = 1
 ## ---------------------------------------------------------------------
 
 [signals]
+status = "code"
+status_because = """
+A vocabulary for a reader, not values to look up. The code decides by
+exception TYPE -- NativeStepError against NameError -- because a type is
+something Python can check and a name in a file is not. Writing the names
+down is worth doing; wiring them would mean matching strings against
+exceptions, which is weaker than what already happens."""
 did_not_converge     = "solver hit its iteration limit (engine error 4204)"
 engine_crashed       = "subprocess exited non-zero, or segfaulted"
 no_stable_phases     = "converged, but returned an empty phase list"
@@ -51,7 +69,12 @@ unsupported_request  = "this tier cannot express the request at all"
 no_boundaries_traced = "MAP found no phase boundaries from this seed"
 
 [policy]
-status          = "planned"
+status = "code"
+status_because = """
+Enforced, and by type rather than by key: is_engine_failure() in
+settings_engine decides whether a failure may advance a tier. Reading
+"surface" out of this file would not add anything -- the rule is the type
+list, and it lives with the types."""
 unnamed_failure = "surface"
 because = """
 A failure that matches no signal above does NOT advance a tier. Today
@@ -176,6 +199,10 @@ where it sampled sparsely. Below that it is ordinary spacing variation."""
 ## ---------------------------------------------------------------------
 
 [binary]
+status = "todo"
+status_because = """
+Genuinely unwired. native_fallback.py holds the path as a constant, so
+changing `prefer` here does nothing. Ten minutes of work, not done."""
 prefer   = "bundled_6058"
 fallback = "built_6120"
 because = """
@@ -226,6 +253,8 @@ Raising the budget helped; reading `finish_reason` is what fixed it, so
 fell to 2 of 46."""
 
 [reviewer_note]
+status = "code"
+status_because = "a note about which model to reach for by hand; nothing to wire"
 independent_but_slow = "openai/gpt-oss-120b"
 because = """
 The one genuinely independent model that answers on this key, and the only

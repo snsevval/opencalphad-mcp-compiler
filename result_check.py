@@ -52,9 +52,17 @@ def check_phase_fraction_sums(result):
     return problems
 
 
-def check_point_coverage(result, max_failed_fraction=0.10):
-    """For property diagrams: how many sampled temperatures actually
-    solved. Returns a list of problem descriptions.
+def check_failed_points(result, max_failed_fraction=0.10):
+    """Of the points that came back, how many carry an error.
+
+    Named for what it counts. It used to be `check_point_coverage`, and a
+    second, different question -- how many requested positions never came
+    back at all -- was later added under the same word, in another module,
+    outside this layer. They are complementary and were indistinguishable
+    by name: on iron4cd this one passed (two points, neither in error)
+    while the other warned (two of twenty requested). See
+    `check_requested_positions` below, which is that other question, now
+    living beside this one.
 
     A property diagram where a handful of points failed is still useful
     and is reported as such (each failed point keeps its own error), but
@@ -85,6 +93,64 @@ def check_point_coverage(result, max_failed_fraction=0.10):
     return []
 
 
+def measure_requested_positions(points, axis_key, requested_n,
+                                span_low, span_high):
+    """How much of the requested scan actually came back.
+
+    A different question from `check_failed_points`, which counts errors
+    among the points that DID arrive. This one counts the ones that never
+    did -- and a single point is a perfectly well-formed result, so no
+    structural check can notice.
+
+    Measured: a twenty-position request came back with two, covering a
+    tenth of the range asked for, and passed every layer carrying no
+    warning at all.
+
+    Returns None when there is nothing to compare against.
+    """
+    if (not points or requested_n in (None, 0)
+            or span_low is None or span_high is None):
+        return None
+    solved = [p for p in points
+              if "error" not in p and p.get(axis_key) is not None]
+    if not solved:
+        return None
+    span = abs(span_high - span_low)
+    if span <= 0:
+        return None
+    low = min(p[axis_key] for p in solved)
+    high = max(p[axis_key] for p in solved)
+    covered = abs(high - low) / span
+    return {
+        "requested_positions": requested_n,
+        "solved_positions": len(solved),
+        "requested_range": [span_low, span_high],
+        "covered_range": [low, high],
+        "covered_fraction": round(min(covered, 1.0), 4),
+    }
+
+
+def check_requested_positions(result, minimum_covered=0.9):
+    """Did the scan cover the range that was asked for?
+
+    Reads the measurement the tool already attached rather than
+    recomputing it: the numbers belong in the payload for the caller to
+    read, and the check is about the same numbers.
+    """
+    coverage = result.get("coverage")
+    if not coverage:
+        return []
+    if coverage.get("covered_fraction", 1.0) >= minimum_covered:
+        return []
+    low, high = coverage["covered_range"]
+    return [
+        "%d of %d requested positions were solved; the scan covers "
+        "%.4g to %.4g of the range asked for."
+        % (coverage["solved_positions"], coverage["requested_positions"],
+           low, high)
+    ]
+
+
 def verify_result(result):
     """Run every structural check. Returns (passed, problems)."""
     if not isinstance(result, dict):
@@ -93,7 +159,7 @@ def verify_result(result):
         return False, [f"Result carries an error: {result['error']}"]
 
     problems = check_phase_fraction_sums(result)
-    problems += check_point_coverage(result)
+    problems += check_failed_points(result)
     return (not problems), problems
 
 
@@ -337,6 +403,7 @@ def verify_correspondence(result, request_args):
         ("elements", check_requested_elements(result, request_args)),
         ("mass_balance", check_mass_balance(result, request_args)),
         ("suspended_phases", check_suspended_phases_absent(result, request_args)),
+        ("requested_positions", check_requested_positions(result)),
     ):
         checked.append(name)
         problems += found
