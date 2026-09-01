@@ -1119,6 +1119,7 @@ def calculate_property_diagram(
         if "error" in result or not result.get("phase_molar_amounts"):
             points.append({
                 "temperature_K": T,
+                "source": "python_loop",
                 "error": result.get("error") or (
                     "Calculation returned no stable phases (likely an "
                     "unreliable/degenerate solve at this point)."
@@ -1130,6 +1131,10 @@ def calculate_property_diagram(
             "temperature_K": T,
             "gibbs_energy_J": result["gibbs_energy_J"],
             "phase_molar_amounts": amounts,
+            # Every point names what produced it. The other two tiers did
+            # this already; this one was missed, and the floor invariant is
+            # what surfaced it.
+            "source": "python_loop",
         })
         for phase in amounts:
             phase_series.setdefault(phase, [None] * n_points)
@@ -1188,7 +1193,11 @@ def calculate_property_diagram(
         "native_backend_error": native_backend_error,
         "chart_error": chart_error,
     }
-    _attach_basis(data, "phase_mass_fraction")
+    # This tier calls the single-point path once per temperature, so its
+    # numbers are MOLAR amounts -- not the mass fractions the STEP series
+    # carries. Same tool, same field name, different quantity depending on
+    # which tier answered, which is the whole reason the basis is stated.
+    _attach_basis(data, "phase_molar_amount")
     _attach_mixed_basis_note(data)
     _attach_scan_summary(data, "temperature_K")
     _attach_coverage(data, "temperature_K", n_points,

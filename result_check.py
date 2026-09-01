@@ -273,6 +273,7 @@ def inv_points_have_provenance(result):
 
 
 OUTPUT_INVARIANTS = {
+    "floor_fields_present": lambda result: check_floor_fields(result),
     "boundaries_are_brackets": inv_boundaries_are_brackets,
     "single_point_regions_flagged": inv_single_point_regions_flagged,
     "flagged_results_not_hidden": inv_flagged_results_not_hidden,
@@ -374,7 +375,6 @@ def check_floor_fields(result, request_args=None, rule=None):
 
 
 VERIFY_PREDICATES = {
-    "floor_fields": check_floor_fields,
     "phase_fraction_sums": lambda result, req, rule: check_phase_fraction_sums(
         result, tolerance=_rule_value(rule, "tolerance")),
     "failed_points": lambda result, req, rule: check_failed_points(

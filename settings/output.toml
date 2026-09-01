@@ -199,6 +199,20 @@ choice of ours."""
 
 [honesty]
 
+[honesty.floor_fields_present]
+check = "floor_fields_present"
+because = """
+The fields [floor] requires are actually on the result. A floor that is
+declared and never checked is a promise, not a floor -- and this one names
+`basis`, which was absent from every result until it was written.
+
+Checked here rather than among the chemistry checks, and the reason is a
+mistake worth recording: it was a [[verify]] rule at stage "result" first,
+which runs BEFORE the verification block is attached -- so it demanded
+verification.passed of a payload that could not have it yet, and failed
+every ordinary calculation. A statement about the finished payload has to
+run when the payload is finished."""
+
 [honesty.boundaries_as_brackets]
 check = "boundaries_are_brackets"
 because = """
@@ -508,16 +522,6 @@ error are skipped rather than reported twice.
 1e-3 because STEP and the single-point path disagree in the fourth decimal
 on a converged answer, and a tighter bound would flag arithmetic that is
 correct."""
-
-[[verify]]
-id    = "floor-fields"
-name  = "floor_fields"
-stage = "result"
-check = "floor_fields"
-because = """
-The fields [floor] requires are actually on the result. A floor that is
-declared and never checked is a promise, not a floor -- and this one names
-`basis`, which was absent from every result until it was written."""
 
 [[verify]]
 id    = "failed-points"
