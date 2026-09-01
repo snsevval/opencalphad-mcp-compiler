@@ -521,8 +521,29 @@ def _phase_mass_fractions_from_moles(phase_molar_amounts, phase_element_composit
     return {name: m / total_mass for name, m in masses.items()}
 
 
+def canonical_phase_name(name):
+    """The one spelling of a phase name this server hands out.
+
+    Two differences to undo, and they came from two engines. MAP writes
+    FCC-A1-AUTO#2 where every other path writes FCC_A1_AUTO#2. And whether
+    a phase carries "#1" depends on which path answered: STEP's CSV writes
+    plain LIQUID, the single-point listing writes LIQUID#1 for the very
+    same phase.
+
+    Measured: 3,400 result records carry a "#1" name, and a benchmark case
+    failed because a scan that fell to the slower tier returned FCC_A1#1
+    where FCC_A1 was expected -- a difference in provenance leaking out as
+    what looks like a different phase.
+
+    Only "#1" is dropped. "#2" and higher are genuinely separate
+    composition sets and must stay distinct.
+    """
+    name = name.replace("-", "_")
+    return name[:-2] if name.endswith("#1") else name
+
+
 def _strip_default_composition_set(name):
-    """Drop a trailing "#1" composition-set suffix.
+    """Deprecated spelling of canonical_phase_name, kept for callers.
 
     In OpenCalphad "#1" is a phase's FIRST (default) composition set, and
     the engine prints it inconsistently depending on which output path it
@@ -537,7 +558,7 @@ def _strip_default_composition_set(name):
     miscibility gap) and must stay distinct -- merging those would fuse
     two physically different phases into one line.
     """
-    return name[:-2] if name.endswith("#1") else name
+    return canonical_phase_name(name)
 
 
 def _canonicalize_phase_name(name, known_full_names):

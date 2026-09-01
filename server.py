@@ -310,6 +310,48 @@ def _attach_axis_basis(result: dict) -> dict:
     return result
 
 
+def _canonical_phases(result):
+    """One spelling of every phase name on the way out.
+
+    Applied at the boundary rather than in each tier, because the tiers are
+    exactly where it went wrong: STEP writes LIQUID, the single-point path
+    writes LIQUID#1 for the same phase, MAP writes FCC-A1-AUTO#2 with
+    hyphens. Which tier answered is provenance -- it belongs in `source`,
+    not in the phase name.
+
+    Measured: 3,400 logged results carry a "#1" name, and a benchmark case
+    failed when a scan fell to the slower tier and returned FCC_A1#1 where
+    FCC_A1 was expected.
+
+    "#2" and higher survive. They are genuinely separate composition sets
+    -- FCC_A1_AUTO#2 is the copper-rich half of the Ag-Cu miscibility gap
+    -- and merging them would fuse two different phases into one line.
+    """
+    if not isinstance(result, dict):
+        return result
+    canon = native_step.canonical_phase_name
+
+    def _rekey(d):
+        if not isinstance(d, dict):
+            return d
+        yeni = {}
+        for ad, deger in d.items():
+            k = canon(ad)
+            # Two spellings of one phase must not become two entries; if
+            # both arrive, the later one is the same number.
+            yeni[k] = deger
+        return yeni
+
+    for alan in ("phase_molar_amounts", "phase_element_composition",
+                 "driving_forces_RT", "phase_status"):
+        if alan in result:
+            result[alan] = _rekey(result[alan])
+    for nokta in result.get("points") or []:
+        if isinstance(nokta, dict) and "phase_molar_amounts" in nokta:
+            nokta["phase_molar_amounts"] = _rekey(nokta["phase_molar_amounts"])
+    return result
+
+
 def _attach_basis(result, basis, source=None):
     """State what the numbers in this result are a fraction OF.
 
@@ -750,6 +792,7 @@ def calculate_equilibrium(
         result["phase_notes"] = notes
     # A single-point equilibrium returns molar amounts of each phase, and
     # the engine that produced it is its provenance.
+    _canonical_phases(result)
     _attach_basis(result, "phase_molar_amount",
                   source=result.get("backend_used"))
     return _attach_verification(result, {
@@ -1085,6 +1128,7 @@ def calculate_property_diagram(
                 ),
                 "chart_error": None,
             }
+            _canonical_phases(data)
             _attach_basis(data, "phase_mass_fraction")
             _attach_mixed_basis_note(data)
             _attach_scan_summary(data, "temperature_K")
@@ -1197,6 +1241,7 @@ def calculate_property_diagram(
     # numbers are MOLAR amounts -- not the mass fractions the STEP series
     # carries. Same tool, same field name, different quantity depending on
     # which tier answered, which is the whole reason the basis is stated.
+    _canonical_phases(data)
     _attach_basis(data, "phase_molar_amount")
     _attach_mixed_basis_note(data)
     _attach_scan_summary(data, "temperature_K")
@@ -1341,6 +1386,7 @@ def calculate_isothermal_section(
         data.update(source_counts)
         data.update(extra)
         _attach_axis_basis(data)
+        _canonical_phases(data)
         _attach_basis(data, "phase_mass_fraction")
         _attach_mixed_basis_note(data)
         _attach_scan_summary(data, "x", to_weight_percent=lambda v:

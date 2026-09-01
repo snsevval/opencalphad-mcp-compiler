@@ -979,8 +979,8 @@ B_COK_FAZ = [
             "temperature_K": 1100,
         },
         "expected": {
-            "phases": ["FCC_A1", "M7C3#1"],
-            "stoichiometry": {"M7C3#1": 3 / 10},
+            "phases": ["FCC_A1", "M7C3"],
+            "stoichiometry": {"M7C3": 3 / 10},
             "mass_balance": True,
             "elements_present": True,
         },
@@ -1002,7 +1002,7 @@ B_COK_FAZ = [
             "temperature_K": 1100,
         },
         "expected": {
-            "phases": ["BCC_A2#1", "M23C6", "FCC_A1"],
+            "phases": ["BCC_A2", "M23C6", "FCC_A1"],
             "stoichiometry": {"M23C6": 6 / 29},
             "backend_used": "native_oc",
             "mass_balance": True,
@@ -1299,7 +1299,7 @@ C_FAZ_GECISI = [
 ]
 D_BILESIM_KUMESI = [
     # Ayni faz adinin birden cok kez, farkli bilesimlerle cikmasi. Ag-Cu'da
-    # karismazlik boslugu iki FCC katisi uretir (FCC_A1#1, FCC_A1_AUTO#2);
+    # karismazlik boslugu iki FCC katisi uretir (FCC_A1, FCC_A1_AUTO#2);
     # celiklerde ayni ad hem ostenit hem MC karburu olabilir.
     #
     # Bu sinif, bu projede iki gercek hatanin cikti yer: LIQUID/LIQUID#1 ad
@@ -1375,9 +1375,13 @@ D_BILESIM_KUMESI = [
         "zorluk": "zor",
         "olcum": "AYNI SONUCTA IKI FCC KUMESI: biri demirce zengin matris "
                  "(FCC_A1_AUTO#2, Fe 0.92), digeri vanadyum karburu "
-                 "(FCC_A1#1, C 0.46 / V 0.36). Ikisi de FCC_A1 adini tasir "
-                 "ve yalnizca bilesim ayirt eder. Faz adinin kimlik olmadigini "
-                 "gosteren en net vaka.",
+                 "(FCC_A1, C 0.46 / V 0.36). Ikisi de ayni kristal yapiyi "
+                 "tasir ve yalnizca bilesim ayirt eder. Faz adinin kimlik "
+                 "olmadigini gosteren en net vaka. "
+                 "Varsayilan kume '#1' eki olmadan yazilir; ikinci kume "
+                 "'#2' ekini KORUR, cunku o gercekten ayri bir kumedir. "
+                 "Vaka eskiden FCC_A1#1 bekliyordu -- o, hangi kademenin "
+                 "cevapladigina gore degisen bir yazimdi.",
         "soru": "steel7.TDB'de C=0.04 Cr=0.06 Mo=0.05 Si=0.003 V=0.01 "
                 "Fe=0.837 icin 1173 K'de hesapla",
         "tool": "calculate_equilibrium",
@@ -1388,7 +1392,7 @@ D_BILESIM_KUMESI = [
             "temperature_K": 1173,
         },
         "expected": {
-            "phases": ["FCC_A1_AUTO#2", "FCC_A1#1"],
+            "phases": ["FCC_A1_AUTO#2", "FCC_A1"],
             "mass_balance": True,
             "elements_present": True,
         },

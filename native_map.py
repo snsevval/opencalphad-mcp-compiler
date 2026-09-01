@@ -121,17 +121,12 @@ class NativeMapError(Exception):
 def _canonical_phase(name):
     """Spell a phase the way the rest of this server does.
 
-    Two differences to undo. MAP writes FCC-A1-AUTO#2 where every other
-    output says FCC_A1_AUTO#2. And whether a phase carries its "#1"
-    suffix depends on the seed: mapping agcu from a liquid seed reports
-    LIQUID and FCC_A1, from a two-solid seed LIQUID#1 and FCC_A1#1 -- the
-    same phases either way. "#1" is a phase's default composition set and
-    is dropped, exactly as native_step drops it; "#2" and higher are
-    genuinely separate composition sets (FCC_A1_AUTO#2 is the Cu-rich half
-    of the Ag-Cu miscibility gap) and are kept.
+    One implementation, in native_step. This module used to carry its own
+    copy of the same three lines -- which is how two spellings of the same
+    rule end up drifting apart.
     """
-    name = name.replace("-", "_")
-    return name[:-2] if name.endswith("#1") else name
+    import native_step
+    return native_step.canonical_phase_name(name)
 
 
 def generate_map_macro(db_path, elements_composition, axis_element,
