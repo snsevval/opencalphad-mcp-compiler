@@ -24,6 +24,12 @@ import os
 
 import oc_service
 
+# One atmosphere, from settings/input.toml [accept.defaults].
+# It was declared there and hardcoded here at the same time; the
+# file is the one that says why.
+import settings_engine as _se
+_DEFAULT_PRESSURE = _se.POLICY.input.defaults.get("pressure_Pa", 1e5)
+
 
 def _delegate(operation, database, elements_composition, **extra):
     """Every check now comes from settings/input.toml.
@@ -49,7 +55,7 @@ def _delegate(operation, database, elements_composition, **extra):
 
 
 def check_equilibrium_request(
-    database, elements_composition, temperature_K, pressure_Pa=1e5,
+    database, elements_composition, temperature_K, pressure_Pa=_DEFAULT_PRESSURE,
     suspended_phases=None,
 ):
     """PREFLIGHT for calculate_equilibrium. Returns a list of problem
@@ -61,7 +67,7 @@ def check_equilibrium_request(
 
 def check_property_diagram_request(
     database, elements_composition, temperature_min_K, temperature_max_K,
-    pressure_Pa=1e5, suspended_phases=None,
+    pressure_Pa=_DEFAULT_PRESSURE, suspended_phases=None,
 ):
     """PREFLIGHT for calculate_property_diagram."""
     return _delegate("property_diagram", database, elements_composition,
@@ -73,7 +79,7 @@ def check_property_diagram_request(
 
 def check_isothermal_section_request(
     database, elements_composition, axis_element, axis_min, axis_max,
-    temperature_K, pressure_Pa=1e5, suspended_phases=None,
+    temperature_K, pressure_Pa=_DEFAULT_PRESSURE, suspended_phases=None,
 ):
     """PREFLIGHT for calculate_isothermal_section."""
     return _delegate("isothermal_section", database, elements_composition,
@@ -85,7 +91,7 @@ def check_isothermal_section_request(
 
 def check_scheil_request(
     database, elements_composition, seed_temperature_K, temperature_min_K,
-    pressure_Pa=1e5,
+    pressure_Pa=_DEFAULT_PRESSURE,
 ):
     """PREFLIGHT for calculate_scheil_solidification.
 
@@ -104,7 +110,7 @@ def check_scheil_request(
 def check_phase_diagram_request(
     database, elements_composition, axis_element, axis_min, axis_max,
     temperature_min_K, temperature_max_K, seed_temperature_K,
-    pressure_Pa=1e5,
+    pressure_Pa=_DEFAULT_PRESSURE,
 ):
     """PREFLIGHT for calculate_phase_diagram.
 
@@ -120,45 +126,6 @@ def check_phase_diagram_request(
                      temperature_max_K=temperature_max_K,
                      seed_temperature_K=seed_temperature_K,
                      pressure_Pa=pressure_Pa)
-
-
-# --- Reddin yaninda yol gostermek ------------------------------------
-#
-# Olculdu (1.26): iki elementli bir sistemde bilesim taramasi istendi ve
-# PREFLIGHT uc sikayet birden dondurdu -- "needs at least three elements",
-# "axis_max must be a mole fraction in [0,1)", "axis_max leaves nothing for
-# the dependent element". Ucu de dogru, ve hicbiri ne yapilmasi
-# gerektigini soylemiyor. Cagiran taraf dogru alternatifi kendi buldu ama
-# bunu yaparken STOP RULE'u cignemek zorunda kaldi.
-#
-# Iki durum ayni sey degil:
-#
-#   istek imkansiz            (olmayan element, ters aralik)  -> dur, sor
-#   bu arac yapamaz, baskasi  (ikili sistemde bilesim ekseni)  -> YONLENDIR
-#
-# Ikincisinde soru degismiyor, sadece dogru kapiya gidiyor. Reddin bunu
-# soylemesi gerekiyor; soylemezse ya cagiran taraf kurali cigner ya da
-# cevaplanabilir bir soru cevapsiz kalir.
-_ALTERNATIFLER = [
-    (
-        "at least three elements",
-        "Bu ikili sistemde bileşim ekseni taranamaz, ama aynı soruya "
-        "calculate_phase_diagram cevap verir: iki eksende (bileşim ve "
-        "sıcaklık) faz sınırlarını izler, ve istenen sıcaklıktaki kesiti "
-        "oradan okunur.",
-    ),
-    (
-        "leaves nothing for the dependent",
-        "Eksenin üst ucunu, bağımlı elemente yer kalacak şekilde düşürün "
-        "(örneğin 1.0 yerine 0.95); istenen aralığın tamamı gerekiyorsa "
-        "calculate_phase_diagram bu kısıta tabi değildir.",
-    ),
-    (
-        "must be a mole fraction in [0, 1)",
-        "Eksen ucu mol kesri olmalı. Saf uç (1.0) taranamaz; ona kadar "
-        "olan aralık taranabilir, ya da calculate_phase_diagram kullanılır.",
-    ),
-]
 
 
 def suggest(problems):

@@ -79,7 +79,6 @@ INVARIANT_TOLERANCE_K = 1e-3
 _KEYS = re.compile(r"^KEYS:\s*(.*)$")
 _LINE_BREAK = re.compile(r"^#\s*(?:shift|end) of line\s+\d+")
 _FIRST_LINE = re.compile(r"^\s*#\s*First line:\s*(.*)$")
-_HEREDOC = re.compile(r"^\s*\$\w+\s*<<\s*EOD\s*$")
 # "X(FCC-A1#1,CU)" -> phase FCC-A1#1. The engine spells composition-set
 # names with hyphens here and underscores everywhere else, so the name is
 # put back into the spelling the rest of this server uses.

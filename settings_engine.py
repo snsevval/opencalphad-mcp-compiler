@@ -44,7 +44,7 @@ INPUT = _load("input")
 EXECUTION = _load("execution")
 OUTPUT = _load("output")
 
-ALL_OPERATIONS = set(INPUT["accept"]["operations"])
+ALL_OPERATIONS = set(INPUT["accept"]["operations"])   # compile rebinds this below
 
 
 def _applies(rule, operation):
@@ -286,6 +286,305 @@ def _context(database):
     return ctx
 
 
+# ═════════════════════════════════════════════════════════════════════
+# COMPILE
+#
+# The settings used to be read rule by rule, on every request. That is a
+# rule engine, and it fails quietly: PREDICATES.get(rule["check"]) returns
+# None for a name that does not exist, the loop moves on, and the rule is
+# gone. Measured -- "min_nonzero_count" mistyped as "min_nonzero_kount"
+# took a request from one complaint to none, with no error at load and no
+# sign anywhere that a rule had stopped running. It is the same failure
+# preflight.py had when nine rules sat in it that nobody called.
+#
+# So the files are resolved once, here, and the runtime reads only what
+# comes out. Every name is bound to the thing it names while there is
+# still someone to tell.
+#
+# The severity split is by consequence, not by tidiness:
+#
+#   STOPS     getting this wrong makes a rule silently not run
+#   WARNS     getting this wrong leaves something declared and unused
+#
+# A server that will not start is a bad morning. A server that starts with
+# a rule missing is a wrong answer nobody questions.
+# ═════════════════════════════════════════════════════════════════════
+
+
+class SettingsError(Exception):
+    """A settings file names something the code cannot honour."""
+
+
+# Keys that document rather than configure. Present everywhere, consumed
+# by nothing, and not a sign of anything missing.
+_DOCUMENTATION_KEYS = ("because", "status", "status_because", "id",
+                       "applies", "message", "route_to", "route_note",
+                       "match", "check")
+
+
+class InputPolicy:
+    """input.toml, resolved: which rules run for which operation, each one
+    already bound to the predicate that carries it out."""
+
+    def __init__(self, operations, defaults, composition,
+                 common, per_operation, routes, preconditions):
+        self.operations = operations          # set of names
+        self.defaults = defaults              # {pressure_Pa: ...}
+        self.composition = composition        # basis + normalise_to_one
+        self.common = common                  # [(rule, predicate)]
+        self.per_operation = per_operation    # {op: [(rule, predicate)]}
+        self.routes = routes                  # {op: [(marker, note)]}
+        self.preconditions = preconditions    # [rule]
+
+
+class ExecutionPlan:
+    """execution.toml, resolved: the tier order for each operation and the
+    constants the run needs, looked up once instead of per request."""
+
+    def __init__(self, cascades, endpoint_recheck, gap_detection,
+                 reviewers, reviewer_budget, binary_order,
+                 weak_independence, signals):
+        self.cascades = cascades              # {op: (tiers, entry)}
+        self.endpoint_recheck = endpoint_recheck
+        self.gap_detection = gap_detection
+        self.reviewers = reviewers            # [ {model, independence} ]
+        self.reviewer_budget = reviewer_budget
+        self.binary_order = binary_order      # [(name, path)]
+        self.weak_independence = weak_independence   # set of model names
+        self.signals = signals                # set of signal names
+
+
+class OutputPlan:
+    """output.toml, resolved: the wording and the derivations, keyed the
+    way the runtime asks for them."""
+
+    def __init__(self, derive, notes, stop_rule, conversion, floor):
+        self.derive = derive
+        self.notes = notes                    # {id: text}
+        self.stop_rule = stop_rule
+        self.conversion = conversion          # {name: block}
+        self.floor = floor
+
+
+class CompiledPolicy:
+    """Everything the runtime is allowed to read. Built once, at import."""
+
+    def __init__(self, input_policy, execution_plan, output_plan, warnings):
+        self.input = input_policy
+        self.execution = execution_plan
+        self.output = output_plan
+        self.warnings = warnings
+
+    def report(self):
+        """The warnings as text, for settings_audit and for startup."""
+        if not self.warnings:
+            return "DERLEME: temiz -- her ad bagli, okunmayan anahtar yok"
+        satirlar = ["DERLEME: %d uyari" % len(self.warnings)]
+        satirlar += ["   " + u for u in self.warnings]
+        return "\n".join(satirlar)
+
+
+def _consume_unread(block, consumed, path, warnings):
+    """Warn about keys the compiler did not claim.
+
+    Only for sections that carry no `status`: a section that says why it is
+    unread has already answered this question. Everything else in a wired
+    section should have a reader, and until now nothing checked -- which is
+    how accept.defaults sat in the file with nine hardcoded copies of its
+    value in the code.
+    """
+    for key, value in block.items():
+        if key in _DOCUMENTATION_KEYS:
+            continue
+        p = "%s.%s" % (path, key)
+        if p in consumed:
+            continue
+        if isinstance(value, dict):
+            if "status" in value:
+                continue
+            _consume_unread(value, consumed, p, warnings)
+        else:
+            warnings.append("%s dosyada var, derleyici okumuyor" % p)
+
+
+def compile_settings(giris=None, yurutme=None, cikti=None):
+    """Resolve the three settings files into the policy the runtime reads.
+
+    Raises SettingsError for anything that would make a rule quietly not
+    run. Collects the rest as warnings, so a declared-but-unread key is
+    visible without refusing to start.
+    """
+    giris = giris if giris is not None else INPUT
+    yurutme = yurutme if yurutme is not None else EXECUTION
+    cikti = cikti if cikti is not None else OUTPUT
+
+    hatalar, uyarilar, consumed = [], [], set()
+
+    # ---- input ------------------------------------------------------
+    operations = set(giris["accept"]["operations"])
+    consumed.add("input.accept.operations")
+
+    defaults = dict(giris["accept"].get("defaults", {}))
+    defaults.pop("because", None)
+    for k in defaults:
+        consumed.add("input.accept.defaults.%s" % k)
+
+    composition = dict(giris["accept"].get("composition", {}))
+    consumed.add("input.accept.composition.normalise_to_one")
+    consumed.add("input.accept.composition.basis")
+
+    common, per_operation, routes = [], {op: [] for op in operations}, \
+        {op: [] for op in operations}
+
+    for rule in giris["reject"] + giris["route"]:
+        kimlik = rule.get("id", "<isimsiz>")
+        kapsam = rule.get("applies", "*")
+        # `applies` is "*", one operation name, or a list of them --
+        # whichever _applies() already accepts.
+        adlar = [] if kapsam == "*" else (
+            kapsam if isinstance(kapsam, list) else [kapsam])
+        bilinmeyen = [a for a in adlar if a not in operations]
+        if bilinmeyen:
+            hatalar.append("kural %r: applies=%r diye bir islem yok"
+                           % (kimlik, bilinmeyen))
+            continue
+
+        ad = rule.get("check")
+        if ad is not None:
+            predicate = PREDICATES.get(ad)
+            if predicate is None:
+                hatalar.append(
+                    "kural %r: check=%r diye bir yuklem yok -- kural "
+                    "sessizce kosmayacakti" % (kimlik, ad))
+                continue
+            if kapsam == "*":
+                common.append((rule, predicate))
+            else:
+                for op in operations:
+                    if _applies(rule, op):
+                        per_operation[op].append((rule, predicate))
+            if not rule.get("message"):
+                hatalar.append("kural %r: message yok, sikayet uretemez"
+                               % kimlik)
+
+        # A route may carry its own check, or be a pure router keyed by
+        # `match` to text another rule produces.
+        if rule.get("route_note"):
+            isaret = rule.get("match") or \
+                rule.get("message", "").split("{")[0].strip()[:40]
+            if not isaret:
+                hatalar.append(
+                    "kural %r: route_note var ama eslesecek isaret yok -- "
+                    "mesaj placeholder ile basliyor, `match` gerekli"
+                    % kimlik)
+                continue
+            for op in operations:
+                if _applies(rule, op):
+                    routes[op].append((isaret, rule["route_note"].strip()))
+
+    # A precondition's `check` does NOT name a predicate here: it costs a
+    # calculation, so the tool that can pay for one performs it and calls
+    # precondition() for the wording. What this side needs is an id to look
+    # up by and a message to format -- those are what is checked.
+    preconditions = list(giris.get("precondition", []))
+    for rule in preconditions:
+        if not rule.get("id"):
+            hatalar.append("precondition: id yok, aranamaz")
+        elif not rule.get("message"):
+            hatalar.append("precondition %r: message yok, soyleyecegi sey yok"
+                           % rule["id"])
+
+    _consume_unread(giris["accept"], consumed, "input.accept", uyarilar)
+
+    # ---- execution --------------------------------------------------
+    signals = set(k for k in yurutme.get("signals", {})
+                  if k not in _DOCUMENTATION_KEYS)
+
+    cascades = {}
+    for entry in yurutme.get("cascade", []):
+        op = entry.get("operation")
+        if op not in operations:
+            hatalar.append("cascade: %r diye bir islem yok" % op)
+            continue
+        tiers = list(entry.get("tiers", []))
+        if not tiers:
+            hatalar.append("cascade %r: hic kademe yok" % op)
+            continue
+        for tier in tiers:
+            if not tier.get("handler"):
+                hatalar.append("cascade %r: handler adi olmayan kademe" % op)
+            for sinyal in tier.get("on", []):
+                if sinyal not in signals:
+                    hatalar.append(
+                        "cascade %r, kademe %r: on=%r diye bir sinyal yok "
+                        "-- bu kademeye asla girilemezdi"
+                        % (op, tier.get("handler"), sinyal))
+        cascades[op] = (tiers, entry)
+
+    hakemler = list(yurutme.get("reviewer", []))
+    # The chain says which of ITS entries are weak; [independence] also
+    # covers models selectable by hand that never appear in the chain.
+    zayif = {r["model"] for r in hakemler
+             if r.get("independence") == "weak" and r.get("model")}
+    zayif |= set(yurutme.get("independence", {}).get("weak_models", []))
+
+    ikili = yurutme.get("binary", {})
+    yollar = ikili.get("paths", {})
+    binary_order = [(ad, yollar[ad]) for ad in ikili.get("order", [])
+                    if ad in yollar]
+    for ad in ikili.get("order", []):
+        if ad not in yollar:
+            uyarilar.append("binary.order %r icin paths girdisi yok" % ad)
+
+    execution_plan = ExecutionPlan(
+        cascades=cascades,
+        endpoint_recheck=dict(yurutme.get("endpoint_recheck", {})),
+        gap_detection=dict(yurutme.get("gap_detection", {})),
+        reviewers=hakemler,
+        reviewer_budget=dict(yurutme.get("reviewer_budget", {})),
+        binary_order=binary_order,
+        weak_independence=zayif,
+        signals=signals,
+    )
+
+    # ---- output -----------------------------------------------------
+    notlar = {}
+    for n in cikti.get("note", []):
+        kimlik = n.get("id")
+        if not kimlik:
+            hatalar.append("output.note: id'siz not")
+            continue
+        if not n.get("text") and not n.get("note"):
+            uyarilar.append("not %r: metni bos" % kimlik)
+        notlar[kimlik] = n
+
+    output_plan = OutputPlan(
+        derive=dict(cikti.get("derive", {})),
+        notes=notlar,
+        stop_rule=dict(cikti.get("stop_rule", {})),
+        conversion={k: v for k, v in cikti.get("conversion", {}).items()
+                    if isinstance(v, dict)},
+        floor=dict(cikti.get("floor", {})),
+    )
+
+    if hatalar:
+        raise SettingsError(
+            "ayar dosyalari acilamadi -- %d hata:\n   %s"
+            % (len(hatalar), "\n   ".join(hatalar)))
+
+    return CompiledPolicy(
+        InputPolicy(operations, defaults, composition, common,
+                    per_operation, routes, preconditions),
+        execution_plan, output_plan, uyarilar)
+
+
+POLICY = compile_settings()
+ALL_OPERATIONS = POLICY.input.operations
+if POLICY.warnings:
+    import sys as _sys
+    print(POLICY.report(), file=_sys.stderr)
+
+
 def check(operation, **request):
     """Apply the input rules for one operation.
 
@@ -302,8 +601,11 @@ def check(operation, **request):
 
     ctx = _context(request.get("database"))
     problems = []
-    kurallar = INPUT["reject"] + INPUT["route"]
 
+    # Rules arrive already split and already bound to their predicates.
+    # Nothing is looked up by name here any more: a name that resolved to
+    # nothing would have stopped the import.
+    #
     # Common rules first, then the operation's own -- and a missing or
     # unreadable database stops only the COMMON ones.
     #
@@ -312,23 +614,13 @@ def check(operation, **request):
     # that follow the helper still run. A request naming a database that
     # does not exist AND a negative temperature reports both. Fuzzing
     # caught it; the hand-written cases never combined the two.
-    ortak = [r for r in kurallar if r["applies"] == "*"]
-    kendine_ozel = [r for r in kurallar
-                    if r["applies"] != "*" and _applies(r, operation)]
-
-    for rule in ortak:
-        predicate = PREDICATES.get(rule["check"])
-        if predicate is None:
-            continue
+    for rule, predicate in POLICY.input.common:
         found = predicate(rule, request, ctx)
         problems.extend(found)
         if found and rule["id"] in ("database-exists", "database-readable"):
             break
 
-    for rule in kendine_ozel:
-        predicate = PREDICATES.get(rule["check"])
-        if predicate is None:
-            continue
+    for rule, predicate in POLICY.input.per_operation.get(operation, []):
         problems.extend(predicate(rule, request, ctx))
 
     return problems
@@ -340,15 +632,17 @@ def route_for(operation, problems):
     Only for the "wrong tool" class. An impossible request gets nothing:
     inventing a route would push the caller toward a calculation nobody
     asked for, which is the failure the stop rule exists to prevent.
+
+    The marker each route matches on is resolved at compile time, from
+    `match` where a rule gives one and from the message otherwise. A route
+    whose message opens with a placeholder yields an empty marker and could
+    never fire -- that now stops the import instead of going unnoticed.
     """
     blob = " ".join(problems)
     notes = []
-    for rule in INPUT["route"]:
-        if not _applies(rule, operation):
-            continue
-        marker = rule["message"].split("{")[0].strip()[:40]
-        if marker and marker in blob and rule.get("route_note"):
-            notes.append(rule["route_note"].strip())
+    for isaret, note in POLICY.input.routes.get(operation, []):
+        if isaret in blob and note not in notes:
+            notes.append(note)
     return notes
 
 def stop_rule_block(indent="    "):
@@ -358,7 +652,7 @@ def stop_rule_block(indent="    "):
     typed out by hand in six docstrings, which is how a correction to it
     turned into six separate edits.
     """
-    rule = OUTPUT["stop_rule"]
+    rule = POLICY.output.stop_rule
     lines = ["PREFLIGHT REJECTION — STOP RULE",
              "If the result has stage=\"PREFLIGHT\", the request was refused",
              "before any calculation ran. Two cases, and they call for",
@@ -390,7 +684,7 @@ def note(note_id, **fields):
     Returns None when the note is not declared or is still `planned`, so
     a caller can leave the field out rather than emit an empty string.
     """
-    for entry in OUTPUT.get("note", []):
+    for entry in POLICY.output.notes.values():
         if entry.get("id") != note_id:
             continue
         if entry.get("status") == "planned":
@@ -407,7 +701,7 @@ def note(note_id, **fields):
 
 def derive_settings():
     """Tolerances the scan summary derives with."""
-    d = OUTPUT["derive"]
+    d = POLICY.output.derive
     return {
         "presence_tolerance": d["presence_tolerance"],
         "dominance_threshold": d["dominance_threshold"],
@@ -415,9 +709,58 @@ def derive_settings():
     }
 
 
+def binary_order():
+    """Which native engine build to try, in order, from execution.toml.
+
+    Returns (name, path) pairs. The path may contain $OC_BUILD_DIR, which
+    the caller expands -- where a build lives is environment, while which
+    build is preferred is a measured decision and belongs in the file.
+    """
+    return list(POLICY.execution.binary_order)
+
+
+def conversion_setting(name):
+    """What output.toml permits for one kind of basis conversion."""
+    blok = POLICY.output.conversion.get(name)
+    return dict(blok) if isinstance(blok, dict) else None
+
+
+def axis_weight_percent(composition, axis_element, x):
+    """The scanned element's weight per cent at axis position x.
+
+    An axis position is a mole fraction of the scanned element in the
+    overall composition, and the payload used to carry it as a bare number
+    called `x`. Measured on 1.29: the caller converted 25 of them by hand
+    and every figure came out low, because nickel is heavier than the alloy
+    around it and the conversion has to move the other way.
+
+    composition_at() is the same reconstruction the gap-fill uses, so the
+    alloy converted here is the alloy the engine computed. Returns None
+    rather than a guess whenever any part of that is unavailable -- an
+    absent second basis is a gap, a wrong one is a wrong answer.
+    """
+    kural = conversion_setting("axis_position")
+    if not kural or not kural.get("allowed"):
+        return None
+    try:
+        import native_step
+        kutle = native_step.ATOMIC_MASS
+        tam = native_step.composition_at(composition, axis_element, x)
+    except Exception:                                    # noqa: BLE001
+        return None
+    if any(el.upper() not in kutle for el in tam):
+        return None
+    agirlik = {el: v * kutle[el.upper()] for el, v in tam.items()}
+    toplam = sum(agirlik.values())
+    hedef = next((el for el in tam if el.upper() == axis_element.upper()), None)
+    if toplam <= 0 or hedef is None:
+        return None
+    return round(100.0 * agirlik[hedef] / toplam, 4)
+
+
 def precondition(check_id, **fields):
     """The message for a precondition that costs a calculation to test."""
-    for entry in INPUT.get("precondition", []):
+    for entry in POLICY.input.preconditions:
         if entry.get("id") == check_id:
             return entry["message"].strip().format(**fields)
     return None
@@ -493,10 +836,8 @@ class CascadeExhausted(Exception):
 
 def tiers_for(operation):
     """The tier list for one operation, in file order."""
-    for entry in EXECUTION.get("cascade", []):
-        if entry.get("operation") == operation:
-            return list(entry.get("tiers", [])), entry
-    return [], {}
+    tiers, entry = POLICY.execution.cascades.get(operation, ([], {}))
+    return list(tiers), entry
 
 
 def run_cascade(operation, handlers, request=None):
@@ -576,6 +917,88 @@ def _signal_listed(exc, signal_names):
         return True
     return is_engine_failure(exc)
 
+def resolve_composition(composition, basis=None):
+    """Turn a declared composition into the canonical mole fractions the
+    engine is conditioned on.
+
+    This is the INPUT side of the basis question, and until now it did not
+    exist. input.toml declared the setting -- three values, a default, and
+    a paragraph saying "declared, the conversion becomes ours and stops
+    being arithmetic the caller has to get right" -- but the only code that
+    read it ran AFTER the engine, on the result. So a caller who said
+    weight_percent had their numbers conditioned as mole fractions anyway.
+
+    That is not a rounding difference. W(C)=0.01 in iron is x(C)=0.045:
+    hypereutectoid, austenite plus carbide. X(C)=0.01 is 0.217 wt%:
+    hypoeutectoid, and a little ferrite at 1100 K. Two alloys, one payload,
+    no way to tell which was computed.
+
+    Returns (canonical, report). `canonical` is what the engine gets;
+    `report` records what arrived, in which basis, and what it became --
+    None when nothing needed doing, so a mole-fraction request looks
+    exactly as it always did.
+    """
+    ayarlar = POLICY.input.composition.get("basis", {})
+    izinli = ayarlar.get("values", ["mole_fraction"])
+    basis = basis or ayarlar.get("default", "mole_fraction")
+    if basis not in izinli:
+        raise ValueError(
+            "unknown composition basis %r; settings allow %s"
+            % (basis, ", ".join(izinli)))
+
+    if not composition:
+        return composition, None
+
+    toplam = sum(composition.values())
+    if toplam <= 0:
+        return composition, None          # a rejection rule owns this case
+
+    normalise = POLICY.input.composition.get("normalise_to_one", True)
+    olcekli = bool(normalise) and abs(toplam - 1.0) > 1e-9
+
+    if basis == "mole_fraction":
+        kanonik = ({el: v / toplam for el, v in composition.items()}
+                   if olcekli else dict(composition))
+        if not olcekli:
+            return composition, None
+        return kanonik, {"declared_basis": basis,
+                         "declared": dict(composition),
+                         "canonical_mole_fraction": _round6(kanonik),
+                         "converted": False,
+                         "rescaled": True,
+                         "declared_sum": round(toplam, 6)}
+
+    # ---- mass basis: convert before the engine sees it ---------------
+    try:
+        import native_step
+        kutle = native_step.ATOMIC_MASS
+    except Exception:                                    # noqa: BLE001
+        raise ValueError("cannot convert %s: atomic masses unavailable"
+                         % basis)
+    eksik = [el for el in composition if el.upper() not in kutle]
+    if eksik:
+        # Better to refuse than to convert with a guessed mass -- a wrong
+        # conversion is a different alloy, silently.
+        raise ValueError(
+            "cannot convert %s to mole fractions: no atomic mass for %s"
+            % (basis, ", ".join(sorted(eksik))))
+
+    mol = {el: (v / toplam) / kutle[el.upper()]
+           for el, v in composition.items()}
+    mol_toplam = sum(mol.values())
+    kanonik = {el: v / mol_toplam for el, v in mol.items()}
+    return kanonik, {"declared_basis": basis,
+                     "declared": dict(composition),
+                     "canonical_mole_fraction": _round6(kanonik),
+                     "converted": True,
+                     "rescaled": olcekli,
+                     "declared_sum": round(toplam, 6)}
+
+
+def _round6(d):
+    return {el: round(v, 6) for el, v in d.items()}
+
+
 def composition_report(composition, basis=None):
     """State the composition in both bases, and say which one arrived.
 
@@ -589,7 +1012,7 @@ def composition_report(composition, basis=None):
 
     Nobody involved was being careless. The number had no unit attached.
     """
-    ayarlar = INPUT["accept"]["composition"].get("basis", {})
+    ayarlar = POLICY.input.composition.get("basis", {})
     basis = basis or ayarlar.get("default", "mole_fraction")
     if not composition:
         return None

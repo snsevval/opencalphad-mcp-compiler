@@ -199,17 +199,27 @@ where it sampled sparsely. Below that it is ordinary spacing variation."""
 ## ---------------------------------------------------------------------
 
 [binary]
-status = "todo"
-status_because = """
-Genuinely unwired. native_fallback.py holds the path as a constant, so
-changing `prefer` here does nothing. Ten minutes of work, not done."""
-prefer   = "bundled_6058"
-fallback = "built_6120"
+order = ["bundled_6058", "built_6120"]
 because = """
 The bundled 6.058 build solves steel1 Fe-C at 1200 K from a cold start in
-eleven iterations. The 6.120 build we compiled ourselves does not converge
-there in either grid-minimiser mode. Same engine family, measurably
-different solver -- so the older one is preferred where it is present."""
+eleven iterations, matching the known-correct G = -56563.789 J/mol exactly.
+The 6.120 build we compiled ourselves does not converge there at all, in
+either grid-minimiser mode. Same engine family, measurably different
+solver -- so the older one is tried first wherever it is present.
+
+Tried in order, and the first one actually on disk wins: a machine without
+the separately-installed CAE GUI simply falls to the build we made. The
+OC_BINARY environment variable still overrides everything, which is how a
+single run is pinned to one engine for comparison."""
+
+[binary.paths]
+bundled_6058 = "/mnt/c/OpenCalphad_CAE_0_1_0/Console/Windows/oc6P.exe"
+built_6120   = "$OC_BUILD_DIR/OC"
+because = """
+$OC_BUILD_DIR expands from the environment, defaulting to the path
+native_fallback computes. WSL2 runs the Windows .exe directly from a Linux
+path through process interop, which is why a .exe appears in this list at
+all."""
 
 
 ## ---------------------------------------------------------------------
@@ -219,6 +229,10 @@ different solver -- so the older one is preferred where it is present."""
 ## is listed here because it cascades like everything else.
 ## ---------------------------------------------------------------------
 
+## Which model to reach for when a genuinely independent audit is wanted is
+## in [reviewer_note] below, with the latency measurements that keep it out
+## of this chain.
+
 [[reviewer]]
 model = "nvidia/nemotron-3-super-120b-a12b"
 independence = "weak"
@@ -227,6 +241,25 @@ because = "same family as the model driving the server; flagged on every verdict
 [[reviewer]]
 model = "nvidia/nemotron-3.5-lightning-30b-a3b"
 independence = "weak"
+
+## Which models count as too close to the one driving the server for
+## their review to be independent. The chain entries carry `independence`
+## of their own; this list also covers models reachable by hand through
+## OC_VALIDATOR_MODEL, which are not in the chain and would otherwise be
+## judged by a set kept separately in the code.
+
+[independence]
+weak_models = [
+  "nvidia/nemotron-3-super-120b-a12b",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+  "nvidia/nemotron-3.5-lightning-30b-a3b",
+]
+because = """
+Same family as the model driving the server. A review from inside the
+family is worth having and is not independent, and Layer B exists to be
+independent -- so the weakness is stated on every verdict that uses one
+rather than left for the reader to notice."""
+
 
 [reviewer_budget]
 max_tokens = 4000

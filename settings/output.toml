@@ -271,14 +271,37 @@ told the user the real phase diagram forbade them."""
 
 [[note]]
 id   = "gibbs-difference-is-not-a-ranking"
-when = "two_results_compared"
+when = "compared_alloys_differ_in_elements"
 text = """
-Lower Gibbs energy means more stable only between states of the SAME \
-system. Two different compositions are different systems, so this \
-difference does not rank them."""
+These compositions do not contain the same elements, so this difference \
+does NOT say which alloy is more stable -- each Gibbs energy is measured \
+against a different set of reference states and the difference mostly \
+reflects that. Stability compares states of one composition. To compare \
+two alloys, use what does transfer: which phases each forms, how much of \
+each, how close other phases are to appearing (driving_force_RT), or over \
+what temperature range each stays single-phase."""
 because = """
 Handed over unframed once, and read as "alloy B is more stable than alloy
-A" -- a comparison the number does not support."""
+A" -- a comparison the number does not support. Measured: asked which of
+Fe-20Cr and Fe-20Cr-2Mo is more stable at 1273 K, the caller read the field
+correctly (-569 J) and concluded the molybdenum alloy was more stable. Both
+are single-phase ferrite; neither is more stable than the other. It took
+the framing the field name offered, and there was none anywhere else.
+
+Swapping 2% Fe for 2% Mo moves G by the reference contribution of that
+swap and says nothing about how favourable either alloy is."""
+
+
+[[note]]
+id   = "gibbs-difference-is-a-ranking"
+when = "compared_alloys_share_elements"
+text = """
+Both sides have the same elements, so this difference is a like-for-like \
+comparison: the lower Gibbs energy is the more stable state."""
+because = """
+The other half of the rule above, and it has to be said too. A caller told
+only when the comparison is invalid will assume it is always invalid, and
+the same-element case is exactly the one the number does answer."""
 
 [[note]]
 id   = "composition-was-rescaled"
@@ -356,13 +379,14 @@ caller found the right alternative and had to break the rule to use it."""
 ## ---------------------------------------------------------------------
 
 [conversion]
-status = "planned"
 status_because = """
-All three depend on fields that do not exist yet: basis conversion needs
-[report.basis], rounding needs [report.precision] and [floor.raw_values].
-Written now because an unstated exception to an invariant is how
-invariants stop being true -- output.toml claims it never touches a
-number, and these are the three places it eventually will."""
+Read for [conversion.axis_position]; the other two sub-blocks carry their
+own `planned` status and say what they are waiting on. Written out in full
+because an unstated exception to an invariant is how invariants stop being
+true -- output.toml claims it never touches a number, and these are the
+places it eventually will. Adding a second basis alongside the first is
+not touching one: the mole value stays exactly as the engine produced
+it."""
 
 [conversion.units]
 status    = "planned"
@@ -372,16 +396,39 @@ because = """
 J/mol to kJ/mol loses nothing and can be undone exactly. Permitted, because
 the invariant is about content and this changes none."""
 
-[conversion.basis]
+## Two conversions were written here as one, and only the second needs the
+## phase compositions. Splitting them because the first is answerable today
+## and was measured going wrong while it sat behind the second's condition.
+
+[conversion.axis_position]
+allowed   = true
+condition = "overall_composition_recoverable"
+because = """
+An axis position is an OVERALL composition coordinate. Converting it needs
+the overall composition at that point, and native_step.composition_at
+reconstructs it exactly as the macro did -- so the alloy converted is the
+alloy computed, not a nearby one. Reversible: the mole value stays, and the
+base composition plus the dependent-element rule recover it.
+
+Measured (1.29): a 25-point nickel scan came back with every axis position
+named `x` and no unit on it, while composition_basis described the base
+composition where nickel is still zero. The caller converted all 25 by hand
+and every figure was low -- x(NI)=0.0333 is 3.55 weight per cent, reported
+as 3.2 -- and then advised 2-3 wt% for full austenite where 3.55 was
+needed. Nobody was careless; the number had no unit attached, which is the
+same failure 1.10 had and the same fix."""
+
+[conversion.phase_amounts]
 status    = "planned"
 allowed   = true
 condition = "phase_compositions_also_reported"
 because = """
-Mole to mass conversion is arithmetic on the numbers, and it is reversible
-ONLY if the phase compositions travel with them. Without those, the
-conversion is one-way and the original content cannot be recovered -- which
-would make it a change of content, not of presentation, and it would belong
-in input.toml instead."""
+Converting a phase's MOLAR AMOUNT to a mass fraction is different
+arithmetic: it needs that phase's own composition, and the payload carries
+phase_molar_amounts only. Without those the conversion is one-way and the
+original content cannot be recovered -- which would make it a change of
+content, not of presentation, and it would belong in input.toml
+instead."""
 
 [conversion.rounding]
 status    = "planned"

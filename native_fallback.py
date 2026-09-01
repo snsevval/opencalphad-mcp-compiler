@@ -19,16 +19,10 @@ byte-count cap and always kills the process afterward -- the data we need
 is printed within the first couple KB, long before the spin loop matters.
 This same read-then-kill pattern is what makes it safe to use here too.
 
-Which binary: our own compiled OpenCalphad 6.120 (dev branch) build has a
-confirmed weaker grid-minimizer/STEP solver than the 6.058 stable release
-bundled with the separately-installed OpenCalphad CAE GUI (e.g. steel1
-Fe-C at 1200K does not converge cold-start in our 6.120 build at all, in
-either grid-minimizer mode -- see the plan file, Faz 4/6 -- but converges
-in 11 iterations on 6.058, matching the known-correct reference value
-G=-56563.789 J/mol exactly). Since WSL2 can invoke a Windows .exe directly
-from a Linux path via its process interop, we prefer that 6.058 binary
-when it's present on disk, and only fall back to our own Linux build if
-it isn't (e.g. on a machine without that separate GUI install).
+Which binary is preferred, and where each one lives, is in
+settings/execution.toml under [binary] -- it is a measured decision
+(6.058 converges where our 6.120 build does not) and it is stated once,
+there, with the measurement beside it. _resolve_binary below reads it.
 """
 import os
 import re
@@ -37,11 +31,34 @@ import time
 
 OC_BUILD_DIR = os.environ.get("OC_BUILD_DIR", "/root/projects/opencalphad")
 _LINUX_BINARY = os.path.join(OC_BUILD_DIR, "OC")
-_WINDOWS_GUI_BINARY = "/mnt/c/OpenCalphad_CAE_0_1_0/Console/Windows/oc6P.exe"
-OC_BINARY = os.environ.get(
-    "OC_BINARY",
-    _WINDOWS_GUI_BINARY if os.path.isfile(_WINDOWS_GUI_BINARY) else _LINUX_BINARY,
-)
+def _resolve_binary():
+    """The native engine to run, in the order execution.toml gives.
+
+    Which build is preferred is a measured decision -- 6.058 converges
+    where our 6.120 build does not -- so it is stated in the settings file
+    rather than here. Where a build lives is environment, so the path may
+    name $OC_BUILD_DIR and OC_BINARY still overrides everything.
+
+    Falls back to the build we compiled if the settings cannot be read at
+    all, because a missing settings file should not leave the server with
+    no engine to name in its error.
+    """
+    pinned = os.environ.get("OC_BINARY")
+    if pinned:
+        return pinned
+    try:
+        import settings_engine
+        adaylar = settings_engine.binary_order()
+    except Exception:                                    # noqa: BLE001
+        adaylar = []
+    for _ad, yol in adaylar:
+        yol = yol.replace("$OC_BUILD_DIR", OC_BUILD_DIR)
+        if os.path.isfile(yol):
+            return yol
+    return _LINUX_BINARY
+
+
+OC_BINARY = _resolve_binary()
 
 _FLOAT = r"[-+]?\d+(?:\.\d+)?(?:[Ee][-+]?\d+)?"
 

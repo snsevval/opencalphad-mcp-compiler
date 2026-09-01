@@ -2214,3 +2214,111 @@ Düşmeye devam eden iki şey, ikisi de tarama özetinin kapsamı dışında:
 - **1.25 bileşim** — istekle motor arasında bozuluyor, hiçbir katman
   bakmıyordu; `composition_basis` alanı artık en azından **görünür**
   kılıyor
+
+---
+
+## 1.29 — cevaplandı
+
+**Soru.** *iron4cd'de 1200 K'de nikel oranını %0'dan %20'ye çıkar, östenit ne
+zaman kararlı oluyor? (Fe-%18Cr-%0.5C bazında)*
+
+İlk turda bu soru **"motor bu alaşımı çözemiyor"** diye kaydedilmişti. Yanlıştı:
+uyarı veren bir TDB'de motor RETURN bekliyor ve makronun `set c` satırı o istemi
+cevaplamış oluyordu. Düzeltildi, tarama 2/20 noktadan 20/20'ye çıktı.
+
+### Yükte ne vardı
+
+```
+25/25 nokta          covered_fraction 1.0
+backend              native_oc_step_gnuplot
+verification.passed  True
+
+dominant_phase_regions
+   BCC_A2   0      -> 0.00833
+   FCC_A1   0.01667 -> 0.2      from_boundary_between [0.00833, 0.01667]
+
+phase_transitions
+   boundary_between [0.025, 0.03333]   bracket 0.008333
+   disappeared: BCC_A2
+```
+
+### Cevap ne dedi
+
+| | |
+|---|---|
+| Araç seçimi | `isothermal_section` — doğru |
+| Faz kesirleri | x=0'da BCC %94, FCC %4.6 — bağımsız ölçümle birebir |
+| Baskınlık eşiği | *"~%1.7'den itibaren dominant"* — özetin `from` değerinin ta kendisi |
+| Karbür atfı | M23C6, %0.5 C'den — doğru |
+| Fizik | %18 Cr ferritik yapıyor, Ni östenit yapıcı olarak dengeliyor — doğru |
+
+**Baskınlık eşiğini kendi karşılaştırmasıyla değil, türetilmiş özetten okumuş.**
+`output.toml`'un `derive` bölümü tam bunun için var, ve burada işe yaradı.
+
+### Üç kusur
+
+**1 · Ağırlıkça yüzde sütunu ters yönde.** Nikel (58.69), alaşımın ortalama atom
+kütlesinden (~55.0) ağır — yani ağırlıkça değer mol değerinden **büyük** olmalı.
+Sütun küçültmüş:
+
+```
+mol%    model dedi    dogrusu
+0.83      ~0.8         0.89
+1.67      ~1.7         1.78
+2.5       ~2.5         2.67
+3.33      ~3.2         3.55
+```
+
+**2 · Kendi tablosuyla çelişen tavsiye.** *"Pratikte %2–3 Ni (ağırlıksal)
+eklerseniz tam kararlı"* — ama kendi tablosunda %2.5'te BCC hâlâ %10. Tam
+östenitik olmak için ~%3.55 ağırlıkça gerekiyor.
+
+**3 · Sınır tek sayı olarak verilmiş.** Yük aralığı açıkça uzatmıştı
+(`boundary_between: [0.025, 0.0333]`); cevap `%3.33` demiş. Doğrusu *"BCC %2.5
+ile %3.33 arasında kayboluyor"*.
+
+### Bunun ortaya çıkardığı sistem boşluğu — kapatıldı
+
+Birinci ve ikinci kusur modelin dikkatsizliği değildi. Eksen konumları yükte
+`x` adında **çıplak sayılar** olarak duruyordu, ve `composition_basis` yalnızca
+taban bileşimi tarif ediyordu — orada taranan element hâlâ sıfır. Model 25
+konumu elle çevirmek zorunda kaldı ve yönü kaçırdı.
+
+1.10'da kapattığımız delik taramalarda açık kalmıştı.
+
+Kapatıldı: her nokta `x_weight_percent` taşıyor, her özet yer imi ikinci bazı
+da veriyor, tarama `axis_basis = "mole_fraction"` diye etiketleniyor. Dönüşüm
+`native_step.composition_at()` üzerinden — gap-fill'in kullandığı fonksiyon —
+yani dönüştürülen alaşım motorun hesapladığının aynısı. Ölçüldü: 195 gerçek
+tarama üzerinde hiçbir mevcut alan değişmedi, yalnızca yedi yeni alan eklendi.
+
+Üçüncü kusur açık: `honesty.boundaries_as_brackets` davranışta uygulanıyor ama
+dosyadan okunmuyor, ve `boundary_between` alanı yükte olmasına rağmen
+kullanılmadı.
+
+---
+
+## Yönlendirmede kapatılan boşluk
+
+`1.26`'da reddin yanına alternatif koymuştuk. Bugün ölçüldü ki eksikti.
+
+`preflight.py`'de 35 satırlık `_ALTERNATIFLER` listesi duruyordu — üç yönlendirme
+metni, okuyan yok. Ölü kod. Ama içindeki üçün **ikisi `input.toml`'a hiç
+taşınmamıştı**, ve ölü liste onları saklamaya devam ettiği için kayıp görünmez
+kalmıştı.
+
+Boşluk şöyle gizlenmişti: ikili bir sistemde üç şikâyet **birlikte** çıkıyor, ve
+tek route kuralı ("en az üç element") üçünü de örtüyor gibi görünüyor. Üçlü bir
+sistemde birinci şikâyet susuyor, kural tetiklenmiyor:
+
+```
+IKILI + eksen ucu 1.0    3 sikayet -> 1 yonlendirme    kapsanmis
+UCLU  + eksen ucu 1.0    2 sikayet -> 0 YONLENDIRME    kayip
+```
+
+Bir tuzak daha çıktı: `route_for` işareti mesajın `{` öncesinden türetiyordu, ve
+`axis-bounds-half-open`'ın mesajı placeholder ile başlıyor — işaret boş çıkıyor,
+o kural asla eşleşemezdi. Route kuralları artık açık bir `match` alanı taşıyor.
+
+Sonuç: üçlü sistem **0 → 2 yönlendirme**. Ölçüldü: 550 istekte reddetme davranışı
+birebir aynı, yönlendirme sayısı 30 → 171.

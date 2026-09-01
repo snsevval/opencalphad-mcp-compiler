@@ -394,6 +394,54 @@ note is there because the caller's first retry sent min == max and was
 rejected again -- measured, not anticipated."""
 
 
+[[route]]
+id       = "axis-upper-end-is-pure"
+applies  = "isothermal_section"
+match    = "must be a mole fraction in [0, 1)"
+message  = "The axis upper end is the pure element, which cannot be scanned."
+route_to = "phase_diagram"
+route_note = """
+The axis upper end has to stay below the pure element: at exactly 1.0 the \
+scanned element is the whole alloy and nothing is left to balance against. \
+Scan up to 0.95 instead, or use calculate_phase_diagram, which is not \
+bound by this and traces the boundaries across the full range."""
+because = """
+Measured: this rejection and the dependent-element one fire together on any
+system whose axis is pushed to the pure end, and in a BINARY they arrive
+alongside "needs at least three elements" -- which is why the gap hid. The
+three-element route covered the binary case, so the binary looked answered,
+while a TERNARY with axis_max = 1.0 got two complaints and no route at all.
+
+Keyed on `match` rather than the message, because this rule's message opens
+with a placeholder and the derived marker would be empty."""
+
+
+[[route]]
+id       = "axis-leaves-no-dependent"
+applies  = "isothermal_section"
+match    = "leaves nothing for the dependent element"
+message  = "The axis range leaves the dependent element nothing to absorb."
+route_to = "phase_diagram"
+route_note = """
+Lower the axis upper end so the dependent element still has room -- the \
+other elements are held fixed and one of them absorbs the balance, so the \
+axis cannot claim all of it. If the whole range is genuinely needed, \
+calculate_phase_diagram is not subject to this constraint."""
+because = """
+The rejection says what is wrong and not what to do about it. Measured on
+1.26: three correct complaints arrived together and none of them named an
+action, so the caller had to invent one -- and inventing one means breaking
+the stop rule. A rejection that is answerable elsewhere has to say so.
+
+Two cases are not the same thing, and only the second gets a route:
+
+  request is impossible      (element absent, range reversed)  -> stop, ask
+  wrong tool, another fits   (composition axis on a binary)    -> ROUTE
+
+In the second the question does not change, it only goes to the right
+door."""
+
+
 ## ---------------------------------------------------------------------
 ## PRECONDITION -- costs one calculation to check
 ##

@@ -1116,13 +1116,15 @@ B_COK_FAZ = [
     {
         "id": "B12_iron4cd_yedi_element",
         "zorluk": "zor",
-        "olcum": "MOTOR SINIRI. Yedi element birden: OCASI hata 4204 ile "
-                 "yakinsamiyor, native motor da cozemiyor. Vaka bilerek "
-                 "birakildi -- olculen sey artik dogru sayi degil, DOGRU "
-                 "BASARISIZLIK: sistem cokmeden, uydurma bir sayi "
-                 "uretmeden, iki kademeyi de denedigini soyleyerek "
-                 "duruyor mu? Bu projede ayni durum bir zamanlar segfault "
-                 "veriyordu.",
+        "olcum": "ARTIK COZULUYOR. Bu vaka bir motor siniri olarak "
+                 "yazilmisti: yedi element birden, OCASI 4204 ile "
+                 "yakinsamiyor, native motor da cozemiyor. Sinir bizdeydi. "
+                 "Uyari veren bir TDB'de motor RETURN bekliyor ve makronun "
+                 "kosul satiri o istemi cevaplamis oluyordu; iron4cd tam "
+                 "oyle bir veritabani. Duzeltildikten sonra native kademe "
+                 "cozuyor: FCC_A1 + M23C6, kesirler 1'e topluyor, Katman A "
+                 "ve karsilik denetimi geciyor -- %16 Cr, %8 Ni, %0.1 C "
+                 "icin ders kitabi sonucu. Olculen sey artik dogru sayi.",
         "soru": "iron4cd.TDB'de Fe=0.70 Cr=0.16 Ni=0.08 Mo=0.02 Mn=0.02 "
                 "Si=0.01 C=0.01 icin 1100 K'de hesapla",
         "tool": "calculate_equilibrium",
@@ -1134,7 +1136,9 @@ B_COK_FAZ = [
             "temperature_K": 1100,
         },
         "expected": {
-            "engine_limit": True,
+            "phases": ["FCC_A1", "M23C6_D84"],
+            "elements_present": True,
+            "mass_balance": True,
         },
     },
 ]

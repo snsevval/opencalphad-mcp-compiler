@@ -78,10 +78,6 @@ _DEFAULT_MODELS = [
     "nvidia/nemotron-3.5-lightning-30b-a3b",
 ]
 
-# Gercek bagimsizlik icin kullanilabilecek, olculmus calisan model(ler).
-# Zincirde degil, cunku gecikmesi ongorulemiyor; belgede degil, burada,
-# cunku bir dahaki sefere aranacak yer burasi.
-INDEPENDENT_MODELS = ["openai/gpt-oss-120b"]
 _pinned = os.environ.get("OC_VALIDATOR_MODEL", "")
 def _chain_from_settings():
     """The reviewer chain, from settings/execution.toml.
@@ -95,7 +91,7 @@ def _chain_from_settings():
     try:
         import settings_engine
         chain = [r["model"] for r in
-                 settings_engine.EXECUTION.get("reviewer", [])]
+                 settings_engine.POLICY.execution.reviewers]
         return chain or _DEFAULT_MODELS
     except Exception:                                    # noqa: BLE001
         return _DEFAULT_MODELS
@@ -114,11 +110,17 @@ def _max_tokens():
     except Exception:                                    # noqa: BLE001
         return 4000
 
-WEAK_INDEPENDENCE_MODELS = {
-    "nvidia/nemotron-3-super-120b-a12b",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-    "nvidia/nemotron-3.5-lightning-30b-a3b",
-}
+def _weak_independence():
+    """Models too close to the one driving the server to be independent.
+
+    From settings/execution.toml. It used to be a set here as well as an
+    `independence` field there -- the same fact in two places, and adding a
+    reviewer to the file would not have taught this side about it.
+    """
+    try:
+        return settings_engine.POLICY.execution.weak_independence
+    except Exception:                                    # noqa: BLE001
+        return frozenset()
 
 # 529 is the free tier's shared-capacity signal -- it hit three separate
 # loop runs in one session on requests that succeeded seconds later
@@ -333,7 +335,7 @@ def independence_note(model_used):
     """Text to append when the verdict came from the same-family fallback
     instead of a genuinely independent reviewer. Layer B exists to be
     independent, so a weaker version of it has to be visible."""
-    if model_used in WEAK_INDEPENDENCE_MODELS:
+    if model_used in _weak_independence():
         return (
             f" [NOT: bu değerlendirme {model_used} ile yapıldı -- bu model, "
             "sunucuyu süren Nemotron ile aynı aileden, yani bağımsızlığı "

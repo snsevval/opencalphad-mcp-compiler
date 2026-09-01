@@ -20,6 +20,17 @@ import native_fallback  # noqa: E402
 
 DEFAULT_DB_DIR = "/mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros"
 
+# One atmosphere, from settings/input.toml [accept.defaults].
+# It was declared there and hardcoded here at the same time; the file
+# is the one that says why. Imported lazily because settings_engine
+# reaches back into this module for the database directory.
+def _default_pressure():
+    import settings_engine
+    return settings_engine.POLICY.input.defaults.get("pressure_Pa", 1e5)
+
+
+_DEFAULT_PRESSURE = None   # filled on first use, see below
+
 _ELEMENT_RE = re.compile(r"^\s*ELEMENT\s+(\S+)", re.IGNORECASE | re.MULTILINE)
 _PHASE_RE = re.compile(r"^\s*PHASE\s+(\S+)", re.IGNORECASE | re.MULTILINE)
 _NON_ELEMENT_NAMES = {"/-", "VA", "ELECTRON_GAS"}
@@ -93,7 +104,7 @@ def calculate_equilibrium(
     database,
     elements_composition,
     temperature_K,
-    pressure_Pa=1e5,
+    pressure_Pa=None,
     suspended_phases=None,
     dormant_phases=None,
     fixed_phases=None,
@@ -169,6 +180,9 @@ def calculate_equilibrium(
     # read from settings/execution.toml rather than written here. What
     # each tier DOES stays below, because that part is work, not rule.
     import settings_engine
+
+    if pressure_Pa is None:
+        pressure_Pa = _default_pressure()
 
     hatalar = {}
 

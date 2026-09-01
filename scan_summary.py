@@ -236,7 +236,38 @@ def _melting(rows):
     return melting
 
 
-def summarize(points, axis_key="temperature_K"):
+def _add_weight_percent(summary, convert):
+    """State every axis landmark in weight per cent as well as mole.
+
+    Added alongside, never instead: the mole value stays exactly as the
+    engine produced it, which is what our own checks run against. A
+    landmark that cannot be converted simply carries no second figure.
+    """
+    def wp(v):
+        return None if v is None else convert(v)
+
+    for bolge in summary.get("phase_regions") or []:
+        bolge["from_weight_percent"] = wp(bolge.get("from"))
+        bolge["to_weight_percent"] = wp(bolge.get("to"))
+    for gecis in summary.get("phase_transitions") or []:
+        cift = gecis.get("boundary_between")
+        if cift:
+            gecis["boundary_between_weight_percent"] = [wp(cift[0]), wp(cift[1])]
+    for bolge in summary.get("dominant_phase_regions") or []:
+        bolge["from_weight_percent"] = wp(bolge.get("from"))
+        bolge["to_weight_percent"] = wp(bolge.get("to"))
+        cift = bolge.get("from_boundary_between")
+        if cift:
+            bolge["from_boundary_between_weight_percent"] = [wp(cift[0]),
+                                                             wp(cift[1])]
+    for az in summary.get("under_sampled") or []:
+        az["at_weight_percent"] = wp(az.get("at"))
+    aralik = summary.get("range")
+    if aralik:
+        summary["range_weight_percent"] = [wp(aralik[0]), wp(aralik[1])]
+
+
+def summarize(points, axis_key="temperature_K", to_weight_percent=None):
     """Turn a list of scan points into the answers a caller would
     otherwise have to derive by comparing rows.
 
@@ -288,4 +319,13 @@ def summarize(points, axis_key="temperature_K"):
     melting = _melting(rows)
     if melting:
         summary["melting"] = melting
+
+    if to_weight_percent is not None:
+        summary["axis_basis"] = "mole_fraction"
+        _add_weight_percent(summary, to_weight_percent)
+        summary["note"] += (
+            " Axis positions are MOLE FRACTIONS of the scanned element; "
+            "each landmark also carries the weight per cent, which is not "
+            "the same number -- convert nothing by hand, read the field."
+        )
     return summary

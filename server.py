@@ -44,6 +44,12 @@ import preflight  # noqa: E402
 import result_check  # noqa: E402
 import scan_summary  # noqa: E402
 import settings_engine  # noqa: E402
+
+# One atmosphere, from settings/input.toml [accept.defaults].
+# It was declared there and hardcoded here at the same time; the
+# file is the one that says why.
+_DEFAULT_PRESSURE = settings_engine.POLICY.input.defaults.get(
+    "pressure_Pa", 1e5)
 import call_log  # noqa: E402
 import semantic_check  # noqa: E402
 import failure_classify  # noqa: E402
@@ -241,7 +247,26 @@ def _attach_coverage(result: dict, axis_key: str, requested_n,
     return result
 
 
-def _attach_scan_summary(result: dict, axis_key: str) -> dict:
+def _attach_mixed_basis_note(result: dict) -> dict:
+    """Say so when a series holds points from more than one engine.
+
+    STEP reports phase mass fractions; positions its line never reached are
+    filled by single-point equilibrium calls converted to the same basis.
+    The two once disagreed by 26 per cent, which is why each point carries
+    a `source` -- but a caller reading the series as one curve has no
+    reason to look at the field unless told.
+    """
+    if not isinstance(result, dict):
+        return result
+    if result.get("native_step_points") and result.get("gap_filled_points"):
+        metin = settings_engine.note("mixed-basis-in-combined-scan")
+        if metin:
+            result.setdefault("notes", []).append(metin)
+    return result
+
+
+def _attach_scan_summary(result: dict, axis_key: str,
+                         to_weight_percent=None) -> dict:
     """Hand over the across-row answers, not only the rows.
 
     A scan returns every number a caller needs, but the questions asked of
@@ -255,13 +280,38 @@ def _attach_scan_summary(result: dict, axis_key: str) -> dict:
     hand. Omitted entirely when there is too little to summarize, so an
     empty shell never reads as "nothing happens here".
     """
-    summary = scan_summary.summarize(result.get("points"), axis_key)
+    summary = scan_summary.summarize(result.get("points"), axis_key,
+                                     to_weight_percent=to_weight_percent)
     if summary:
         result["scan_summary"] = summary
     return result
 
 
-def _attach_verification(result: dict, request_args: Optional[dict] = None) -> dict:
+def _attach_axis_basis(result: dict) -> dict:
+    """Put a unit on every axis position, and the second basis beside it.
+
+    A composition axis arrives as a bare number called `x`. Measured on
+    1.29: the caller built a weight-per-cent column for 25 of them and
+    every entry was low, because the scanned element is heavier than the
+    alloy around it. The base composition report does not help here -- in
+    it, the scanned element is still zero.
+    """
+    composition = result.get("composition")
+    axis_element = result.get("axis_element")
+    if not composition or not axis_element:
+        return result
+    for nokta in result.get("points") or []:
+        if "x" not in nokta:
+            continue
+        agirlik = settings_engine.axis_weight_percent(
+            composition, axis_element, nokta["x"])
+        if agirlik is not None:
+            nokta["x_weight_percent"] = agirlik
+    return result
+
+
+def _attach_verification(result: dict, request_args: Optional[dict] = None,
+                         declared_basis: Optional[dict] = None) -> dict:
     """Run VERIFY A (and VERIFY B when enabled) and record the outcome.
 
     Deliberately non-destructive: a result that fails a check is still
@@ -276,6 +326,10 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None) -> d
     reported as unavailable, never as disapproval: NVIDIA's capacity must
     not turn into a false alarm about the user's chemistry.
     """
+    # What the caller declared, and what it became before the engine saw
+    # it. Only present when something was actually converted or rescaled.
+    _attach_declared_basis(result, declared_basis)
+
     # Say which basis the composition arrived in, and give both.
     # Steel is quoted by weight by convention and this engine conditions on
     # mole fractions; the payload used to say neither, and three separate
@@ -409,7 +463,7 @@ def _calc_one(
     database: str,
     elements_composition: dict,
     temperature_K: float,
-    pressure_Pa: float = 1e5,
+    pressure_Pa: float = _DEFAULT_PRESSURE,
     suspended_phases: Optional[list] = None,
     dormant_phases: Optional[list] = None,
     fixed_phases: Optional[dict] = None,
@@ -502,6 +556,46 @@ def inspect_database(database: str, directory: Optional[str] = None) -> dict:
     return oc_service.inspect_database(database, directory or oc_service.DEFAULT_DB_DIR)
 
 
+def _canonical_composition(composition, basis, label=""):
+    """Resolve a declared composition to the mole fractions the engine takes.
+
+    The INPUT side of the basis question. W(C)=0.01 and X(C)=0.01 are
+    different alloys -- 0.045 against 0.010 in mole fraction -- and until
+    this existed both were conditioned identically, because the basis
+    setting was read only after the engine had already run.
+
+    Returns (canonical, report, rejection). The rejection is a ready
+    payload: an unconvertible request is refused before any calculation,
+    the way every other impossible request is, rather than converted with a
+    guessed mass.
+    """
+    try:
+        kanonik, rapor = settings_engine.resolve_composition(
+            composition, basis)
+    except ValueError as exc:
+        mesaj = ("%s: %s" % (label, exc)) if label else str(exc)
+        return None, None, _preflight_failure([mesaj])
+    return kanonik, rapor, None
+
+
+def _attach_declared_basis(result, rapor):
+    """Record what arrived and what it became, and say so if it changed.
+
+    Only when something was actually done -- a mole-fraction request that
+    already summed to one carries nothing new, and an unchanged payload is
+    the point.
+    """
+    if not isinstance(result, dict) or not rapor:
+        return result
+    result["composition_declared"] = rapor
+    if rapor.get("rescaled"):
+        metin = settings_engine.note("composition-was-rescaled",
+                                     total=rapor.get("declared_sum"))
+        if metin:
+            result.setdefault("notes", []).append(metin)
+    return result
+
+
 @mcp.tool()
 @_with_stop_rule
 @call_log.logged
@@ -509,10 +603,11 @@ def calculate_equilibrium(
     database: str,
     elements_composition: dict[str, float],
     temperature_K: float,
-    pressure_Pa: float = 1e5,
+    pressure_Pa: float = _DEFAULT_PRESSURE,
     suspended_phases: Optional[list[str]] = None,
     dormant_phases: Optional[list[str]] = None,
     fixed_phases: Optional[dict[str, float]] = None,
+    composition_basis: Optional[str] = None,
 ) -> dict:
     """Calculate a single-point thermodynamic equilibrium with OpenCalphad.
 
@@ -590,6 +685,16 @@ def calculate_equilibrium(
     if problems:
         return _preflight_failure(problems)
 
+    # Basis resolution runs AFTER the request has been judged, not before.
+    # Normalising first would hand every rule an already-tidied composition
+    # -- composition-scale-plausible exists to catch {FE: 99, C: 1} as a
+    # possible mistake, and it cannot do that once the numbers have been
+    # divided by their sum.
+    elements_composition, _basis_report, _red = _canonical_composition(
+        elements_composition, composition_basis)
+    if _red is not None:
+        return _red
+
     result = _calc_one(
         database, elements_composition, temperature_K, pressure_Pa,
         suspended_phases, dormant_phases, fixed_phases,
@@ -608,7 +713,7 @@ def calculate_equilibrium(
         "suspended_phases": suspended_phases,
         "dormant_phases": dormant_phases,
         "fixed_phases": fixed_phases,
-    })
+    }, declared_basis=_basis_report)
 
 
 def _same_elements(composition_a: dict, composition_b: dict) -> bool:
@@ -631,10 +736,11 @@ def compare_alloys(
     composition_a: dict[str, float],
     composition_b: dict[str, float],
     temperature_K: float,
-    pressure_Pa: float = 1e5,
+    pressure_Pa: float = _DEFAULT_PRESSURE,
     suspended_phases: Optional[list[str]] = None,
     label_a: str = "A",
     label_b: str = "B",
+    composition_basis: Optional[str] = None,
 ) -> dict:
     """Calculate equilibrium for two compositions at the same T/P and compare them.
 
@@ -691,6 +797,9 @@ def compare_alloys(
     look alike to them. If "passed" is false, say what "problems" lists
     rather than presenting the numbers as if nothing had been found.
     """
+    # Both sides are read in the same declared basis: comparing an alloy
+    # given by weight against one given by mole would compare two things
+    # nobody asked about together.
     problems = (
         preflight.check_equilibrium_request(
             database, composition_a, temperature_K, pressure_Pa, suspended_phases
@@ -701,6 +810,16 @@ def compare_alloys(
     )
     if problems:
         return _preflight_failure(problems)
+
+    # After the rejection rules, not before -- see calculate_equilibrium.
+    composition_a, _basis_a, _red = _canonical_composition(
+        composition_a, composition_basis, label_a)
+    if _red is not None:
+        return _red
+    composition_b, _basis_b, _red = _canonical_composition(
+        composition_b, composition_basis, label_b)
+    if _red is not None:
+        return _red
 
     # Both sides get the same verification treatment. That means two Layer B
     # round trips when it's enabled, which roughly doubles this tool's
@@ -718,11 +837,11 @@ def compare_alloys(
 
     result_a = _attach_verification(
         _calc_one(database, composition_a, temperature_K, pressure_Pa, suspended_phases),
-        _args_for(composition_a),
+        _args_for(composition_a), declared_basis=_basis_a,
     )
     result_b = _attach_verification(
         _calc_one(database, composition_b, temperature_K, pressure_Pa, suspended_phases),
-        _args_for(composition_b),
+        _args_for(composition_b), declared_basis=_basis_b,
     )
 
     if "error" in result_a or "error" in result_b:
@@ -767,24 +886,10 @@ def compare_alloys(
         # single-phase ferrite; neither is more stable than the other. It
         # took the framing the field name offered, and there was none
         # anywhere else to take.
-        if _same_elements(composition_a, composition_b):
-            comparison["gibbs_energy_difference_note"] = (
-                "Both sides have the same elements, so this difference is a "
-                "like-for-like comparison: the lower Gibbs energy is the "
-                "more stable state."
-            )
-        else:
-            comparison["gibbs_energy_difference_note"] = (
-                "These compositions do not contain the same elements, so "
-                "this difference does NOT say which alloy is more stable -- "
-                "each Gibbs energy is measured against a different set of "
-                "reference states and the difference mostly reflects that. "
-                "Stability compares states of one composition. To compare "
-                "two alloys, use what does transfer: which phases each "
-                "forms, how much of each, how close other phases are to "
-                "appearing (driving_force_RT), or over what temperature "
-                "range each stays single-phase."
-            )
+        kimlik = ("gibbs-difference-is-a-ranking"
+                  if _same_elements(composition_a, composition_b)
+                  else "gibbs-difference-is-not-a-ranking")
+        comparison["gibbs_energy_difference_note"] = settings_engine.note(kimlik)
 
     return {
         label_a: result_a,
@@ -802,8 +907,9 @@ def calculate_property_diagram(
     temperature_min_K: float,
     temperature_max_K: float,
     n_points: int = 15,
-    pressure_Pa: float = 1e5,
+    pressure_Pa: float = _DEFAULT_PRESSURE,
     suspended_phases: Optional[list[str]] = None,
+    composition_basis: Optional[str] = None,
 ):
     """Sweep temperature and calculate a phase diagram over that range.
 
@@ -870,6 +976,12 @@ def calculate_property_diagram(
     if problems:
         return _preflight_failure(problems)
 
+    # After the rejection rules, not before.
+    elements_composition, _basis_report, _red = _canonical_composition(
+        elements_composition, composition_basis)
+    if _red is not None:
+        return _red
+
     _diagram_args = {
         "database": database,
         "elements_composition": elements_composition,
@@ -926,11 +1038,13 @@ def calculate_property_diagram(
                 ),
                 "chart_error": None,
             }
+            _attach_mixed_basis_note(data)
             _attach_scan_summary(data, "temperature_K")
             _attach_coverage(data, "temperature_K", n_points,
                              temperature_min_K, temperature_max_K)
             return [
-                _attach_verification(data, _diagram_args),
+                _attach_verification(data, _diagram_args,
+                                     declared_basis=_basis_report),
                 Image(data=chart_bytes, format="png"),
             ]
         except Exception as exc:
@@ -1026,10 +1140,12 @@ def calculate_property_diagram(
         "native_backend_error": native_backend_error,
         "chart_error": chart_error,
     }
+    _attach_mixed_basis_note(data)
     _attach_scan_summary(data, "temperature_K")
     _attach_coverage(data, "temperature_K", n_points,
                      temperature_min_K, temperature_max_K)
-    _attach_verification(data, _diagram_args)
+    _attach_verification(data, _diagram_args,
+                         declared_basis=_basis_report)
     if chart_bytes:
         return [data, Image(data=chart_bytes, format="png")]
     return data
@@ -1046,7 +1162,8 @@ def calculate_isothermal_section(
     axis_max: float,
     temperature_K: float,
     n_points: int = 15,
-    pressure_Pa: float = 1e5,
+    pressure_Pa: float = _DEFAULT_PRESSURE,
+    composition_basis: Optional[str] = None,
 ):
     """Hold temperature fixed and scan one element's content instead.
 
@@ -1115,6 +1232,12 @@ def calculate_isothermal_section(
     if problems:
         return _preflight_failure(problems)
 
+    # After the rejection rules, not before.
+    elements_composition, _basis_report, _red = _canonical_composition(
+        elements_composition, composition_basis)
+    if _red is not None:
+        return _red
+
     _section_args = {
         "database": database,
         "elements_composition": elements_composition,
@@ -1159,7 +1282,11 @@ def calculate_isothermal_section(
         }
         data.update(source_counts)
         data.update(extra)
-        _attach_scan_summary(data, "x")
+        _attach_axis_basis(data)
+        _attach_mixed_basis_note(data)
+        _attach_scan_summary(data, "x", to_weight_percent=lambda v:
+                             settings_engine.axis_weight_percent(
+                                 elements_composition, symbol, v))
         return _attach_coverage(data, "x", n_points, axis_min, axis_max)
 
     try:
@@ -1196,7 +1323,8 @@ def calculate_isothermal_section(
             },
         )
         return [
-            _attach_verification(data, _section_args),
+            _attach_verification(data, _section_args,
+                                 declared_basis=_basis_report),
             Image(data=chart_bytes, format="png"),
         ]
     except Exception as exc:
@@ -1278,7 +1406,8 @@ def calculate_isothermal_section(
             "chart_error": chart_error,
         },
     )
-    _attach_verification(data, _section_args)
+    _attach_verification(data, _section_args,
+                         declared_basis=_basis_report)
     if chart_bytes:
         return [data, Image(data=chart_bytes, format="png")]
     return data
@@ -1292,8 +1421,9 @@ def calculate_scheil_solidification(
     elements_composition: dict[str, float],
     seed_temperature_K: float,
     temperature_min_K: Optional[float] = None,
-    pressure_Pa: float = 1e5,
+    pressure_Pa: float = _DEFAULT_PRESSURE,
     temperature_step_K: Optional[float] = None,
+    composition_basis: Optional[str] = None,
 ):
     """Simulate non-equilibrium solidification (Scheil-Gulliver).
 
@@ -1362,6 +1492,12 @@ def calculate_scheil_solidification(
     )
     if problems:
         return _preflight_failure(problems)
+
+    # After the rejection rules, not before.
+    elements_composition, _basis_report, _red = _canonical_composition(
+        elements_composition, composition_basis)
+    if _red is not None:
+        return _red
 
     db_path = (
         database if os.path.isabs(database)
@@ -1446,7 +1582,8 @@ def calculate_scheil_solidification(
             "rather than completed by other means."
         ),
     }
-    return _attach_verification(data, _scheil_args)
+    return _attach_verification(data, _scheil_args,
+                                declared_basis=_basis_report)
 
 
 @mcp.tool()
@@ -1463,7 +1600,8 @@ def calculate_phase_diagram(
     seed_temperature_K: Optional[float] = None,
     axis_step: Optional[float] = None,
     temperature_step_K: Optional[float] = None,
-    pressure_Pa: float = 1e5,
+    pressure_Pa: float = _DEFAULT_PRESSURE,
+    composition_basis: Optional[str] = None,
 ):
     """Trace the phase boundaries themselves across composition and temperature.
 
@@ -1523,6 +1661,12 @@ def calculate_phase_diagram(
     )
     if problems:
         return _preflight_failure(problems)
+
+    # After the rejection rules, not before.
+    elements_composition, _basis_report, _red = _canonical_composition(
+        elements_composition, composition_basis)
+    if _red is not None:
+        return _red
 
     # Steps, not point counts. 40 across and 70 up match the distribution's
     # own map1.OCM, which is the only calibration available for what this
@@ -1621,7 +1765,7 @@ def calculate_phase_diagram(
         "elements_composition": elements_composition,
         "temperature_K": seed_temperature_K,
         "pressure_Pa": pressure_Pa,
-    })
+    }, declared_basis=_basis_report)
     if chart_bytes:
         return [data, Image(data=chart_bytes, format="png")]
     return data
