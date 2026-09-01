@@ -359,9 +359,10 @@ class OutputPlan:
     """output.toml, resolved: the wording and the derivations, keyed the
     way the runtime asks for them."""
 
-    def __init__(self, derive, notes, conversion, floor):
+    def __init__(self, derive, notes, conversion, floor, verify):
         self.derive = derive
         self.notes = notes                    # {id: text}
+        self.verify = verify                  # [rule] -- Layer A, in order
         self.conversion = conversion          # {name: block}
         self.floor = floor
 
@@ -558,12 +559,38 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
             uyarilar.append("not %r: metni bos" % kimlik)
         notlar[kimlik] = n
 
+    # Layer A's checks. The predicates live in result_check, which imports
+    # nothing, so reaching into it here is safe and the resolution happens
+    # while there is still someone to tell about a name that does not
+    # exist. A check declared and unresolvable would otherwise be a check
+    # that silently never runs -- the failure this compiler was built for.
+    dogrulamalar = list(cikti.get("verify", []))
+    if dogrulamalar:
+        try:
+            import result_check
+            kayit = result_check.VERIFY_PREDICATES
+        except Exception as exc:                         # noqa: BLE001
+            hatalar.append("verify: result_check okunamadi (%s)" % exc)
+            kayit = {}
+        for rule in dogrulamalar:
+            kimlik = rule.get("id", "<isimsiz>")
+            if not rule.get("check"):
+                hatalar.append("verify %r: check adi yok" % kimlik)
+            elif kayit and rule["check"] not in kayit:
+                hatalar.append(
+                    "verify %r: check=%r diye bir kontrol yok -- kural "
+                    "sessizce kosmayacakti" % (kimlik, rule["check"]))
+            if rule.get("stage") not in ("result", "correspondence"):
+                hatalar.append("verify %r: stage=%r gecersiz"
+                               % (kimlik, rule.get("stage")))
+
     output_plan = OutputPlan(
         derive=dict(cikti.get("derive", {})),
         notes=notlar,
         conversion={k: v for k, v in cikti.get("conversion", {}).items()
                     if isinstance(v, dict)},
         floor=dict(cikti.get("floor", {})),
+        verify=dogrulamalar,
     )
 
     if hatalar:

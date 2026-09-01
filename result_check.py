@@ -18,7 +18,7 @@ belongs in verification/, not here.
 SUM_TOLERANCE = 1e-3
 
 
-def check_phase_fraction_sums(result):
+def check_phase_fraction_sums(result, tolerance=None):
     """Wherever phase_molar_amounts appears -- a single-point result, or
     per-point inside a property diagram -- the fractions should sum to ~1
     and each stay within [0, 1]. Returns a list of problem descriptions
@@ -29,13 +29,14 @@ def check_phase_fraction_sums(result):
     surfaced as that point's error, and re-flagging its (absent) fractions
     would just be noise.
     """
+    tolerance = SUM_TOLERANCE if tolerance is None else tolerance
     problems = []
 
     def _check_one(amounts, where):
         if not amounts:
             return
         total = sum(amounts.values())
-        if abs(total - 1.0) > SUM_TOLERANCE:
+        if abs(total - 1.0) > tolerance:
             problems.append(f"{where}: phase fractions sum to {total:.6f}, not 1.0")
         for name, value in amounts.items():
             if value != value:  # NaN
@@ -151,6 +152,55 @@ def check_requested_positions(result, minimum_covered=0.9):
     ]
 
 
+# ── THE CHECKS THIS LAYER RUNS ───────────────────────────────────────
+# Which ones, at which stage, with which threshold: settings/output.toml,
+# under [[verify]]. The arithmetic is here; the declaration is there, the
+# same division input.toml has with settings_engine's predicates.
+#
+# The registry gives every check one shape -- (result, request_args, rule)
+# -- so the two entry points below can be loops instead of hand-written
+# sequences. A sequence is what this was, and a check dropping out of one
+# is invisible: preflight.py carried nine rules nobody called for months.
+# A name in the file that resolves to nothing now stops the server.
+
+
+def _rule_value(rule, key, default=None):
+    return rule.get(key, default) if rule else default
+
+
+VERIFY_PREDICATES = {
+    "phase_fraction_sums": lambda result, req, rule: check_phase_fraction_sums(
+        result, tolerance=_rule_value(rule, "tolerance")),
+    "failed_points": lambda result, req, rule: check_failed_points(
+        result, max_failed_fraction=_rule_value(rule, "max_failed_fraction", 0.10)),
+    "requested_elements": lambda result, req, rule: check_requested_elements(
+        result, req),
+    "mass_balance": lambda result, req, rule: check_mass_balance(
+        result, req, tolerance=_rule_value(rule, "tolerance")),
+    "suspended_phases_absent": lambda result, req, rule:
+        check_suspended_phases_absent(result, req),
+    "requested_positions": lambda result, req, rule: check_requested_positions(
+        result, minimum_covered=_rule_value(rule, "minimum_covered", 0.9)),
+    "reported_conditions": lambda result, req, rule: check_reported_conditions(
+        result, req),
+    "degrees_of_freedom": lambda result, req, rule: check_degrees_of_freedom(
+        result),
+}
+
+
+def _declared(stage):
+    """The checks declared for one stage, already bound to their predicates.
+
+    settings_engine imported lazily: it reaches into this module at compile
+    time to resolve the names, and this module must stay importable on its
+    own for that to work.
+    """
+    import settings_engine
+    return [(rule, VERIFY_PREDICATES[rule["check"]])
+            for rule in settings_engine.POLICY.output.verify
+            if rule.get("stage") == stage]
+
+
 def verify_result(result):
     """Run every structural check. Returns (passed, problems)."""
     if not isinstance(result, dict):
@@ -158,8 +208,9 @@ def verify_result(result):
     if "error" in result:
         return False, [f"Result carries an error: {result['error']}"]
 
-    problems = check_phase_fraction_sums(result)
-    problems += check_failed_points(result)
+    problems = []
+    for rule, predicate in _declared("result"):
+        problems += predicate(result, None, rule)
     return (not problems), problems
 
 
@@ -236,7 +287,9 @@ def check_requested_elements(result, request_args):
     return problems
 
 
-def check_mass_balance(result, request_args):
+def check_mass_balance(result, request_args, tolerance=None):
+    """[tolerance] comes from settings/output.toml; the module constant is
+    the fallback for a direct call."""
     """Each element's amount, summed over the phases, must match the request.
 
     Stronger than presence: an element can appear and still be there in the
@@ -255,6 +308,7 @@ def check_mass_balance(result, request_args):
         return []
 
     problems = []
+    tol = MASS_BALANCE_TOLERANCE if tolerance is None else tolerance
     for element, requested in composition.items():
         symbol = element.upper()
         placed = sum(
@@ -262,7 +316,7 @@ def check_mass_balance(result, request_args):
             for phase, amount in amounts.items()
         )
         wanted = requested / scale
-        if abs(placed - wanted) > MASS_BALANCE_TOLERANCE:
+        if abs(placed - wanted) > tol:
             problems.append(
                 f"Mass balance for {symbol}: phases hold {placed:.6g}, "
                 f"request was {wanted:.6g}."
@@ -399,24 +453,20 @@ def verify_correspondence(result, request_args):
     checked = []
     unavailable = []
 
-    for name, found in (
-        ("elements", check_requested_elements(result, request_args)),
-        ("mass_balance", check_mass_balance(result, request_args)),
-        ("suspended_phases", check_suspended_phases_absent(result, request_args)),
-        ("requested_positions", check_requested_positions(result)),
-    ):
-        checked.append(name)
-        problems += found
-
-    for name, (found, available) in (
-        ("conditions", check_reported_conditions(result, request_args)),
-        ("degrees_of_freedom", check_degrees_of_freedom(result)),
-    ):
-        if available:
-            checked.append(name)
-            problems += found
+    for rule, predicate in _declared("correspondence"):
+        ad = rule.get("name", rule["id"])
+        if rule.get("reports_availability"):
+            # Availability differs by engine tier and is reported rather
+            # than papered over: a check that could not run is recorded as
+            # unavailable, never as passed.
+            found, available = predicate(result, request_args, rule)
+            if not available:
+                unavailable.append(ad)
+                continue
         else:
-            unavailable.append(name)
+            found = predicate(result, request_args, rule)
+        checked.append(ad)
+        problems += found
 
     report = {"passed": not problems, "problems": problems, "checked": checked}
     if unavailable:

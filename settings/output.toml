@@ -425,3 +425,143 @@ because = """
 Rounding destroys information. Permitted for display because the unrounded
 value stays in the result and is what our own checks run against. See
 [floor.raw_values]."""
+
+## ---------------------------------------------------------------------
+## VERIFY -- what is checked once the engine has answered
+##
+## Layer A. These do not decide what to compute or how to say it: they
+## decide whether the result may be CLAIMED CORRECT. That is a fourth kind
+## of risk, and it lives here because it is the only side that looks at
+## what came out.
+##
+## The predicates stay in result_check.py, exactly as input.toml's checks
+## stay in settings_engine -- the arithmetic is code. What moved is the
+## declaration: which checks run, at which stage, with which threshold,
+## and why each one exists.
+##
+## No enable flags. A check listed here MUST run; the compiler binds every
+## name at startup and refuses to start on one it cannot resolve. That is
+## the point of writing them down: eight checks were called from a
+## hand-written sequence, and if one had dropped out of that sequence
+## nothing would have noticed -- which is precisely what happened in
+## preflight.py, where nine rules sat uncalled for months.
+##
+## `stage` picks the entry point:
+##   result          is this a well-formed thermodynamic result
+##   correspondence  is it a result for the question that was asked
+## ---------------------------------------------------------------------
+
+[[verify]]
+id    = "phase-fraction-sums"
+name  = "phase_fractions"
+stage = "result"
+check = "phase_fraction_sums"
+tolerance = 1e-3
+because = """
+Fractions that do not sum to one are not a result at all. Applied wherever
+phase_molar_amounts appears -- a single point, or every point of a scan --
+and to NaN and out-of-range values with it. Points carrying their own
+error are skipped rather than reported twice.
+
+1e-3 because STEP and the single-point path disagree in the fourth decimal
+on a converged answer, and a tighter bound would flag arithmetic that is
+correct."""
+
+[[verify]]
+id    = "failed-points"
+name  = "failed_points"
+stage = "result"
+check = "failed_points"
+max_failed_fraction = 0.10
+because = """
+Of the points that came back, how many carry an error. A scan with a
+scattering of unsolved points is still usable; one where a tenth of them
+failed is a different object and should say so.
+
+Not the same question as scan coverage, which asks how many positions never
+came back at all -- both were once called `coverage`, and on iron4cd this
+one passed with two points neither in error while the other warned at two
+of twenty requested."""
+
+[[verify]]
+id    = "requested-elements"
+name  = "elements"
+stage = "correspondence"
+check = "requested_elements"
+because = """
+Every element asked for is present, and no element that was not asked for
+appeared. Measured with PREFLIGHT disabled: a request for Fe-0.1Ni came
+back as pure iron, structurally flawless, because the native macro silently
+dropped the element it could not write. PREFLIGHT catches an element that
+is not in the database; only this catches one that IS in the database and
+never reached the calculation."""
+
+[[verify]]
+id    = "mass-balance"
+name  = "mass_balance"
+stage = "correspondence"
+check = "mass_balance"
+tolerance = 2e-4
+because = """
+Each element's amount in the result matches what was requested. A macro
+that writes the conditions in the wrong order, or drops one, produces a
+converged answer for a different alloy.
+
+2e-4 is the spread the engine's own reporting shows on a correct
+conditioning; below that the check fires on rounding."""
+
+[[verify]]
+id    = "suspended-phases-absent"
+name  = "suspended_phases"
+stage = "correspondence"
+check = "suspended_phases_absent"
+because = """
+A phase the caller suspended must genuinely be absent from the result.
+Suspension is honoured only on the OCASI path; if a request falls to a tier
+that cannot express it, the answer comes back as though nothing was
+suspended and looks entirely normal."""
+
+[[verify]]
+id    = "requested-positions"
+name  = "requested_positions"
+stage = "correspondence"
+check = "requested_positions"
+minimum_covered = 0.9
+because = """
+How much of the requested scan actually came back. Measured on iron4cd: a
+twenty-point nickel scan returned two points, and the payload said
+"verified" because both of them were sound. Two points are not a scan of
+the range that was asked for.
+
+0.9 rather than 1.0 because a line may legitimately stop short at a phase
+boundary; below nine tenths it is a different question being answered."""
+
+[[verify]]
+id    = "reported-conditions"
+name  = "conditions"
+stage = "correspondence"
+check = "reported_conditions"
+reports_availability = true
+because = """
+The engine prints the conditions it actually used; this reads them back and
+compares. Measured on iron4cd: a database that warns on load leaves the
+engine waiting for RETURN, the macro's condition line answers that prompt
+instead, and the calculation runs with no conditions at all -- degrees of
+freedom 6, G = 0.0. The request was flawless, so nothing upstream could
+have caught it.
+
+Reports availability because OCASI is called through function arguments and
+prints no such account. An absent check is recorded as unavailable, never
+as passed."""
+
+[[verify]]
+id    = "degrees-of-freedom"
+name  = "degrees_of_freedom"
+stage = "correspondence"
+check = "degrees_of_freedom"
+reports_availability = true
+because = """
+A fully conditioned equilibrium has zero degrees of freedom. Anything else
+means the engine solved a less constrained problem than the one described,
+and the number it returns is for that problem. Same origin as the check
+above, and the same availability caveat."""
