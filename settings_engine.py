@@ -361,10 +361,11 @@ class OutputPlan:
     """output.toml, resolved: the wording and the derivations, keyed the
     way the runtime asks for them."""
 
-    def __init__(self, derive, notes, conversion, floor, verify):
+    def __init__(self, derive, notes, conversion, floor, verify, honesty):
         self.derive = derive
         self.notes = notes                    # {id: text}
         self.verify = verify                  # [rule] -- Layer A, in order
+        self.honesty = honesty                # {id: rule} -- our own output
         self.conversion = conversion          # {name: block}
         self.floor = floor
 
@@ -595,6 +596,25 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
                 hatalar.append("verify %r: stage=%r gecersiz"
                                % (kimlik, rule.get("stage")))
 
+    # [honesty] declares invariants about OUR behaviour, each naming a
+    # predicate in result_check. Resolved here for the same reason the
+    # verify checks are: an invariant nothing can run is a promise, and a
+    # promise silently unkept is worse than one never made.
+    durustluk = {k: v for k, v in cikti.get("honesty", {}).items()
+                 if isinstance(v, dict) and v.get("check")}
+    if durustluk:
+        try:
+            import result_check
+            kayit_inv = result_check.OUTPUT_INVARIANTS
+        except Exception as exc:                         # noqa: BLE001
+            hatalar.append("honesty: result_check okunamadi (%s)" % exc)
+            kayit_inv = {}
+        for kimlik, kural in durustluk.items():
+            if kayit_inv and kural["check"] not in kayit_inv:
+                hatalar.append(
+                    "honesty %r: check=%r diye bir degismez yok -- beyan "
+                    "edilip hic kontrol edilmeyecekti" % (kimlik, kural["check"]))
+
     output_plan = OutputPlan(
         derive=dict(cikti.get("derive", {})),
         notes=notlar,
@@ -602,6 +622,7 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
                     if isinstance(v, dict)},
         floor=dict(cikti.get("floor", {})),
         verify=dogrulamalar,
+        honesty=durustluk,
     )
 
     if hatalar:

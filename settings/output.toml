@@ -184,22 +184,23 @@ choice of ours."""
 ## visible error.
 ## ---------------------------------------------------------------------
 
-[honesty]
-status = "todo"
-status_because = """
-All six rules below are obeyed in the code today -- boundaries are
-reported as brackets, single-point regions are flagged, a failing result
-is returned rather than hidden, an absent review is not disapproval, no
-point is invented, and the review advises rather than decides. None of
-them is read from here.
+## These are checked, not switched.
+##
+## Each one used to carry `enabled = true`, and that was the wrong shape:
+## making an invariant a flag makes it switchable off, and there is no
+## value of never_hide_flagged_results anyone should be able to set. So
+## each carries a `check` instead -- the name of a predicate resolved at
+## startup, run against the finished payload, and reported when violated.
+##
+## Different from [[verify]] above, which asks whether the CHEMISTRY is
+## sound. These ask whether WE behaved as described. A violation is a bug
+## in this server, not a problem with the user's alloy, and is reported
+## separately for that reason.
 
-Marked `todo` rather than `code` because they COULD be read. But note what
-that would buy: making them switches makes them switchable off, and these
-are invariants, not preferences. If they are wired it should be as
-assertions the code checks itself against, not as flags."""
+[honesty]
 
 [honesty.boundaries_as_brackets]
-enabled = true
+check = "boundaries_are_brackets"
 because = """
 A boundary lies between two sampled positions and is at neither of them.
 Reported as one number it reads as a measurement; reported as the pair it
@@ -207,7 +208,7 @@ is one. Every boundary carries `boundary_between` and the width of that
 interval."""
 
 [honesty.flag_single_point_regions]
-enabled = true
+check = "single_point_regions_flagged"
 because = """
 A phase field seen at one position only has an unknown extent. It exists,
 and its width is not known, and both halves of that have to survive into
@@ -215,14 +216,14 @@ the answer -- which is what `under_sampled` is for. The failure it guards
 against is real: a field seen once was reported as absent."""
 
 [honesty.never_hide_flagged_results]
-enabled = true
+check = "flagged_results_not_hidden"
 because = """
 A result that fails a check is still returned, flagged rather than
 replaced. The caller asked for a calculation and the engine produced one;
 hiding it would remove the evidence needed to judge what went wrong."""
 
 [honesty.review_is_advisory_not_a_verdict]
-enabled = true
+check = "review_does_not_decide"
 because = """
 The independent review reports; it does not decide. Its objection is
 recorded and framed as an objection, and it never flips a result to
@@ -243,18 +244,26 @@ from here. That is a lead, and a lead is worth having. It is not a
 verdict, and presenting it as one costs more than it returns."""
 
 [honesty.absent_review_is_not_disapproval]
-enabled = true
+check = "absent_review_not_disapproval"
 because = """
 An unreachable reviewer says nothing about the chemistry. Absence of an
 opinion is never reported as a negative one -- the provider's capacity must
 not turn into a false alarm about the user's alloy."""
 
 [honesty.no_invented_points]
-enabled = true
+check = "points_have_provenance"
 because = """
 A position the engine could not solve is left out, never interpolated. A
 gap in a scan is a fact about the calculation; filling it with a plausible
-value would hide exactly the thing worth knowing."""
+value would hide exactly the thing worth knowing.
+
+Checked through PROVENANCE, not through counting. A count tells you how
+many points came back, which is a different question and one
+requested-positions already asks. This asks whether every point can be
+traced to something that produced it: each carries a source, and the
+per-source tallies the scan reports must add up to the points it hands
+over. A fabricated point has no producer to name and breaks that
+arithmetic."""
 
 
 ## ---------------------------------------------------------------------

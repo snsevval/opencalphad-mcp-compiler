@@ -168,6 +168,145 @@ def _rule_value(rule, key, default=None):
     return rule.get(key, default) if rule else default
 
 
+# ── OUTPUT INVARIANTS ────────────────────────────────────────────────
+# Declared in settings/output.toml under [honesty], each as the name of
+# one of these. Not the same question as the checks above: those ask
+# whether the CHEMISTRY is sound, these ask whether WE behaved the way the
+# file says we do. A violation is a bug in this server, and is reported
+# apart from anything about the user's alloy.
+
+
+def inv_boundaries_are_brackets(result):
+    """A boundary lies between two sampled positions and is at neither."""
+    ozet = result.get("scan_summary") or {}
+    bozuk = []
+    for gecis in ozet.get("phase_transitions") or []:
+        cift = gecis.get("boundary_between")
+        if not (isinstance(cift, (list, tuple)) and len(cift) == 2):
+            bozuk.append(str(gecis.get("disappeared") or
+                             gecis.get("appeared") or "?"))
+    if bozuk:
+        return ["a transition was reported without the interval it lies in: "
+                + ", ".join(bozuk)]
+    return []
+
+
+def inv_single_point_regions_flagged(result):
+    """A field seen at one position has an unknown extent, and must say so."""
+    ozet = result.get("scan_summary") or {}
+    isaretli = {tuple(u.get("phases") or []) for u in
+                (ozet.get("under_sampled") or [])}
+    kacan = [b for b in (ozet.get("phase_regions") or [])
+             if b.get("n_points") == 1
+             and tuple(b.get("phases") or []) not in isaretli]
+    if kacan:
+        return ["a phase field seen at one position only was reported "
+                "without saying its extent is unknown: %d of them"
+                % len(kacan)]
+    return []
+
+
+def inv_flagged_results_not_hidden(result):
+    """A result that fails a check is still returned, flagged not replaced."""
+    dogrulama = result.get("verification") or {}
+    if dogrulama.get("passed") is not False:
+        return []
+    if result.get("points") or result.get("phase_molar_amounts"):
+        return []
+    return ["a result that failed its checks came back without its numbers; "
+            "the evidence for judging it was removed"]
+
+
+def inv_review_does_not_decide(result):
+    """The independent review reports; it never flips a result to failed."""
+    dogrulama = result.get("verification") or {}
+    inceleme = dogrulama.get("independent_review")
+    if not isinstance(inceleme, dict):
+        return []
+    if inceleme.get("advisory_only") is not True:
+        return ["the independent review was recorded without advisory_only, "
+                "which is what keeps an objection from reading as a verdict"]
+    return []
+
+
+def inv_absent_review_not_disapproval(result):
+    """An unreachable reviewer says nothing; absence is never a negative."""
+    dogrulama = result.get("verification") or {}
+    inceleme = dogrulama.get("independent_review")
+    if not isinstance(inceleme, dict):
+        return []
+    ulasilamadi = (inceleme.get("available") is False
+                   or inceleme.get("unavailable") is True)
+    if ulasilamadi and inceleme.get("objected"):
+        return ["a review that could not be reached was recorded as an "
+                "objection; an absent opinion is not a negative one"]
+    return []
+
+
+def inv_points_have_provenance(result):
+    """Every point can be traced to something that produced it.
+
+    Through provenance, not through counting -- a count answers a different
+    question, and requested-positions already asks it. Each point names a
+    source, and the per-source tallies the scan reports must add up to the
+    points handed over. A fabricated point has no producer to name and
+    breaks that arithmetic.
+    """
+    noktalar = result.get("points")
+    if not noktalar:
+        return []
+    problems = []
+    kaynaksiz = sum(1 for n in noktalar
+                    if not (isinstance(n, dict) and str(n.get("source") or "").strip()))
+    if kaynaksiz:
+        problems.append("%d of %d points name no producer"
+                        % (kaynaksiz, len(noktalar)))
+
+    sayilar = [result.get(k) for k in ("native_step_points", "gap_filled_points")]
+    if all(isinstance(x, int) for x in sayilar):
+        beyan = sum(sayilar)
+        if beyan != len(noktalar):
+            problems.append(
+                "the per-source tallies add up to %d but %d points were "
+                "handed over" % (beyan, len(noktalar)))
+    return problems
+
+
+OUTPUT_INVARIANTS = {
+    "boundaries_are_brackets": inv_boundaries_are_brackets,
+    "single_point_regions_flagged": inv_single_point_regions_flagged,
+    "flagged_results_not_hidden": inv_flagged_results_not_hidden,
+    "review_does_not_decide": inv_review_does_not_decide,
+    "absent_review_not_disapproval": inv_absent_review_not_disapproval,
+    "points_have_provenance": inv_points_have_provenance,
+}
+
+
+def check_output_invariants(result):
+    """Run every invariant [honesty] declares. Returns (passed, violations).
+
+    Reported separately from the chemistry checks: a violation here says the
+    server did not behave as its own settings describe, which is our problem
+    and not the caller's alloy.
+    """
+    if not isinstance(result, dict):
+        return True, []
+    try:
+        import settings_engine
+        beyan = settings_engine.POLICY.output.honesty
+    except Exception:                                    # noqa: BLE001
+        return True, []
+    ihlaller = []
+    for kimlik, kural in beyan.items():
+        ad = kural.get("check")
+        yuklem = OUTPUT_INVARIANTS.get(ad)
+        if yuklem is None:
+            continue
+        for ihlal in yuklem(result):
+            ihlaller.append("%s: %s" % (kimlik, ihlal))
+    return (not ihlaller), ihlaller
+
+
 def check_floor_fields(result, request_args=None, rule=None):
     """The fields that must be on every result, from output.toml [floor].
 

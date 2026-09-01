@@ -397,8 +397,7 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
         # One deadline for the whole stage, shared with the DEBUGGER's
         # retry below. Read from settings/execution.toml so the number
         # sits next to the measurement that produced it.
-        stage_deadline = time.time() + settings_engine.EXECUTION[
-            "reviewer_budget"]["stage_deadline_s"]
+        stage_deadline = time.time() + settings_engine.POLICY.execution            .reviewer_budget["stage_deadline_s"]
         review = semantic_check.review(request_args, result,
                                        deadline=stage_deadline)
         verification["layer_b"] = review
@@ -421,6 +420,23 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
             if failure.get("strategy") == failure_classify.STRATEGY_RETRY_REVIEWER:
                 _retry_review(result, verification, request_args,
                               problems, deadline=stage_deadline)
+
+    # Our own output invariants, from output.toml [honesty]. Run last,
+    # against the finished payload, because they ask whether the thing
+    # about to be handed over matches what the file says we do -- and the
+    # DEBUGGER above can still change it.
+    #
+    # Recorded apart from the chemistry. A violation here is a bug in this
+    # server, not a problem with the caller's alloy, and putting our fault
+    # in a field that reads as a comment on their metallurgy would be the
+    # same confusion Layer B was demoted for.
+    saglam, ihlaller = result_check.check_output_invariants(result)
+    verification["output_invariants"] = {
+        "passed": saglam,
+        "checked": len(settings_engine.POLICY.output.honesty),
+    }
+    if ihlaller:
+        verification["output_invariants"]["violations"] = ihlaller
 
     return result
 
