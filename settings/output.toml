@@ -344,31 +344,18 @@ that never arrived."""
 ## docstrings, and correcting it meant editing all six by hand.
 ## ---------------------------------------------------------------------
 
-[stop_rule]
-on_route_present = """
-The question IS answerable, just not by this tool. Call the tool named in \
-`alternative`, with the same question. This is routing, not substitution, \
-and the rule below does not apply to it."""
-
-on_no_route = """
-Do NOT call this or any other calculation tool again in this turn. Quote \
-the rejection reason, including any list of valid elements or phases it \
-names, and ask which corrected request the user wants. Naming options is \
-fine; running one is not."""
-
-on_precondition = """
-A precondition result DOES invite a retry: the request is shaped correctly \
-and its starting point is in the wrong place. It names the repair. Suggest \
-it and ask before re-running."""
-
-because = """
-The user asked a specific question. Computing a different one -- even a
-near-identical one, even while announcing the change -- hands them a result
-they did not ask for.
-
-But a request that is merely at the wrong door is not a different question,
-and the rule used to forbid both with one sentence. Measured (1.26): the
-caller found the right alternative and had to break the rule to use it."""
+## STOP RULE was here. It moved to input.toml, next to the reject, route
+## and precondition rules its three keys answer.
+##
+## Measured, and the file's own invariant is what showed it: this section
+## touches no number, so it looked at home here -- but it decides whether
+## ANOTHER CALCULATION RUNS. Change on_no_route to "try something else" and
+## the system computes a different thing. That is the input side's risk,
+## not this file's.
+##
+## The code had it right before the settings did: stop_rule_block() sits in
+## settings_engine above the "Output side" divider, among the functions
+## that decide what runs.
 
 
 ## ---------------------------------------------------------------------

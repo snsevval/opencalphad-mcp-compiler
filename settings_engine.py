@@ -327,7 +327,7 @@ class InputPolicy:
     already bound to the predicate that carries it out."""
 
     def __init__(self, operations, defaults, composition,
-                 common, per_operation, routes, preconditions):
+                 common, per_operation, routes, preconditions, stop_rule):
         self.operations = operations          # set of names
         self.defaults = defaults              # {pressure_Pa: ...}
         self.composition = composition        # basis + normalise_to_one
@@ -335,6 +335,7 @@ class InputPolicy:
         self.per_operation = per_operation    # {op: [(rule, predicate)]}
         self.routes = routes                  # {op: [(marker, note)]}
         self.preconditions = preconditions    # [rule]
+        self.stop_rule = stop_rule            # what a rejection permits
 
 
 class ExecutionPlan:
@@ -358,10 +359,9 @@ class OutputPlan:
     """output.toml, resolved: the wording and the derivations, keyed the
     way the runtime asks for them."""
 
-    def __init__(self, derive, notes, stop_rule, conversion, floor):
+    def __init__(self, derive, notes, conversion, floor):
         self.derive = derive
         self.notes = notes                    # {id: text}
-        self.stop_rule = stop_rule
         self.conversion = conversion          # {name: block}
         self.floor = floor
 
@@ -561,7 +561,6 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
     output_plan = OutputPlan(
         derive=dict(cikti.get("derive", {})),
         notes=notlar,
-        stop_rule=dict(cikti.get("stop_rule", {})),
         conversion={k: v for k, v in cikti.get("conversion", {}).items()
                     if isinstance(v, dict)},
         floor=dict(cikti.get("floor", {})),
@@ -574,7 +573,8 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
 
     return CompiledPolicy(
         InputPolicy(operations, defaults, composition, common,
-                    per_operation, routes, preconditions),
+                    per_operation, routes, preconditions,
+                    dict(giris.get("stop_rule", {}))),
         execution_plan, output_plan, uyarilar)
 
 
@@ -652,7 +652,7 @@ def stop_rule_block(indent="    "):
     typed out by hand in six docstrings, which is how a correction to it
     turned into six separate edits.
     """
-    rule = POLICY.output.stop_rule
+    rule = POLICY.input.stop_rule
     lines = ["PREFLIGHT REJECTION — STOP RULE",
              "If the result has stage=\"PREFLIGHT\", the request was refused",
              "before any calculation ran. Two cases, and they call for",
