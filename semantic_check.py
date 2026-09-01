@@ -120,6 +120,7 @@ def _weak_independence():
     reviewer to the file would not have taught this side about it.
     """
     try:
+        import settings_engine
         return settings_engine.POLICY.execution.weak_independence
     except Exception:                                    # noqa: BLE001
         return frozenset()
@@ -131,6 +132,7 @@ def _transient_http():
     """Replies that mean "ask again", from execution.toml [reviewer_retry].
     A busy provider is never an objection to the user's alloy."""
     try:
+        import settings_engine
         kodlar = settings_engine.POLICY.execution.retry_http
         return kodlar or {429, 500, 502, 503, 504, 529}
     except Exception:                                    # noqa: BLE001

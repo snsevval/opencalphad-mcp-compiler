@@ -367,6 +367,46 @@ a genuinely independent audit is wanted."""
 ## cascade says WHICH tier runs, and these say how long each gets.
 ## ---------------------------------------------------------------------
 
+## The benchmark runner asks a reviewer too, and it asks a DIFFERENT one
+## on purpose: the live path is chosen for latency, this one for
+## independence. Both chains belong here rather than one in a file and one
+## in code -- which is how they came to disagree about the token budget.
+
+[[validator_reviewer]]
+model = "deepseek-ai/deepseek-v4-flash"
+independence = "strong"
+because = "outside the Nemotron family; the only dependable independent reviewer on this key"
+
+[[validator_reviewer]]
+model = "nvidia/nemotron-3-super-120b-a12b"
+independence = "weak"
+because = """
+Last resort. It answers reliably but shares a family with the model driving
+the server, so a verdict from it is a weaker kind of independence.
+verify_layer_b records which model actually answered, so a report never
+passes the fallback off as the independent review."""
+
+## Layer C reads the rendered chart, so it needs models that accept an
+## image. Benchmarked 2026-08-03 against a real agcu.TDB chart, asking
+## three checkable questions (y-axis origin, number of series, visible
+## discontinuity):
+##
+##   nemotron-3-nano-omni    6.9s   all three correct
+##   minimax-m3             42.9s   all three correct, also read values off
+##                                  the curves accurately (~0.73 / ~0.24)
+##   inkling                 404    not enabled for this account
+##   cosmos3-nano-reasoner   404    not enabled for this account
+##   gemma-4-31b             timeout
+
+[[vision_reviewer]]
+model = "minimaxai/minimax-m3"
+independence = "strong"
+
+[[vision_reviewer]]
+model = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+independence = "weak"
+
+
 [timeouts]
 single_point_s   = 12
 scheil_s         = 180

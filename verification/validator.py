@@ -18,6 +18,7 @@ AUTHOR's expectations, not from a co-conspiring executor model.
 """
 import json
 import os
+import sys
 import re
 import time
 import urllib.error
@@ -27,6 +28,16 @@ import result_check
 
 NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+
+# The reviewer policy lives in ONE place: semantic_check, reading
+# execution.toml. This module used to carry a second copy of all of it --
+# its own chain, its own token budget, its own retry codes, its own verdict
+# parser, its own independence set -- and the copies drifted. The live path
+# was raised to 4000 tokens when 1500 was measured to cut verdicts off
+# mid-sentence; this side stayed at 1500 for weeks afterwards, so the test
+# runner was judging with the bug the server had already fixed.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import semantic_check  # noqa: E402
 # Deliberately a different model than whatever a human/AI client normally
 # drives this MCP server with (that's typically nemotron-3-ultra) -- see
 # the plan file, Faz 9: "dümdüz tek model hepsine bakmasın".
@@ -53,10 +64,25 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 # verify_layer_b records which model actually answered, so a report never
 # silently passes off the fallback as the independent review.
 # OC_VALIDATOR_MODEL (singular) still works and pins the chain to one model.
-_DEFAULT_VALIDATOR_MODELS = [
+def _chain(bolum, yedek):
+    """One reviewer chain, from settings/execution.toml.
+
+    Which models are asked, and in what order, is policy. It was a list
+    here and a list there, and the two drifted -- see the token budget.
+    """
+    try:
+        import settings_engine
+        zincir = [r["model"] for r in
+                  getattr(settings_engine.POLICY.execution, bolum, [])]
+        return zincir or yedek
+    except Exception:                                    # noqa: BLE001
+        return yedek
+
+
+_DEFAULT_VALIDATOR_MODELS = _chain("validator_reviewers", [
     "deepseek-ai/deepseek-v4-flash",
     "nvidia/nemotron-3-super-120b-a12b",
-]
+])
 
 # Layer C reviews the rendered chart, so it needs models that actually
 # accept an image. Benchmarked 2026-08-03 against a real agcu.TDB chart,
@@ -70,10 +96,10 @@ _DEFAULT_VALIDATOR_MODELS = [
 #   gemma-4-31b          timeout
 # Independent model first, same-family fallback second -- same principle
 # as Layer B.
-_DEFAULT_VISION_MODELS = [
+_DEFAULT_VISION_MODELS = _chain("vision_reviewers", [
     "minimaxai/minimax-m3",
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-]
+])
 _pinned_vision = os.environ.get("OC_VISION_MODEL", "")
 VISION_MODELS = [_pinned_vision] if _pinned_vision else _DEFAULT_VISION_MODELS
 
@@ -103,10 +129,10 @@ VISION_MODELS = [_pinned_vision] if _pinned_vision else _DEFAULT_VISION_MODELS
 # OC_ENABLE_VISION_CHECK=0 to skip it.
 VISION_CHECK_ENABLED = os.environ.get("OC_ENABLE_VISION_CHECK", "1") != "0"
 
-_WEAK_INDEPENDENCE_MODELS = {
-    "nvidia/nemotron-3-super-120b-a12b",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-}
+# Weak independence: execution.toml [independence], through the one
+# implementation.
+def _weak_independence():
+    return semantic_check._weak_independence()
 _pinned = os.environ.get("OC_VALIDATOR_MODEL", "")
 VALIDATOR_MODELS = [_pinned] if _pinned else _DEFAULT_VALIDATOR_MODELS
 VALIDATOR_MODEL = VALIDATOR_MODELS[0]  # kept for reporting/backwards use
@@ -184,39 +210,19 @@ def verify_layer_a(case, result):
 
 
 def _post_once(model, prompt, timeout_s, image_b64=None):
-    content = prompt if image_b64 is None else [
-        {"type": "text", "text": prompt},
-        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}},
-    ]
-    payload = json.dumps({
-        "model": model,
-        "messages": [{"role": "user", "content": content}],
-        "temperature": 0.0,
-        # Same reason as semantic_check.post_once: the verdict marker is
-        # asked for last, so the budget has to reach it.
-        "max_tokens": 1500,
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        f"{NVIDIA_BASE_URL}/chat/completions",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {NVIDIA_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-        body = json.loads(resp.read().decode("utf-8"))
-    return body["choices"][0]["message"]["content"]
+    """One request, through the live path's implementation.
+
+    Including its token budget, which is the whole point: this copy sat at
+    1500 while the server used 4000, and 1500 truncates a verdict before
+    the marker it is asked to end with.
+    """
+    return semantic_check.post_once(model, prompt, timeout_s, image_b64)
 
 
-# HTTP 529 "Service temporarily overloaded" is the shared-capacity signal
-# of the free tier, not a fault of any particular model or of the request
-# -- it hit three separate runs of the verification loop in one session,
-# on a request that succeeded seconds later unchanged. It says "not now,
-# try again", so the correct response is to wait and retry, and only then
-# move on to a different model.
-_TRANSIENT_HTTP_CODES = {429, 500, 502, 503, 504, 529}
+# Which replies mean "ask again": execution.toml [reviewer_retry], through
+# the one implementation.
+def _transient_http():
+    return semantic_check._transient_http()
 
 
 def _call_model_chain(models, prompt, timeout_s=60, image_b64=None):
@@ -243,7 +249,7 @@ def _call_model_chain(models, prompt, timeout_s=60, image_b64=None):
                 reply = _post_once(model, prompt, timeout_s, image_b64=image_b64)
             except urllib.error.HTTPError as exc:
                 attempts.append(f"{model}: HTTP {exc.code}")
-                if exc.code not in _TRANSIENT_HTTP_CODES:
+                if exc.code not in _transient_http():
                     break  # a real rejection (bad model name, auth) -- next model
                 continue
             except Exception as exc:
@@ -264,32 +270,21 @@ def _call_validator_model(prompt, timeout_s=60):
     return _call_model_chain(VALIDATOR_MODELS, prompt, timeout_s)
 
 
-_MARKER_RE = re.compile(r"SONUC\s*:\s*(BASARILI|BASARISIZ)", re.IGNORECASE)
-_POSITIVE_WORDS = ("başarılı", "basarili", "tutarlı", "makul", "doğru", "pass")
-_NEGATIVE_WORDS = ("başarısız", "basarisiz", "tutarsız", "mantıksız", "yanlış", "fail")
+# The verdict parser is one implementation, in semantic_check. A test
+# runner that read verdicts by its own rules would be grading the server
+# against a different reading of the same reply.
 
 
 def _parse_validator_reply(reply_text):
-    """Tolerant parsing: look for the exact 'SONUC: BASARILI/BASARISIZ'
-    marker first (what the model is explicitly instructed to produce);
-    if that's genuinely missing (models don't always follow format
-    instructions -- this is exactly the failure mode that motivated
-    designing this as a fallback chain rather than a single strict regex),
-    fall back to keyword scanning; if still ambiguous, return None rather
-    than guessing -- an inconclusive result must be visible, never
-    silently coerced to pass or fail."""
-    m = _MARKER_RE.search(reply_text)
-    if m:
-        return m.group(1).upper() == "BASARILI"
-    lower = reply_text.lower()
-    has_pos = any(w in lower for w in _POSITIVE_WORDS)
-    has_neg = any(w in lower for w in _NEGATIVE_WORDS)
-    if has_pos and not has_neg:
-        return True
-    if has_neg and not has_pos:
-        return False
-    return None
+    """Read a verdict, through the one implementation.
 
+    This used to be a second copy of semantic_check.parse_verdict, with its
+    own marker regex and its own keyword lists. A test runner that reads
+    verdicts by its own rules is grading the server against a different
+    reading of the same reply -- and would go on agreeing with itself while
+    the two drifted.
+    """
+    return semantic_check.parse_verdict(reply_text)
 
 def verify_layer_b(case, result):
     """Independent model review, for cases where Layer A alone can't
@@ -338,7 +333,7 @@ def verify_layer_b(case, result):
         f" [NOT: bu değerlendirme {model_used} ile yapıldı -- bu model, "
         "sunucuyu süren Nemotron ile aynı aileden, yani bağımsızlığı daha "
         "zayıf.]"
-        if model_used in _WEAK_INDEPENDENCE_MODELS else ""
+        if model_used in _weak_independence() else ""
     )
 
     verdict = _parse_validator_reply(reply)
@@ -358,7 +353,7 @@ def _independence_caveat(model_used):
         f" [NOT: bu değerlendirme {model_used} ile yapıldı -- bu model, "
         "sunucuyu süren Nemotron ile aynı aileden, yani bağımsızlığı daha "
         "zayıf.]"
-        if model_used in _WEAK_INDEPENDENCE_MODELS else ""
+        if model_used in _weak_independence() else ""
     )
 
 

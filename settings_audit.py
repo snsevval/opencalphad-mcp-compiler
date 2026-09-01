@@ -153,10 +153,67 @@ def yon_uc(metinler):
     return sonuc
 
 
+
+def yon_dort():
+    """Ayari okudugunu SANAN ama sessizce yedege dusen okuyucu var mi?
+
+    Bir okuyucu genellikle soyle yazilir:
+
+        try:
+            import settings_engine
+            return settings_engine.POLICY...
+        except Exception:
+            return default
+
+    Import basarisiz olursa -- ornegin modul seviyesinde yoksa -- fonksiyon
+    yedege duser ve HIC ses cikarmaz. Bugun iki tane vardi. Biri dogru
+    GORUNUYORDU, cunku yedegi dosyadaki degerin aynisiydi: ayari hic
+    okumadan dogru cevap veriyordu, ki bu en zor fark edilen tur.
+
+    Iddiayi test etmenin tek yolu dosyayi degistirip cevabin degisip
+    degismedigine bakmak. Degismiyorsa okumuyordur.
+    """
+    YOL = os.path.join(SETTINGS, "execution.toml")
+    asil = io.open(YOL, encoding="utf-8").read()
+    sorunlar = []
+
+    DENEMELER = [
+        ("semantic_check", "_max_tokens",
+         "max_tokens = 4000", "max_tokens = 1234", 1234),
+        ("semantic_check", "_transient_http",
+         "transient_http = [429, 500, 502, 503, 504, 529]",
+         "transient_http = [418]", {418}),
+    ]
+    try:
+        for modul, fonksiyon, eski, yeni, beklenen in DENEMELER:
+            if eski not in asil:
+                continue
+            io.open(YOL, "w", encoding="utf-8").write(asil.replace(eski, yeni))
+            for m in (modul, "settings_engine"):
+                sys.modules.pop(m, None)
+            try:
+                mod = __import__(modul)
+                deger = getattr(mod, fonksiyon)()
+            except Exception as exc:                     # noqa: BLE001
+                sorunlar.append("%s.%s cagrilamadi: %s"
+                                % (modul, fonksiyon, exc))
+                continue
+            if deger != beklenen:
+                sorunlar.append(
+                    "%s.%s() ayari OKUMUYOR: dosyada %r yazarken %r donduruyor "
+                    "-- sessizce yedege dusuyor"
+                    % (modul, fonksiyon, beklenen, deger))
+    finally:
+        io.open(YOL, "w", encoding="utf-8").write(asil)
+        for m in ("semantic_check", "settings_engine"):
+            sys.modules.pop(m, None)
+    return sorunlar
+
 def main():
     metinler = _kaynak()
     hepsi = "\n".join(metinler.values())
-    sorunlar = yon_bir(hepsi) + yon_iki(metinler) + yon_uc(metinler)
+    sorunlar = (yon_bir(hepsi) + yon_iki(metinler)
+                + yon_uc(metinler) + yon_dort())
     if sorunlar:
         print("AYAR DENETIMI: %d sorun" % len(sorunlar))
         for s in sorunlar:
