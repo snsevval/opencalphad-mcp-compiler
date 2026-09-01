@@ -133,6 +133,25 @@ def complete_below_per_cent():
     """Below this the melt counts as spent."""
     return float(_scheil_setting("complete_below_per_cent", 1.0))
 
+def _policy_number(bolum, anahtar, default):
+    """One number from settings/execution.toml, read once at import.
+
+    Timeouts and tolerances are policy: raising a timeout changes whether a
+    slow calculation comes back or is abandoned. The literal stays as the
+    fallback because a missing settings file must not leave a subprocess
+    waiting forever.
+    """
+    try:
+        import settings_engine
+        return settings_engine.execution_number(bolum, anahtar, default)
+    except Exception:                                    # noqa: BLE001
+        return default
+
+
+SCHEIL_TIMEOUT_S = _policy_number("timeouts", "scheil_s", 180)
+REAP_TIMEOUT_S = _policy_number("timeouts", "process_reap_s", 5)
+
+
 _LIQUID_LINE = re.compile(r"^\s*Liquid:\s+([\d.]+)%\s+([\d.]+):\s*(.*)$")
 _NODE_LINE = re.compile(r"Creating a node at\s+([\d.]+)\s+where\s+(\S+)\s+appears")
 _STORE_ERROR = re.compile(r"Error storing equilibria\s+(\d+)")
@@ -211,7 +230,7 @@ def generate_scheil_macro(db_path, elements_composition, seed_temperature_K,
 
 def run_native_scheil(db_path, elements_composition, seed_temperature_K,
                       temperature_min_K, temperature_step_K, pressure_Pa,
-                      timeout=180, max_bytes=4_000_000):
+                      timeout=SCHEIL_TIMEOUT_S, max_bytes=4_000_000):
     """Run one simulation and return (raw_text, independent_elements).
 
     Bounded in both time and bytes and then killed, for the reason
@@ -259,7 +278,7 @@ def run_native_scheil(db_path, elements_composition, seed_temperature_K,
         finally:
             proc.kill()
             try:
-                proc.wait(timeout=5)
+                proc.wait(timeout=REAP_TIMEOUT_S)
             except subprocess.TimeoutExpired:
                 pass
         return "".join(chunks), independents
@@ -350,7 +369,7 @@ def parse_scheil_output(raw_text, independent_elements):
 
 def run_with_step_ladder(db_path, elements_composition, seed_temperature_K,
                          temperature_min_K, pressure_Pa,
-                         temperature_step_K=None, timeout=180):
+                         temperature_step_K=None, timeout=SCHEIL_TIMEOUT_S):
     """Run the simulation, trying several temperature steps, and keep the best.
 
     "Best" needs no judgement: the run that leaves the least liquid

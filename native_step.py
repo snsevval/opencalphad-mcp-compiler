@@ -326,7 +326,7 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
             finally:
                 proc.kill()
                 try:
-                    proc.wait(timeout=5)
+                    proc.wait(timeout=REAP_TIMEOUT_S)
                 except subprocess.TimeoutExpired:
                     pass
 
@@ -462,7 +462,29 @@ def parse_step_csv(csv_text):
     return points
 
 
-def _dedupe_sorted(points, tol=1e-6):
+def _policy_number(bolum, anahtar, default):
+    """One number from settings/execution.toml, read once at import.
+
+    Timeouts and tolerances are policy: raising a timeout changes whether a
+    slow calculation comes back or is abandoned. The literal stays as the
+    fallback because a missing settings file must not leave a subprocess
+    waiting forever.
+    """
+    try:
+        import settings_engine
+        return settings_engine.execution_number(bolum, anahtar, default)
+    except Exception:                                    # noqa: BLE001
+        return default
+
+
+GAP_FILL_TIMEOUT_S = _policy_number("timeouts", "gap_fill_s", 15)
+REAP_TIMEOUT_S = _policy_number("timeouts", "process_reap_s", 5)
+DUP_TOL = _policy_number("tolerances", "duplicate_axis_position", 1e-6)
+SUM_TOL = _policy_number("tolerances", "combined_sum", 1e-5)
+AGREE_TOL = _policy_number("tolerances", "fractions_agree", 1e-4)
+
+
+def _dedupe_sorted(points, tol=DUP_TOL):
     """Sort by T and merge points whose T is within tol of each other
     (STEP restarts from the seed point for the second direction, so the
     seed appears twice)."""
@@ -543,7 +565,7 @@ def _canonicalize_phase_name(name, known_full_names):
     return _strip_default_composition_set(name)
 
 
-def _validate_combined_points(combined, sum_tol=1e-5):
+def _validate_combined_points(combined, sum_tol=SUM_TOL):
     """Verify every point's phase fractions sum to 1 +/- sum_tol and stay
     within [0, 1] before any CSV/chart is produced from them. Raises
     NativeStepError (loudly, rather than silently plotting bad data) if a
@@ -563,7 +585,7 @@ def _validate_combined_points(combined, sum_tol=1e-5):
                 )
 
 
-def _fractions_agree(a, b, tol=1e-4):
+def _fractions_agree(a, b, tol=AGREE_TOL):
     """Do two readings of the same axis position describe the same
     equilibrium? Both sides must already be canonicalized -- otherwise
     "LIQUID" and "LIQUID#1" would read as a disagreement.
@@ -614,7 +636,8 @@ def composition_at(elements_composition, axis_element, x):
 
 def build_combined_series(db_path, elements_composition, temperature_min_K,
                            temperature_max_K, n_points, pressure_Pa,
-                           step_timeout=STEP_TIMEOUT_S, fallback_timeout=15,
+                           step_timeout=STEP_TIMEOUT_S,
+                           fallback_timeout=GAP_FILL_TIMEOUT_S,
                            axis_element=None, axis_min=None, axis_max=None):
     """Run native STEP, detect gaps where its line terminated early, and
     fill those gaps with native_fallback.run_and_parse single-point calls,

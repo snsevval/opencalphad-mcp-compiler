@@ -74,7 +74,36 @@ OC_BUILD_DIR = native_fallback.OC_BUILD_DIR
 # A boundary counts as invariant when its temperatures agree to this much.
 # Generous on purpose: the engine prints an invariant's points at one
 # computed temperature, so the spread is float noise, not physics.
-INVARIANT_TOLERANCE_K = 1e-3
+def _invariant_tolerance_K():
+    """From settings/execution.toml [tolerances]. MAP reports one invariant
+    reaction as several points with rounding between them; this is how
+    close they must be to count as one temperature."""
+    try:
+        import settings_engine
+        return settings_engine.execution_number(
+            "tolerances", "map_invariant_K", 1e-3)
+    except Exception:                                    # noqa: BLE001
+        return 1e-3
+
+def _policy_number(bolum, anahtar, default):
+    """One number from settings/execution.toml, read once at import.
+
+    Timeouts and tolerances are policy: raising a timeout changes whether a
+    slow calculation comes back or is abandoned. The literal stays as the
+    fallback because a missing settings file must not leave a subprocess
+    waiting forever.
+    """
+    try:
+        import settings_engine
+        return settings_engine.execution_number(bolum, anahtar, default)
+    except Exception:                                    # noqa: BLE001
+        return default
+
+
+MAP_TIMEOUT_S = _policy_number("timeouts", "map_s", 240)
+CHART_TIMEOUT_S = _policy_number("timeouts", "chart_render_s", 30)
+REAP_TIMEOUT_S = _policy_number("timeouts", "process_reap_s", 5)
+
 
 _KEYS = re.compile(r"^KEYS:\s*(.*)$")
 _LINE_BREAK = re.compile(r"^#\s*(?:shift|end) of line\s+\d+")
@@ -190,7 +219,7 @@ def run_native_map(db_path, elements_composition, axis_element,
                    axis_min, axis_max, axis_step,
                    temperature_min_K, temperature_max_K, temperature_step_K,
                    seed_temperature_K, pressure_Pa,
-                   timeout=240, max_bytes=4_000_000):
+                   timeout=MAP_TIMEOUT_S, max_bytes=4_000_000):
     """Run MAP and return the text of the gnuplot script it wrote.
 
     Raises NativeMapError if no script appeared, which is what a failed
@@ -239,7 +268,7 @@ def run_native_map(db_path, elements_composition, axis_element,
         finally:
             proc.kill()
             try:
-                proc.wait(timeout=5)
+                proc.wait(timeout=REAP_TIMEOUT_S)
             except subprocess.TimeoutExpired:
                 pass
 
@@ -299,7 +328,8 @@ def parse_map_plt(plt_text):
         if not current:
             return
         temperatures = [p["temperature_K"] for p in current]
-        invariant = (max(temperatures) - min(temperatures)) <= INVARIANT_TOLERANCE_K
+        invariant = ((max(temperatures) - min(temperatures))
+                     <= _invariant_tolerance_K())
         # Which phases this boundary is actually about. "Appears at least
         # once" is too generous: at the point where a boundary meets an
         # invariant the engine prints 0.0 for the absent phases instead of
@@ -376,7 +406,8 @@ def parse_map_plt(plt_text):
     }
 
 
-def render_gnuplot_png(diagram, title, output_png_path, timeout=30,
+def render_gnuplot_png(diagram, title, output_png_path,
+                       timeout=CHART_TIMEOUT_S,
                        axis_min=None, axis_max=None,
                        temperature_min_K=None, temperature_max_K=None):
     """Draw the phase diagram: composition across, temperature up.

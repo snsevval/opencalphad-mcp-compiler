@@ -73,10 +73,7 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 #
 # Zayif bagimsizlik gizlenmiyor -- independence_note her cevaba iliskiyor,
 # ve WEAK_INDEPENDENCE_MODELS bunu makine tarafindan da okunur kiliyor.
-_DEFAULT_MODELS = [
-    "nvidia/nemotron-3-super-120b-a12b",
-    "nvidia/nemotron-3.5-lightning-30b-a3b",
-]
+
 
 _pinned = os.environ.get("OC_VALIDATOR_MODEL", "")
 def _chain_from_settings():
@@ -92,9 +89,14 @@ def _chain_from_settings():
         import settings_engine
         chain = [r["model"] for r in
                  settings_engine.POLICY.execution.reviewers]
-        return chain or _DEFAULT_MODELS
-    except Exception:                                    # noqa: BLE001
-        return _DEFAULT_MODELS
+        if not chain:
+            # An empty chain is a settings error, not something to paper
+            # over with a second list kept here. execution.toml is the one
+            # source for which models are asked.
+            raise RuntimeError("execution.toml declares no reviewer")
+        return chain
+    except Exception as exc:                             # noqa: BLE001
+        raise RuntimeError("reviewer chain unavailable: %s" % exc) from exc
 
 
 MODELS = [_pinned] if _pinned else _chain_from_settings()
@@ -125,7 +127,14 @@ def _weak_independence():
 # 529 is the free tier's shared-capacity signal -- it hit three separate
 # loop runs in one session on requests that succeeded seconds later
 # unchanged. It means "not now", so wait and retry before moving on.
-_TRANSIENT_HTTP_CODES = {429, 500, 502, 503, 504, 529}
+def _transient_http():
+    """Replies that mean "ask again", from execution.toml [reviewer_retry].
+    A busy provider is never an objection to the user's alloy."""
+    try:
+        kodlar = settings_engine.POLICY.execution.retry_http
+        return kodlar or {429, 500, 502, 503, 504, 529}
+    except Exception:                                    # noqa: BLE001
+        return {429, 500, 502, 503, 504, 529}
 
 
 def post_once(model, prompt, timeout_s, image_b64=None):
@@ -214,7 +223,7 @@ def call_model_chain(models, prompt, timeout_s=60, image_b64=None,
                     model, prompt, budget, image_b64=image_b64)
             except urllib.error.HTTPError as exc:
                 attempts.append(f"{model}: HTTP {exc.code}")
-                if exc.code not in _TRANSIENT_HTTP_CODES:
+                if exc.code not in _transient_http():
                     break  # real rejection (bad model, auth) -- try next model
                 continue
             except Exception as exc:

@@ -344,7 +344,8 @@ class ExecutionPlan:
 
     def __init__(self, cascades, endpoint_recheck, gap_detection,
                  reviewers, reviewer_budget, binary_order,
-                 weak_independence, signals, scheil, engine_failures):
+                 weak_independence, signals, scheil, engine_failures,
+                 timeouts, tolerances, retry_http):
         self.cascades = cascades              # {op: (tiers, entry)}
         self.endpoint_recheck = endpoint_recheck
         self.gap_detection = gap_detection
@@ -355,6 +356,9 @@ class ExecutionPlan:
         self.signals = signals                # set of signal names
         self.scheil = scheil                  # step ladder + completion
         self.engine_failures = engine_failures  # names that may advance a tier
+        self.timeouts = timeouts              # how long each tier gets
+        self.tolerances = tolerances          # when two numbers are one
+        self.retry_http = retry_http          # provider replies worth retrying
 
 
 class OutputPlan:
@@ -558,6 +562,12 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
         signals=signals,
         scheil=dict(yurutme.get("scheil", {})),
         engine_failures=motor_hatalari,
+        timeouts={k: v for k, v in yurutme.get("timeouts", {}).items()
+                  if k != "because"},
+        tolerances={k: v for k, v in yurutme.get("tolerances", {}).items()
+                    if k != "because"},
+        retry_http=set(yurutme.get("reviewer_retry", {}).get(
+            "transient_http", [])),
     )
 
     # ---- output -----------------------------------------------------
@@ -776,6 +786,18 @@ def binary_order():
     build is preferred is a measured decision and belongs in the file.
     """
     return list(POLICY.execution.binary_order)
+
+
+def execution_number(bolum, anahtar, default):
+    """One number from execution.toml, with the code's own value as the
+    fallback. Timeouts and tolerances are policy -- raising a timeout
+    changes whether a slow calculation returns or is abandoned -- but a
+    missing settings file should not leave a subprocess waiting forever.
+    """
+    try:
+        return getattr(POLICY.execution, bolum).get(anahtar, default)
+    except Exception:                                    # noqa: BLE001
+        return default
 
 
 def conversion_setting(name):

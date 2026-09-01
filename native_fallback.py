@@ -60,6 +60,25 @@ def _resolve_binary():
 
 OC_BINARY = _resolve_binary()
 
+def _policy_number(bolum, anahtar, default):
+    """One number from settings/execution.toml, read once at import.
+
+    Timeouts and tolerances are policy: raising a timeout changes whether a
+    slow calculation comes back or is abandoned. The literal stays as the
+    fallback because a missing settings file must not leave a subprocess
+    waiting forever.
+    """
+    try:
+        import settings_engine
+        return settings_engine.execution_number(bolum, anahtar, default)
+    except Exception:                                    # noqa: BLE001
+        return default
+
+
+SINGLE_POINT_TIMEOUT_S = _policy_number("timeouts", "single_point_s", 12)
+REAP_TIMEOUT_S = _policy_number("timeouts", "process_reap_s", 5)
+
+
 _FLOAT = r"[-+]?\d+(?:\.\d+)?(?:[Ee][-+]?\d+)?"
 
 
@@ -140,7 +159,7 @@ def run_native_equilibrium(
     elements_composition,
     temperature_K,
     pressure_Pa,
-    timeout=12,
+    timeout=SINGLE_POINT_TIMEOUT_S,
     max_bytes=500_000,
     suspended_phases=None,
     dormant_phases=None,
@@ -195,7 +214,7 @@ def run_native_equilibrium(
     finally:
         proc.kill()
         try:
-            proc.wait(timeout=5)
+            proc.wait(timeout=REAP_TIMEOUT_S)
         except subprocess.TimeoutExpired:
             pass
 
@@ -467,7 +486,8 @@ def parse_native_output(raw_text):
 
 
 def run_and_parse(db_path, elements_composition, temperature_K, pressure_Pa,
-                  timeout=12, suspended_phases=None, dormant_phases=None,
+                  timeout=SINGLE_POINT_TIMEOUT_S, suspended_phases=None,
+                  dormant_phases=None,
                   fixed_phases=None):
     raw_text = run_native_equilibrium(
         db_path, elements_composition, temperature_K, pressure_Pa,

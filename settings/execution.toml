@@ -308,6 +308,20 @@ independent -- so the weakness is stated on every verdict that uses one
 rather than left for the reader to notice."""
 
 
+## Which HTTP replies mean "ask again" rather than "this failed". A
+## retry policy is policy: it decides how much of the provider's bad day
+## the caller has to see.
+
+[reviewer_retry]
+transient_http = [429, 500, 502, 503, 504, 529]
+because = """
+529 is the free tier's shared-capacity signal -- it hit three separate loop
+runs in one session on requests that succeeded seconds later. 429 is rate
+limiting, and 500/502/503/504 are the ordinary gateway failures. None of
+them says anything about the review; they say the provider was busy, and a
+busy provider must never be reported as an objection to the user's alloy."""
+
+
 [reviewer_budget]
 max_tokens = 4000
 stage_deadline_s = 90
@@ -342,3 +356,64 @@ one outside the Nemotron family that does. Not in the chain: its latency on
 a real review prompt is unusable -- three probes timed out at 240 s, other
 rounds answered near 150 s. Selectable by hand via OC_VALIDATOR_MODEL when
 a genuinely independent audit is wanted."""
+
+## ---------------------------------------------------------------------
+## TIMEOUTS -- how long a tier is given before it counts as failed
+##
+## Every one of these was a default argument in a different module. They
+## are policy, not work: raising one changes whether a slow calculation
+## comes back or is abandoned, and that is a decision about patience
+## rather than about chemistry. Kept apart from [cascade] because the
+## cascade says WHICH tier runs, and these say how long each gets.
+## ---------------------------------------------------------------------
+
+[timeouts]
+single_point_s   = 12
+scheil_s         = 180
+map_s            = 240
+gap_fill_s       = 15
+chart_render_s   = 30
+process_reap_s   = 5
+because = """
+Measured against the work each does. A single point is eleven iterations on
+a good day and 12 s is generous; Scheil walks a temperature ladder and 180 s
+covers the 1 K rung; MAP traces boundaries across two axes and is the
+slowest thing here. chart_render is gnuplot, which either draws in a second
+or is stuck. process_reap is how long a killed subprocess is given to die
+before it is killed harder -- not a calculation budget at all, and listed
+here only so no one has to go looking for it in four modules.
+
+A timeout that fires is reported as `timed_out`, which [signals] lists and
+[cascade] may act on: the next tier gets its turn."""
+
+
+## ---------------------------------------------------------------------
+## NUMERICAL TOLERANCES -- when two numbers count as the same number
+##
+## Also policy: these decide when a difference is real. Too tight and the
+## system reports noise as a finding; too loose and a genuine disagreement
+## between two engines is averaged away.
+## ---------------------------------------------------------------------
+
+[tolerances]
+duplicate_axis_position = 1e-6
+combined_sum            = 1e-5
+fractions_agree         = 1e-4
+map_invariant_K         = 1e-3
+because = """
+duplicate_axis_position: two points at the same place, to floating-point
+noise, are one point. STEP and the gap-fill can both land on an endpoint.
+
+combined_sum: the merged series is checked to sum to one. Looser than the
+verify-side 1e-3 would be wrong here -- this runs on values that have just
+been converted between bases and a real error hides at 1e-4.
+
+fractions_agree: whether an endpoint recheck AGREES with the STEP line at
+the same temperature. This is the one that decides whether a point is
+replaced, so it is the loosest: below 1e-4 the two engines disagree in ways
+that are theirs, not the alloy's.
+
+map_invariant_K: MAP reports a set of points as one invariant reaction when
+their temperatures agree to within this. A eutectic is one temperature; the
+tracer reports it several times with rounding between them."""
+
