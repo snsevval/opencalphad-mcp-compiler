@@ -344,7 +344,7 @@ class ExecutionPlan:
 
     def __init__(self, cascades, endpoint_recheck, gap_detection,
                  reviewers, reviewer_budget, binary_order,
-                 weak_independence, signals, scheil):
+                 weak_independence, signals, scheil, engine_failures):
         self.cascades = cascades              # {op: (tiers, entry)}
         self.endpoint_recheck = endpoint_recheck
         self.gap_detection = gap_detection
@@ -354,6 +354,7 @@ class ExecutionPlan:
         self.weak_independence = weak_independence   # set of model names
         self.signals = signals                # set of signal names
         self.scheil = scheil                  # step ladder + completion
+        self.engine_failures = engine_failures  # names that may advance a tier
 
 
 class OutputPlan:
@@ -499,8 +500,15 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
     _consume_unread(giris["accept"], consumed, "input.accept", uyarilar)
 
     # ---- execution --------------------------------------------------
-    signals = set(k for k in yurutme.get("signals", {})
-                  if k not in _DOCUMENTATION_KEYS)
+    signal_blok = yurutme.get("signals", {})
+    signals = set(k for k in signal_blok
+                  if k not in _DOCUMENTATION_KEYS
+                  and k != "engine_failures")
+    motor_hatalari = tuple(signal_blok.get("engine_failures", []))
+    if not motor_hatalari:
+        hatalar.append(
+            "signals.engine_failures bos -- her motor arizasi kendi "
+            "kademesinde kalirdi, hicbir yedek devreye giremezdi")
 
     cascades = {}
     for entry in yurutme.get("cascade", []):
@@ -548,6 +556,7 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
         weak_independence=zayif,
         signals=signals,
         scheil=dict(yurutme.get("scheil", {})),
+        engine_failures=motor_hatalari,
     )
 
     # ---- output -----------------------------------------------------
@@ -830,21 +839,17 @@ def execution_setting(*path, default=None):
     return node
 
 
-# Failures that are the engine's, and may move a request to the next
-# tier. Anything else -- NameError, TypeError, AttributeError, KeyError --
-# is ours, and falling back on it hides a bug behind a slower answer.
-_ENGINE_FAILURES = (
-    "NativeStepError", "NativeScheilError", "NativeMapError",
-    "NativeEquilibriumError", "EquilibriumError",
-    "TimeoutExpired", "CalledProcessError",
-)
-
-
 def is_engine_failure(exc):
     """Does this exception name a signal the cascade is allowed to act on?
 
     settings/execution.toml declares `unnamed_failure = "surface"`: a
-    failure matching no named signal does NOT advance a tier.
+    failure matching no named signal does NOT advance a tier. Which names
+    count is [signals].engine_failures in the same file.
+
+    The isinstance block below stays in code on purpose. Those classes have
+    SUBCLASSES, and catching a subclass is something a list of names cannot
+    do -- our own bugs have to surface rather than fall through to a slower
+    path that returns something plausible.
 
     The reason is measured in kind rather than in one incident: today a
     bare `except Exception` catches an engine fault and a typo in our own
@@ -856,7 +861,8 @@ def is_engine_failure(exc):
                         IndexError, ImportError, SyntaxError,
                         ZeroDivisionError, UnboundLocalError)):
         return False
-    return type(exc).__name__ in _ENGINE_FAILURES or isinstance(exc, OSError)
+    return (type(exc).__name__ in POLICY.execution.engine_failures
+            or isinstance(exc, OSError))
 
 
 class CascadeExhausted(Exception):

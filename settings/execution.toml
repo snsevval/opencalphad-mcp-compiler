@@ -51,14 +51,41 @@ schema_version = 1
 ## slower path, and the result comes back looking like a success.
 ## ---------------------------------------------------------------------
 
+## Two halves, and only one of them was ever a type check.
+##
+## `engine_failures` is a list of exception CLASS NAMES, and the code
+## already compared against it by name -- type(exc).__name__ in the list.
+## Keeping that list in code bought nothing: it was a string comparison
+## either way. It is here now, where a reader can see which failures are
+## allowed to advance a tier.
+##
+## What stays in code is the block above it: NameError, TypeError and their
+## kin are caught with isinstance, which also catches their SUBCLASSES.
+## That is a real type check and a list of names cannot do it -- our own
+## bugs must surface, not fall through to a slower path that returns
+## something plausible.
+##
+## The descriptions below are a vocabulary for a reader. Nothing looks them
+## up, and that is fine: they name what the code already distinguishes.
+
 [signals]
-status = "code"
-status_because = """
-A vocabulary for a reader, not values to look up. The code decides by
-exception TYPE -- NativeStepError against NameError -- because a type is
-something Python can check and a name in a file is not. Writing the names
-down is worth doing; wiring them would mean matching strings against
-exceptions, which is weaker than what already happens."""
+engine_failures = [
+  "NativeStepError",
+  "NativeScheilError",
+  "NativeMapError",
+  "NativeEquilibriumError",
+  "EquilibriumError",
+  "TimeoutExpired",
+  "CalledProcessError",
+]
+because = """
+A failure of the engine's may move a request to the next tier. Anything
+else is ours, and falling back on it hides a bug behind a slower answer
+that looks like a success.
+
+OSError and its subclasses are added by the code rather than listed here,
+because that one IS a hierarchy: a dozen filesystem and process failures
+inherit from it and naming them individually would go stale."""
 did_not_converge     = "solver hit its iteration limit (engine error 4204)"
 engine_crashed       = "subprocess exited non-zero, or segfaulted"
 no_stable_phases     = "converged, but returned an empty phase list"
