@@ -217,6 +217,16 @@ def check_floor_fields(result, request_args=None, rule=None):
                              % (yol, kayip, len(noktalar)))
     else:
         eksik += [yol for yol in nokta_gerekli if not _var(result, yol)]
+        # Fields that exist only where there is one equilibrium. A scan
+        # reports the phase amounts along a series, not one set of
+        # potentials -- measured: 639 single-point results carry them and
+        # no scan does.
+        try:
+            tek_gerekli = settings_engine.POLICY.output.floor.get(
+                "always_present_single_point", [])
+        except Exception:                                # noqa: BLE001
+            tek_gerekli = []
+        eksik += [yol for yol in tek_gerekli if not _var(result, yol)]
 
     if not eksik:
         return []

@@ -41,17 +41,23 @@ schema_version = 1
 ## REPORT -- units and representation
 ## ---------------------------------------------------------------------
 
+## The three include_* flags that were here are gone, and not because they
+## were hard to implement.
+##
+## A flag is a question offered to whoever edits this file, and the
+## question these asked was "shall the result stop saying which engine
+## produced it / whether it passed its checks / what the chemical
+## potentials were?". There is no answer to that anyone wants. Turning one
+## off leaves every number intact and removes what tells a reader whether
+## to trust it -- which is the one kind of damage an output setting can
+## actually do.
+##
+## So they are requirements now, in [floor], where a thing that must be
+## present belongs. energy_unit was the only real preference among them and
+## moved to [conversion.units], where the rule permitting the conversion
+## already lives.
+
 [report]
-status = "todo"
-status_because = """
-None of these flags is implemented. Results always carry backend_used,
-verification and the chemical potentials; energy is always J/mol and
-nothing converts. Turning them into real switches is work that has not
-been done, not work that was decided against."""
-energy_unit          = "J/mol"
-include_backend_used = true
-include_verification = true
-include_potentials   = true
 
 # Nothing rounds today: values come back as full floats
 # (gibbs_energy_J = -62632.0305776248). Written down as designed rather
@@ -61,21 +67,23 @@ status = "planned"
 digits = 6
 
 [report.basis]
-status = "planned"
 mode = "as_computed"
 label_per_point = true
 because = """
-NOT YET WIRED. Today a scan point carries `source` (which engine produced
-it) but no `basis` field, and a single-point result carries neither. The
-basis is knowable from the source and is not stated.
-
 The mirror of input.toml's basis problem, and the one that actually bit us.
 Native STEP reports phase MASS fractions; the single-point path reports
-MOLAR amounts. A combined scan carries both. They once disagreed by 26 per
-cent and the difference was read as a physical effect until it was traced.
+MOLAR amounts, and both arrive in a field called phase_molar_amounts. They
+once disagreed by 26 per cent and the difference was read as a physical
+effect until it was traced.
 
-Converting is allowed -- see [conversion] below -- but the basis of every
-point is stated, never assumed."""
+`as_computed` means the basis is reported as the engine produced it and
+never silently converted; `label_per_point` means every point says which it
+is. Both hold now: a single point comes back phase_molar_amount, a scan
+phase_mass_fraction, and [floor] requires the field so a result cannot go
+out without it.
+
+Converting is separately allowed -- see [conversion] below -- but the basis
+is stated, never assumed."""
 
 
 ## ---------------------------------------------------------------------
@@ -96,6 +104,9 @@ always_present = [
 always_present_per_point = [
   "source",
 ]
+always_present_single_point = [
+  "chemical_potentials_J_per_mol",
+]
 because = """
 These decide how a number should be read: whether it passed its checks,
 which engine produced it, what it is a fraction of, and whether it came
@@ -106,6 +117,11 @@ result; it removes the reader's ability to judge one.
 harmless: the field carrying the numbers is called phase_molar_amounts on
 both paths, and on a scan the values are phase MASS fractions. The two once
 disagreed by 26 per cent and the difference was read as a physical effect.
+
+The chemical potentials are listed for single-point results only, because
+that is where they exist: measured across the call log, 639 results carry
+them and no scan does. A scan is a series of equilibria and reports the
+phase amounts along it, not one set of potentials.
 
 `source` is listed per point rather than at the top, and the check found
 that out: a scan has no single source. Its numbers come from STEP where the
@@ -389,9 +405,16 @@ it."""
 status    = "planned"
 allowed   = true
 condition = "reversible"
+energy    = "J/mol"
 because = """
 J/mol to kJ/mol loses nothing and can be undone exactly. Permitted, because
-the invariant is about content and this changes none."""
+the invariant is about content and this changes none.
+
+`energy` is the unit results are reported in, and it is the one genuine
+preference the old [report] block held: somebody may want kJ/mol, and
+giving it to them changes no content. Still `planned` -- nothing converts
+today, and the value states what is produced rather than claiming a switch
+that is not there."""
 
 ## Two conversions were written here as one, and only the second needs the
 ## phase compositions. Splitting them because the first is answerable today
