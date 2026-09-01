@@ -168,7 +168,64 @@ def _rule_value(rule, key, default=None):
     return rule.get(key, default) if rule else default
 
 
+def check_floor_fields(result, request_args=None, rule=None):
+    """The fields that must be on every result, from output.toml [floor].
+
+    Not a chemistry check: these do not say whether the numbers are right,
+    they say whether a reader can judge them. `basis` in particular -- the
+    same field name carries molar amounts on one path and mass fractions on
+    another, and a result that does not say which is a number nobody can
+    use safely.
+
+    Nested names are read with a dot, so verification.passed is checked
+    where it actually lives.
+    """
+    if not isinstance(result, dict) or "error" in result:
+        return []
+    try:
+        import settings_engine
+        gerekli = settings_engine.POLICY.output.floor.get("always_present", [])
+    except Exception:                                    # noqa: BLE001
+        return []
+
+    def _var(kap, yol):
+        dugum = kap
+        for parca in yol.split("."):
+            if not isinstance(dugum, dict) or parca not in dugum:
+                return False
+            dugum = dugum[parca]
+        return True
+
+    eksik = [yol for yol in gerekli if not _var(result, yol)]
+
+    # A scan has no single source: its numbers come from the STEP line
+    # where it reached and from gap-filled calls where it did not, and the
+    # field says which. So `source` is required per point, and on a
+    # single-point result at the top, where the one set of numbers lives.
+    try:
+        nokta_gerekli = settings_engine.POLICY.output.floor.get(
+            "always_present_per_point", [])
+    except Exception:                                    # noqa: BLE001
+        nokta_gerekli = []
+    noktalar = result.get("points")
+    if noktalar:
+        for yol in nokta_gerekli:
+            kayip = sum(1 for n in noktalar
+                        if isinstance(n, dict) and not _var(n, yol))
+            if kayip:
+                eksik.append("%s (on %d of %d points)"
+                             % (yol, kayip, len(noktalar)))
+    else:
+        eksik += [yol for yol in nokta_gerekli if not _var(result, yol)]
+
+    if not eksik:
+        return []
+    return ["result is missing the fields that say how to read it: %s"
+            % ", ".join(eksik)]
+
+
 VERIFY_PREDICATES = {
+    "floor_fields": check_floor_fields,
     "phase_fraction_sums": lambda result, req, rule: check_phase_fraction_sums(
         result, tolerance=_rule_value(rule, "tolerance")),
     "failed_points": lambda result, req, rule: check_failed_points(

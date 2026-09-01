@@ -310,6 +310,33 @@ def _attach_axis_basis(result: dict) -> dict:
     return result
 
 
+def _attach_basis(result, basis, source=None):
+    """State what the numbers in this result are a fraction OF.
+
+    The field carrying them is called phase_molar_amounts everywhere, and
+    on a scan that name is not what the values mean: STEP reports BPW(),
+    which is phase MASS fraction, and gap-filled points are converted to
+    match before merging. A single-point equilibrium really does return
+    molar amounts. Same field name, two different quantities, and until now
+    nothing said which one was in hand.
+
+    Measured: the two once disagreed by 26 per cent and the difference was
+    read as a physical effect until it was traced.
+
+    Renaming the field would break every caller. Stating the basis costs
+    nothing and answers the question the name raises.
+    """
+    if not isinstance(result, dict):
+        return result
+    result["basis"] = basis
+    if source is not None and "source" not in result:
+        result["source"] = source
+    for nokta in result.get("points") or []:
+        if isinstance(nokta, dict):
+            nokta.setdefault("basis", basis)
+    return result
+
+
 def _attach_verification(result: dict, request_args: Optional[dict] = None,
                          declared_basis: Optional[dict] = None) -> dict:
     """Run VERIFY A (and VERIFY B when enabled) and record the outcome.
@@ -705,6 +732,10 @@ def calculate_equilibrium(
     notes = _phase_notes(result, elements_composition)
     if notes:
         result["phase_notes"] = notes
+    # A single-point equilibrium returns molar amounts of each phase, and
+    # the engine that produced it is its provenance.
+    _attach_basis(result, "phase_molar_amount",
+                  source=result.get("backend_used"))
     return _attach_verification(result, {
         "database": database,
         "elements_composition": elements_composition,
@@ -1038,6 +1069,7 @@ def calculate_property_diagram(
                 ),
                 "chart_error": None,
             }
+            _attach_basis(data, "phase_mass_fraction")
             _attach_mixed_basis_note(data)
             _attach_scan_summary(data, "temperature_K")
             _attach_coverage(data, "temperature_K", n_points,
@@ -1140,6 +1172,7 @@ def calculate_property_diagram(
         "native_backend_error": native_backend_error,
         "chart_error": chart_error,
     }
+    _attach_basis(data, "phase_mass_fraction")
     _attach_mixed_basis_note(data)
     _attach_scan_summary(data, "temperature_K")
     _attach_coverage(data, "temperature_K", n_points,
@@ -1283,6 +1316,7 @@ def calculate_isothermal_section(
         data.update(source_counts)
         data.update(extra)
         _attach_axis_basis(data)
+        _attach_basis(data, "phase_mass_fraction")
         _attach_mixed_basis_note(data)
         _attach_scan_summary(data, "x", to_weight_percent=lambda v:
                              settings_engine.axis_weight_percent(

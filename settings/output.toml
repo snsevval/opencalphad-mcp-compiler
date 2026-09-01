@@ -88,23 +88,33 @@ point is stated, never assumed."""
 ## ---------------------------------------------------------------------
 
 [floor]
-status = "planned"
-status_because = """
-Two of the four fields it names do not exist yet: `basis` is on no result
-and `source` only on scan points. Cannot be enforced before the fields it
-protects are written -- see [report.basis]."""
-always_present         = ["verification.passed", "backend_used"]
-always_present_planned = ["basis", "source"]
+always_present = [
+  "verification.passed",
+  "backend_used",
+  "basis",
+]
+always_present_per_point = [
+  "source",
+]
 because = """
 These decide how a number should be read: whether it passed its checks,
 which engine produced it, what it is a fraction of, and whether it came
 from the line or from a gap-filled point. Removing them does not change a
 result; it removes the reader's ability to judge one.
 
-The first two hold today. `source` is present on scan points and absent
-from single-point results; `basis` is absent everywhere. Both are listed
-separately rather than claimed, because this file is read as a statement
-of what the system does."""
+`basis` was absent everywhere until it was written, and its absence was not
+harmless: the field carrying the numbers is called phase_molar_amounts on
+both paths, and on a scan the values are phase MASS fractions. The two once
+disagreed by 26 per cent and the difference was read as a physical effect.
+
+`source` is listed per point rather than at the top, and the check found
+that out: a scan has no single source. Its numbers come from STEP where the
+line reached and from gap-filled single-point calls where it did not, and
+the field says which -- exactly the distinction this list was written for.
+A single-point result has one set of numbers and carries it at the top.
+
+Enforced, not merely listed. A result missing one of these is reported as
+missing it rather than handed over looking complete."""
 
 [floor.raw_values]
 status   = "planned"
@@ -466,6 +476,16 @@ error are skipped rather than reported twice.
 1e-3 because STEP and the single-point path disagree in the fourth decimal
 on a converged answer, and a tighter bound would flag arithmetic that is
 correct."""
+
+[[verify]]
+id    = "floor-fields"
+name  = "floor_fields"
+stage = "result"
+check = "floor_fields"
+because = """
+The fields [floor] requires are actually on the result. A floor that is
+declared and never checked is a promise, not a floor -- and this one names
+`basis`, which was absent from every result until it was written."""
 
 [[verify]]
 id    = "failed-points"
