@@ -107,13 +107,31 @@ import native_fallback
 OC_BINARY = native_fallback.OC_BINARY
 OC_BUILD_DIR = native_fallback.OC_BUILD_DIR
 
-# Measured, not guessed -- see the table in the module docstring. Ordered
-# best-first so the common case stops after one run.
-STEP_LADDER_K = (5.0, 2.0, 1.0)
+# The step ladder and the completion threshold are in
+# settings/execution.toml under [scheil], with the measurements that chose
+# them. Read through functions rather than bound at import: this module is
+# imported by settings_engine's own dependency chain, and a module-level
+# read would run before the policy exists.
 
-# Below this the melt is spent: what is left is the terminal eutectic, and
-# the simulation has told us what we came for.
-COMPLETE_BELOW_PER_CENT = 1.0
+
+def _scheil_setting(key, default):
+    try:
+        import settings_engine
+        deger = settings_engine.POLICY.execution.scheil.get(key)
+        return default if deger is None else deger
+    except Exception:                                    # noqa: BLE001
+        return default
+
+
+def step_ladder():
+    """Temperature steps to try, best first."""
+    return tuple(float(x) for x in _scheil_setting("step_ladder_K",
+                                                   (5.0, 2.0, 1.0)))
+
+
+def complete_below_per_cent():
+    """Below this the melt counts as spent."""
+    return float(_scheil_setting("complete_below_per_cent", 1.0))
 
 _LIQUID_LINE = re.compile(r"^\s*Liquid:\s+([\d.]+)%\s+([\d.]+):\s*(.*)$")
 _NODE_LINE = re.compile(r"Creating a node at\s+([\d.]+)\s+where\s+(\S+)\s+appears")
@@ -299,7 +317,7 @@ def parse_scheil_output(raw_text, independent_elements):
 
     completed = "liquid fraction less than 1%" in raw_text
     final = points[-1] if points else None
-    if final is not None and final["liquid_fraction"] * 100 < COMPLETE_BELOW_PER_CENT:
+    if final is not None and final["liquid_fraction"] * 100 < complete_below_per_cent():
         completed = True
 
     reason = None
@@ -348,7 +366,8 @@ def run_with_step_ladder(db_path, elements_composition, seed_temperature_K,
     used, and what every step tried achieved. That record is the evidence
     for the number returned, and it is cheap to carry.
     """
-    ladder = (float(temperature_step_K),) if temperature_step_K else STEP_LADDER_K
+    ladder = ((float(temperature_step_K),) if temperature_step_K
+              else step_ladder())
 
     attempts = []
     best = None

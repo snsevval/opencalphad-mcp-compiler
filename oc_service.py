@@ -18,7 +18,13 @@ from pyOC import PhaseStatus  # noqa: E402
 
 import native_fallback  # noqa: E402
 
-DEFAULT_DB_DIR = "/mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros"
+# Where the TDB files live. Environment, not rule: it changes from machine
+# to machine and there is nothing to explain about a path, so it belongs in
+# neither settings file. The default is where the OpenCalphad CAE install
+# puts them on Windows, reached through WSL; OC_DB_DIR overrides it, which
+# is what any other machine will need.
+DEFAULT_DB_DIR = os.environ.get(
+    "OC_DB_DIR", "/mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros")
 
 # One atmosphere, from settings/input.toml [accept.defaults].
 # It was declared there and hardcoded here at the same time; the file

@@ -344,7 +344,7 @@ class ExecutionPlan:
 
     def __init__(self, cascades, endpoint_recheck, gap_detection,
                  reviewers, reviewer_budget, binary_order,
-                 weak_independence, signals):
+                 weak_independence, signals, scheil):
         self.cascades = cascades              # {op: (tiers, entry)}
         self.endpoint_recheck = endpoint_recheck
         self.gap_detection = gap_detection
@@ -353,6 +353,7 @@ class ExecutionPlan:
         self.binary_order = binary_order      # [(name, path)]
         self.weak_independence = weak_independence   # set of model names
         self.signals = signals                # set of signal names
+        self.scheil = scheil                  # step ladder + completion
 
 
 class OutputPlan:
@@ -546,6 +547,7 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
         binary_order=binary_order,
         weak_independence=zayif,
         signals=signals,
+        scheil=dict(yurutme.get("scheil", {})),
     )
 
     # ---- output -----------------------------------------------------

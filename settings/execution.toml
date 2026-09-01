@@ -248,6 +248,26 @@ independence = "weak"
 ## OC_VALIDATOR_MODEL, which are not in the chain and would otherwise be
 ## judged by a set kept separately in the code.
 
+## Scheil runs a temperature step down from the seed, and a step that is
+## too coarse walks past a transition while one too fine takes minutes. The
+## ladder tries the cheap one first and falls back -- the same shape as
+## [[cascade]] above, and it was in native_scheil.py as a tuple.
+
+[scheil]
+step_ladder_K = [5.0, 2.0, 1.0]
+complete_below_per_cent = 1.0
+because = """
+Measured, not guessed: 5 K resolves most alloys and finishes in one run;
+2 K recovers the ones whose last liquid disappears between two 5 K points;
+1 K is for the few that need it and costs the time to say so. Ordered
+best-first so the common case stops after one attempt.
+
+complete_below_per_cent is where the melt counts as spent -- what remains
+below it is the terminal eutectic, which is what the simulation was run to
+find. A caller who passes an explicit temperature_step_K overrides the
+ladder entirely; the file describes the automatic path."""
+
+
 [independence]
 weak_models = [
   "nvidia/nemotron-3-super-120b-a12b",
