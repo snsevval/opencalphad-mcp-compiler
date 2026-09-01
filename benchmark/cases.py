@@ -78,6 +78,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "olmayan_bir_dosya.TDB",
             "elements_composition": {"FE": 0.9, "C": 0.1},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -97,6 +98,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.9, "NI": 0.1},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -116,6 +118,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 1.0},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -134,6 +137,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": -500,
         },
         "expected": {
@@ -152,6 +156,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 0,
         },
         "expected": {
@@ -170,6 +175,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "pressure_Pa": -100000,
         },
@@ -189,6 +195,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "pressure_Pa": 0,
         },
@@ -209,6 +216,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 1.01, "C": -0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -227,6 +235,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 1500,
             "temperature_max_K": 800,
         },
@@ -249,6 +258,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "suspended_phases": ["GRAPHITE"],
         },
@@ -268,6 +278,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.0, "C": 0.0},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -286,6 +297,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": -200,
             "temperature_max_K": 1400,
         },
@@ -312,6 +324,7 @@ DOGRU_RED = [
             "database": "saf2507.TDB",
             "elements_composition": {"FE": 0.6, "CR": 0.25, "NI": 0.07,
                                      "MO": 0.04, "C": 0.04},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
         },
         "expected": {
@@ -331,6 +344,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "BEF.TDB",
             "elements_composition": {"FE": 0.7, "NI": 0.3},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1400,
         },
         "expected": {
@@ -351,6 +365,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "alni-4slx.TDB",
             "elements_composition": {"AL": 0.5, "NI": 0.5},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
             "suspended_phases": ["BCC_A2"],
         },
@@ -372,6 +387,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "AlFe-4SLBF.TDB",
             "elements_composition": {"AL": 0.2, "FE": 0.8},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "suspended_phases": ["FCC_A1"],
         },
@@ -393,6 +409,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
             "suspended_phases": ["AUSTENITE"],
         },
@@ -414,6 +431,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 99, "C": 1},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -432,6 +450,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.099, "C": 0.001},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -451,6 +470,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "MgNaCl.TDB",
             "elements_composition": {"K": 0.3, "CL": 0.7},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {
@@ -471,6 +491,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.9, "NI": 0.1},
+            "composition_basis": "mole_fraction",
             "temperature_K": -300,
         },
         "expected": {
@@ -497,6 +518,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 1.0, "C": 0.0},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -518,6 +540,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "suspended_phases": ["GRAPHITE#1"],
         },
@@ -539,6 +562,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 1000,
             "temperature_max_K": 1000,
         },
@@ -561,6 +585,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 2.475, "C": 0.025},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -589,6 +614,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "composition_basis": "mole_fraction",
             "seed_temperature_K": 900,
             "temperature_min_K": 1200,
         },
@@ -615,6 +641,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "composition_basis": "mole_fraction",
             "seed_temperature_K": 900,
         },
         "expected": {
@@ -645,6 +672,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "axis_element": "NI", "axis_min": 0.0, "axis_max": 0.30,
             "temperature_K": 1100,
         },
@@ -669,6 +697,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "axis_element": "C", "axis_min": 0.0, "axis_max": 0.05,
             "temperature_K": 1100,
         },
@@ -690,6 +719,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "axis_element": "CR", "axis_min": 0.30, "axis_max": 0.01,
             "temperature_K": 1100,
         },
@@ -716,6 +746,7 @@ DOGRU_RED = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.5, "CR": 0.3, "C": 0.2},
+            "composition_basis": "mole_fraction",
             "axis_element": "CR", "axis_min": 0.3, "axis_max": 0.85,
             "temperature_K": 1100,
         },
@@ -755,6 +786,7 @@ A_TEK_FAZ = [
         "arguments": {
             "database": "alni-4slx.TDB",
             "elements_composition": {"AL": 0.5, "NI": 0.5},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
         },
         "expected": {
@@ -773,6 +805,7 @@ A_TEK_FAZ = [
         "arguments": {
             "database": "alni-4slx.TDB",
             "elements_composition": {"AL": 0.5, "NI": 0.5},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1950,
         },
         "expected": {
@@ -793,6 +826,7 @@ A_TEK_FAZ = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
         },
         "expected": {
@@ -813,6 +847,7 @@ A_TEK_FAZ = [
         "arguments": {
             "database": "AlFe-4SLBF.TDB",
             "elements_composition": {"AL": 0.2, "FE": 0.8},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -832,6 +867,7 @@ A_TEK_FAZ = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
         },
         "expected": {
@@ -857,6 +893,7 @@ A_TEK_FAZ = [
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.949, "C": 0.01,
                                      "CR": 0.04, "V": 0.001},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {
@@ -889,6 +926,7 @@ B_COK_FAZ = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -911,6 +949,7 @@ B_COK_FAZ = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.95, "C": 0.05},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -930,6 +969,7 @@ B_COK_FAZ = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.98, "C": 0.02},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -953,6 +993,7 @@ B_COK_FAZ = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {
@@ -976,6 +1017,7 @@ B_COK_FAZ = [
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.919, "C": 0.04,
                                      "CR": 0.04, "V": 0.001},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {
@@ -999,6 +1041,7 @@ B_COK_FAZ = [
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.879, "C": 0.04, "CR": 0.06,
                                      "MO": 0.02, "V": 0.001},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {
@@ -1022,6 +1065,7 @@ B_COK_FAZ = [
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.879, "C": 0.04, "CR": 0.06,
                                      "MO": 0.02, "V": 0.001},
+            "composition_basis": "mole_fraction",
             "temperature_K": 900,
         },
         "expected": {
@@ -1043,6 +1087,7 @@ B_COK_FAZ = [
             "database": "saf2507.TDB",
             "elements_composition": {"FE": 0.62, "CR": 0.25, "NI": 0.07,
                                      "MO": 0.04, "MN": 0.01, "N": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
         },
         "expected": {
@@ -1061,6 +1106,7 @@ B_COK_FAZ = [
         "arguments": {
             "database": "iron4cd.TDB",
             "elements_composition": {"FE": 0.85, "NI": 0.10, "C": 0.05},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {
@@ -1085,6 +1131,7 @@ B_COK_FAZ = [
             "database": "steel7.TDB",
             "elements_composition": {"C": 0.04, "CR": 0.06, "MO": 0.05,
                                      "SI": 0.003, "V": 0.01, "FE": 0.837},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1173,
         },
         "expected": {
@@ -1106,6 +1153,7 @@ B_COK_FAZ = [
             "database": "steel7.TDB",
             "elements_composition": {"C": 0.04, "CR": 0.06, "MO": 0.05,
                                      "SI": 0.003, "V": 0.01, "FE": 0.837},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -1133,6 +1181,7 @@ B_COK_FAZ = [
             "elements_composition": {"FE": 0.70, "CR": 0.16, "NI": 0.08,
                                      "MO": 0.02, "MN": 0.02, "SI": 0.01,
                                      "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {
@@ -1158,6 +1207,7 @@ C_FAZ_GECISI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 800, "temperature_max_K": 1400,
             "n_points": 20,
         },
@@ -1174,6 +1224,7 @@ C_FAZ_GECISI = [
         "arguments": {
             "database": "alni-4slx.TDB",
             "elements_composition": {"AL": 0.5, "NI": 0.5},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 500, "temperature_max_K": 2000,
             "n_points": 20,
         },
@@ -1191,6 +1242,7 @@ C_FAZ_GECISI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 300, "temperature_max_K": 2000,
             "n_points": 25,
         },
@@ -1217,6 +1269,7 @@ C_FAZ_GECISI = [
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.879, "C": 0.04, "CR": 0.06,
                                      "MO": 0.02, "V": 0.001},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 900, "temperature_max_K": 1400,
             "n_points": 20,
         },
@@ -1240,6 +1293,7 @@ C_FAZ_GECISI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.72, "CU": 0.28},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 900, "temperature_max_K": 1200,
             "n_points": 20,
         },
@@ -1256,6 +1310,7 @@ C_FAZ_GECISI = [
         "arguments": {
             "database": "AlFe-4SLBF.TDB",
             "elements_composition": {"AL": 0.2, "FE": 0.8},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 800, "temperature_max_K": 1800,
             "n_points": 20,
         },
@@ -1274,6 +1329,7 @@ C_FAZ_GECISI = [
         "arguments": {
             "database": "alni-4slx.TDB",
             "elements_composition": {"AL": 0.75, "NI": 0.25},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 800, "temperature_max_K": 1700,
             "n_points": 20,
         },
@@ -1291,6 +1347,7 @@ C_FAZ_GECISI = [
             "database": "steel7.TDB",
             "elements_composition": {"C": 0.04, "CR": 0.06, "MO": 0.05,
                                      "SI": 0.003, "V": 0.01, "FE": 0.837},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 900, "temperature_max_K": 1400,
             "n_points": 15,
         },
@@ -1316,6 +1373,7 @@ D_BILESIM_KUMESI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_K": 900,
         },
         "expected": {
@@ -1334,6 +1392,7 @@ D_BILESIM_KUMESI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.9, "CU": 0.1},
+            "composition_basis": "mole_fraction",
             "temperature_K": 900,
         },
         "expected": {"mass_balance": True, "elements_present": True},
@@ -1348,6 +1407,7 @@ D_BILESIM_KUMESI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.2, "CU": 0.8},
+            "composition_basis": "mole_fraction",
             "temperature_K": 900,
         },
         "expected": {"mass_balance": True, "elements_present": True},
@@ -1362,6 +1422,7 @@ D_BILESIM_KUMESI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_K": 700,
         },
         "expected": {
@@ -1389,6 +1450,7 @@ D_BILESIM_KUMESI = [
             "database": "steel7.TDB",
             "elements_composition": {"C": 0.04, "CR": 0.06, "MO": 0.05,
                                      "SI": 0.003, "V": 0.01, "FE": 0.837},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1173,
         },
         "expected": {
@@ -1408,6 +1470,7 @@ D_BILESIM_KUMESI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.6, "CU": 0.4},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1056,
         },
         "expected": {"mass_balance": True, "elements_present": True},
@@ -1434,6 +1497,7 @@ E_YARI_KARARLI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "suspended_phases": ["GRAPHITE"],
         },
@@ -1457,6 +1521,7 @@ E_YARI_KARARLI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "suspended_phases": ["GRAPHITE"],
         },
@@ -1478,6 +1543,7 @@ E_YARI_KARARLI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
             "suspended_phases": ["M23C6"],
         },
@@ -1508,6 +1574,7 @@ E_YARI_KARARLI = [
             "database": "steel7.TDB",
             "elements_composition": {"C": 0.04, "CR": 0.06, "MO": 0.05,
                                      "SI": 0.003, "V": 0.01, "FE": 0.837},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1173,
             "suspended_phases": ["M23C6", "M6C"],
         },
@@ -1537,6 +1604,7 @@ F_KARSILASTIRMA = [
             "database": "steel1.TDB",
             "composition_a": {"FE": 0.99, "C": 0.01},
             "composition_b": {"FE": 0.95, "C": 0.05},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
             "label_a": "Fe-0.01C", "label_b": "Fe-0.05C",
         },
@@ -1557,6 +1625,7 @@ F_KARSILASTIRMA = [
             "database": "agcu.TDB",
             "composition_a": {"AG": 0.8, "CU": 0.2},
             "composition_b": {"AG": 0.3, "CU": 0.7},
+            "composition_basis": "mole_fraction",
             "temperature_K": 900,
             "label_a": "Ag-zengin", "label_b": "Cu-zengin",
         },
@@ -1575,6 +1644,7 @@ F_KARSILASTIRMA = [
             "database": "steel1.TDB",
             "composition_a": {"FE": 0.99, "C": 0.01},
             "composition_b": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
             "label_a": "kromsuz", "label_b": "20Cr",
         },
@@ -1594,6 +1664,7 @@ F_KARSILASTIRMA = [
             "database": "steel1.TDB",
             "composition_a": {"FE": 0.99, "C": 0.01},
             "composition_b": {"FE": 0.98, "C": 0.02},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1200,
             "label_a": "C-0.01", "label_b": "C-0.02",
         },
@@ -1633,6 +1704,7 @@ G_CELIK_DISI = [
         "arguments": {
             "database": "MgNaCl.TDB",
             "elements_composition": {"NA": 0.5, "CL": 0.5},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1100,
         },
         "expected": {"mass_balance": True, "elements_present": True},
@@ -1648,6 +1720,7 @@ G_CELIK_DISI = [
         "arguments": {
             "database": "OU.TDB",
             "elements_composition": {"U": 0.333, "O": 0.667},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {"mass_balance": True, "elements_present": True},
@@ -1675,6 +1748,7 @@ G_CELIK_DISI = [
         "arguments": {
             "database": "CHO-gas.TDB",
             "elements_composition": {"C": 0.2, "H": 0.5, "O": 0.3},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1000,
         },
         "expected": {
@@ -1693,6 +1767,7 @@ G_CELIK_DISI = [
         "arguments": {
             "database": "BEF.TDB",
             "elements_composition": {"MO": 0.3, "NI": 0.5, "RE": 0.2},
+            "composition_basis": "mole_fraction",
             "temperature_K": 1400,
         },
         "expected": {"mass_balance": True, "elements_present": True},
@@ -1708,6 +1783,7 @@ G_CELIK_DISI = [
         "arguments": {
             "database": "OU.TDB",
             "elements_composition": {"U": 0.333, "O": 0.667},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 1000, "temperature_max_K": 2500,
             "n_points": 15,
         },
@@ -1740,6 +1816,7 @@ H_BILESIM_EKSENI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "axis_element": "CR", "axis_min": 0.01, "axis_max": 0.30,
             "temperature_K": 1100, "n_points": 12,
         },
@@ -1771,6 +1848,7 @@ H_BILESIM_EKSENI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.89, "CR": 0.10, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "axis_element": "C", "axis_min": 0.001, "axis_max": 0.05,
             "temperature_K": 1100, "n_points": 12,
         },
@@ -1796,6 +1874,7 @@ H_BILESIM_EKSENI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.79, "CR": 0.20, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "axis_element": "CR", "axis_min": 0.01, "axis_max": 0.30,
             "temperature_K": 1400, "n_points": 12,
         },
@@ -1821,6 +1900,7 @@ H_BILESIM_EKSENI = [
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.85, "CR": 0.10, "MO": 0.02,
                                      "C": 0.03},
+            "composition_basis": "mole_fraction",
             "axis_element": "MO", "axis_min": 0.0, "axis_max": 0.15,
             "temperature_K": 1100, "n_points": 12,
         },
@@ -1863,6 +1943,7 @@ I_KATILASMA = [
             "database": "cost507R.TDB",
             "elements_composition": {"AL": 0.93, "MG": 0.02, "SI": 0.03,
                                      "ZN": 0.02},
+            "composition_basis": "mole_fraction",
             "seed_temperature_K": 1000,
             "temperature_min_K": 600,
         },
@@ -1886,6 +1967,7 @@ I_KATILASMA = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "seed_temperature_K": 1900,
             "temperature_min_K": 1000,
         },
@@ -1909,6 +1991,7 @@ I_KATILASMA = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "composition_basis": "mole_fraction",
             "seed_temperature_K": 1300,
             "temperature_min_K": 800,
         },
@@ -1952,6 +2035,7 @@ J_FAZ_DIYAGRAMI = [
         "arguments": {
             "database": "agcu.TDB",
             "elements_composition": {"AG": 0.8, "CU": 0.2},
+            "composition_basis": "mole_fraction",
             "axis_element": "CU", "axis_min": 0, "axis_max": 1,
             "temperature_min_K": 800, "temperature_max_K": 1500,
             "seed_temperature_K": 1000,
@@ -1978,6 +2062,7 @@ J_FAZ_DIYAGRAMI = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.98, "C": 0.02},
+            "composition_basis": "mole_fraction",
             "axis_element": "C", "axis_min": 0, "axis_max": 0.25,
             "temperature_min_K": 500, "temperature_max_K": 2000,
         },
@@ -2003,6 +2088,7 @@ J_FAZ_DIYAGRAMI = [
         "arguments": {
             "database": "alni-4slx.TDB",
             "elements_composition": {"AL": 0.5, "NI": 0.5},
+            "composition_basis": "mole_fraction",
             "axis_element": "NI", "axis_min": 0, "axis_max": 1,
             "temperature_min_K": 600, "temperature_max_K": 2200,
         },
@@ -2051,6 +2137,7 @@ DOGRU_RAPOR = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.89, "CR": 0.10, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "axis_element": "CR", "axis_min": 0.01, "axis_max": 0.30,
             "temperature_K": 1400, "n_points": 20,
         },
@@ -2082,6 +2169,7 @@ DOGRU_RAPOR = [
         "arguments": {
             "database": "steel1.TDB",
             "elements_composition": {"FE": 0.99, "C": 0.01},
+            "composition_basis": "mole_fraction",
             "temperature_min_K": 300, "temperature_max_K": 2000,
             "n_points": 100,
         },

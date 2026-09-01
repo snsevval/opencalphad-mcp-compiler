@@ -131,6 +131,38 @@ is worse: a crash announces itself. Naming what the database does have is
 also what lets the caller repair the request instead of guessing."""
 
 [[reject]]
+id      = "composition-basis-required"
+applies = "*"
+check   = "basis_declared"
+message = """
+composition_basis is required. Allowed: mole_fraction, mass_fraction, \
+weight_percent. Pass the user's numbers exactly as they were given and name \
+the basis they are in -- do not convert them by hand."""
+because = """
+Not a theoretical risk. Measured: asked for SAF 2507, Fe-25Cr-7Ni-4Mo-0.3N
+in WEIGHT per cent, the caller divided each figure by a hundred and sent it
+as a mole fraction with no basis declared. The engine conditioned on
+
+   x(CR)=0.25   x(MO)=0.04   x(N)=0.003
+
+when the alloy asked about is
+
+   x(CR)=0.2666 x(MO)=0.0231 x(N)=0.0119
+
+Nitrogen is out by a factor of four, and in a duplex stainless nitrogen is
+what sets the austenite fraction. A different alloy was computed, and every
+number that came back was internally consistent for it.
+
+The conversion exists on this side -- resolve_composition does it, and does
+it correctly -- but a caller who says nothing gets the default, and the
+default is mole_fraction. Silence looked like a declaration.
+
+So it is required rather than defaulted. Guessing the scale was considered
+and rejected: x(CR)=0.25 is a perfectly ordinary mole fraction, and a system
+that infers the basis from the size of the numbers would be wrong in a way
+nobody could see."""
+
+[[reject]]
 id      = "at-least-two-elements"
 applies = "*"
 check   = "min_nonzero_count"
@@ -178,18 +210,35 @@ because = "nothing to normalise, and nothing to compute"
 id       = "composition-scale-plausible"
 applies  = "*"
 check    = "sum_within"
-low      = 0.5
-high     = 2.0
-severity = "note"          # surfaces, does not reject; normalisation still runs
 message  = """
-Note: composition amounts sum to {total}, which is far from a typical ~1.0 \
-scale -- values will still be normalized, but double-check this is the \
-intended composition."""
+Composition amounts sum to {total}, which is far from the ~{expected} a \
+{basis} composition reaches. Check the values and the basis: the difference \
+between "93 parts" and "93 per cent" is not one this side can decide."""
+
+# What counts as a plausible total depends on the basis the caller
+# declared. 100 is exactly right for weight_percent and two orders of
+# magnitude wrong for mole_fraction. One range for both rejected a
+# perfectly good weight-percent request -- found by the test that made the
+# basis mandatory.
+[reject.scale_by_basis]
+mole_fraction  = { low = 0.5,  high = 2.0 }
+mass_fraction  = { low = 0.5,  high = 2.0 }
+weight_percent = { low = 50.0, high = 200.0 }
+
 because = """
-Not a hard failure: amounts are normalised either way. But a total this far
-from a reasonable scale is worth surfacing rather than silently normalising
-without comment -- the difference between "93 parts" and "93 percent" is
-the caller's to confirm."""
+The ranges are wide on purpose: this catches a mistake of a factor of a
+hundred, not a composition that fails to add up neatly.
+
+It carried `severity = "note"` and a message beginning "Note:", saying it
+would surface rather than refuse -- and nothing read the field. The code
+rejected, as it does for every rule. Two years of that sentence being false
+in a file whose whole purpose is to be true.
+
+The field is gone rather than wired, because with the basis now declared
+the case it was hedging about does not arise: a total that is wrong FOR THE
+DECLARED BASIS is a mistake, not an ambiguity, and refusing is the right
+answer. Rescaling is still reported when it happens -- output.toml's
+`composition-was-rescaled` says so, which is where a note belongs."""
 
 [[reject]]
 id      = "pressure-positive"
@@ -462,6 +511,9 @@ Do NOT call this or any other calculation tool again in this turn. Quote \
 the rejection reason, including any list of valid elements or phases it \
 names, and ask which corrected request the user wants. Naming options is \
 fine; running one is not."""
+
+on_composition_basis = """
+Pass the composition EXACTLY as the user gave it and name the basis with `composition_basis`. Do not convert between weight per cent and mole fraction yourself -- the server does it, and the one time it was done by hand nitrogen came out four times too low and a different alloy was computed."""
 
 on_precondition = """
 A precondition result DOES invite a retry: the request is shaped correctly \

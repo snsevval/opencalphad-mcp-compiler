@@ -97,6 +97,26 @@ def _subset_of_database_elements(rule, request, ctx):
                                    available=sorted(ctx["db_elements"]))]
 
 
+def _basis_declared(rule, request, ctx):
+    """The caller has named the basis their numbers are in.
+
+    Required, not defaulted. A default turns silence into a declaration,
+    and silence is exactly what produced a four-fold error in nitrogen --
+    see the rule's `because` in input.toml.
+    """
+    if not request.get("composition"):
+        return []          # another rule owns an empty composition
+    izinli = INPUT["accept"]["composition"].get("basis", {}).get(
+        "values", ["mole_fraction"])
+    beyan = request.get("composition_basis")
+    if beyan in izinli:
+        return []
+    if beyan:
+        return ["composition_basis %r is not one of: %s"
+                % (beyan, ", ".join(izinli))]
+    return [rule["message"].strip()]
+
+
 def _min_nonzero_count(rule, request, ctx):
     composition = request.get("composition") or {}
     if len({el.upper() for el in composition}) >= rule["minimum"]:
@@ -136,12 +156,27 @@ def _sum_positive(rule, request, ctx):
 
 
 def _sum_within(rule, request, ctx):
+    """Is the composition on a plausible scale for the basis it declares?
+
+    A weight_percent composition summing to 100 is correct; the same total
+    in mole fractions is off by two orders of magnitude. One range for both
+    refused a perfectly good weight-percent request.
+    """
     total = sum((request.get("composition") or {}).values())
     if total <= 0:
         return []          # already reported by sum_positive; not twice
-    if rule["low"] <= total <= rule["high"]:
+
+    baz = (request.get("composition_basis")
+           or INPUT["accept"]["composition"].get("basis", {})
+           .get("default", "mole_fraction"))
+    aralik = (rule.get("scale_by_basis") or {}).get(baz)
+    if not aralik:
+        aralik = {"low": rule.get("low", 0.5), "high": rule.get("high", 2.0)}
+    if aralik["low"] <= total <= aralik["high"]:
         return []
-    return [rule["message"].format(total=format(total, ".4g"))]
+    return [rule["message"].format(total=format(total, ".4g"),
+                                   expected=100 if aralik["high"] > 10 else 1,
+                                   basis=baz)]
 
 
 def _positive(rule, request, ctx):
@@ -244,6 +279,7 @@ PREDICATES = {
     "file_exists": _file_exists,
     "database_parses": _database_parses,
     "subset_of_database_elements": _subset_of_database_elements,
+    "basis_declared": _basis_declared,
     "min_nonzero_count": _min_nonzero_count,
     "subset_of_database_phases": _subset_of_database_phases,
     "all_non_negative": _all_non_negative,
@@ -731,6 +767,8 @@ def stop_rule_block(indent="    "):
         ("(a) The rejection carries an \"alternative\" field.", "on_route_present"),
         ("(b) No \"alternative\" field.", "on_no_route"),
         ("(c) stage=\"PRECONDITION\" is different again.", "on_precondition"),
+        ("COMPOSITION BASIS is required on every request.",
+         "on_composition_basis"),
     ):
         lines.append(baslik)
         lines.extend("    " + satir for satir in rule[anahtar].strip().split("\n"))

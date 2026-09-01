@@ -57,10 +57,12 @@ def _delegate(operation, database, elements_composition, **extra):
 def check_equilibrium_request(
     database, elements_composition, temperature_K, pressure_Pa=_DEFAULT_PRESSURE,
     suspended_phases=None,
+    composition_basis=None,
 ):
     """PREFLIGHT for calculate_equilibrium. Returns a list of problem
     strings; empty list means the request is valid."""
     return _delegate("equilibrium", database, elements_composition,
+                     composition_basis=composition_basis,
                      temperature_K=temperature_K, pressure_Pa=pressure_Pa,
                      suspended_phases=suspended_phases)
 
@@ -68,9 +70,11 @@ def check_equilibrium_request(
 def check_property_diagram_request(
     database, elements_composition, temperature_min_K, temperature_max_K,
     pressure_Pa=_DEFAULT_PRESSURE, suspended_phases=None,
+    composition_basis=None,
 ):
     """PREFLIGHT for calculate_property_diagram."""
     return _delegate("property_diagram", database, elements_composition,
+                     composition_basis=composition_basis,
                      temperature_min_K=temperature_min_K,
                      temperature_max_K=temperature_max_K,
                      pressure_Pa=pressure_Pa,
@@ -80,9 +84,11 @@ def check_property_diagram_request(
 def check_isothermal_section_request(
     database, elements_composition, axis_element, axis_min, axis_max,
     temperature_K, pressure_Pa=_DEFAULT_PRESSURE, suspended_phases=None,
+    composition_basis=None,
 ):
     """PREFLIGHT for calculate_isothermal_section."""
     return _delegate("isothermal_section", database, elements_composition,
+                     composition_basis=composition_basis,
                      axis_element=axis_element, axis_min=axis_min,
                      axis_max=axis_max, temperature_K=temperature_K,
                      pressure_Pa=pressure_Pa,
@@ -92,6 +98,7 @@ def check_isothermal_section_request(
 def check_scheil_request(
     database, elements_composition, seed_temperature_K, temperature_min_K,
     pressure_Pa=_DEFAULT_PRESSURE,
+    composition_basis=None,
 ):
     """PREFLIGHT for calculate_scheil_solidification.
 
@@ -102,6 +109,7 @@ def check_scheil_request(
     simulation that would otherwise fail obscurely.
     """
     return _delegate("scheil", database, elements_composition,
+                     composition_basis=composition_basis,
                      seed_temperature_K=seed_temperature_K,
                      temperature_min_K=temperature_min_K,
                      pressure_Pa=pressure_Pa)
@@ -111,6 +119,7 @@ def check_phase_diagram_request(
     database, elements_composition, axis_element, axis_min, axis_max,
     temperature_min_K, temperature_max_K, seed_temperature_K,
     pressure_Pa=_DEFAULT_PRESSURE,
+    composition_basis=None,
 ):
     """PREFLIGHT for calculate_phase_diagram.
 
@@ -120,6 +129,7 @@ def check_phase_diagram_request(
     seed outside the range is not a diagram of what was asked for.
     """
     return _delegate("phase_diagram", database, elements_composition,
+                     composition_basis=composition_basis,
                      axis_element=axis_element, axis_min=axis_min,
                      axis_max=axis_max,
                      temperature_min_K=temperature_min_K,

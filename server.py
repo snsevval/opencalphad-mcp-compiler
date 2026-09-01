@@ -310,6 +310,43 @@ def _attach_axis_basis(result: dict) -> dict:
     return result
 
 
+class _Sure:
+    """Time one stage and record it on the result.
+
+    The run has been called slow for weeks without anyone knowing which
+    part of it was. Total wall time cannot tell an engine that got slower
+    from a reviewer that started timing out, and those need opposite
+    fixes.
+
+    Milliseconds, integers: this is for reading a pattern across ninety
+    cases, not for benchmarking a function.
+    """
+
+    def __init__(self, result, ad):
+        self.result = result
+        self.ad = ad
+        self.t0 = None
+
+    def __enter__(self):
+        self.t0 = time.time()
+        return self
+
+    def __exit__(self, *_):
+        if isinstance(self.result, dict):
+            kayit = self.result.setdefault("timings_ms", {})
+            kayit[self.ad] = kayit.get(self.ad, 0) + int(
+                (time.time() - self.t0) * 1000)
+        return False
+
+
+def _sure_ekle(result, ad, baslangic):
+    """Same, for a stage whose result did not exist when it started."""
+    if isinstance(result, dict):
+        kayit = result.setdefault("timings_ms", {})
+        kayit[ad] = kayit.get(ad, 0) + int((time.time() - baslangic) * 1000)
+    return result
+
+
 def _canonical_phases(result):
     """One spelling of every phase name on the way out.
 
@@ -408,6 +445,7 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
         if rapor:
             result['composition_basis'] = rapor
 
+    _t = time.time()
     passed, problems = result_check.verify_result(result)
     verification = {
         "stage": "VERIFY_A",
@@ -423,6 +461,7 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
     # not survive the trip.
     if request_args is not None:
         correspondence = result_check.verify_correspondence(result, request_args)
+        _sure_ekle(result, "verify_a", _t)
         if correspondence is not None:
             verification["correspondence"] = correspondence
             if not correspondence["passed"]:
@@ -440,8 +479,10 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
         # retry below. Read from settings/execution.toml so the number
         # sits next to the measurement that produced it.
         stage_deadline = time.time() + settings_engine.POLICY.execution            .reviewer_budget["stage_deadline_s"]
+        _tb = time.time()
         review = semantic_check.review(request_args, result,
                                        deadline=stage_deadline)
+        _sure_ekle(result, "verify_b", _tb)
         verification["layer_b"] = review
         _apply_review(verification, review, problems)
 
@@ -472,7 +513,9 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
     # server, not a problem with the caller's alloy, and putting our fault
     # in a field that reads as a comment on their metallurgy would be the
     # same confusion Layer B was demoted for.
+    _ti = time.time()
     saglam, ihlaller = result_check.check_output_invariants(result)
+    _sure_ekle(result, "invariants", _ti)
     verification["output_invariants"] = {
         "passed": saglam,
         "checked": len(settings_engine.POLICY.output.honesty),
@@ -554,6 +597,7 @@ def _calc_one(
     fixed_phases: Optional[dict] = None,
 ) -> dict:
     """Run one single-point equilibrium in an isolated subprocess."""
+    _t_engine = time.time()
     payload = {
         "database": database,
         "elements_composition": elements_composition,
@@ -585,7 +629,8 @@ def _calc_one(
             }
         if os.path.exists(out_path):
             with open(out_path) as f:
-                return json.load(f)
+                sonuc = json.load(f)
+            return _sure_ekle(sonuc, "engine", _t_engine)
         return {
             "error": (
                 f"Equilibrium calculation crashed (exit code {proc.returncode}). "
@@ -766,6 +811,7 @@ def calculate_equilibrium(
     problems = preflight.check_equilibrium_request(
         database, elements_composition, temperature_K, pressure_Pa,
         named_phases or None,
+        composition_basis=composition_basis,
     )
     if problems:
         return _preflight_failure(problems)
@@ -892,10 +938,12 @@ def compare_alloys(
     # nobody asked about together.
     problems = (
         preflight.check_equilibrium_request(
-            database, composition_a, temperature_K, pressure_Pa, suspended_phases
+            database, composition_a, temperature_K, pressure_Pa, suspended_phases,
+            composition_basis=composition_basis,
         )
         + preflight.check_equilibrium_request(
-            database, composition_b, temperature_K, pressure_Pa, suspended_phases
+            database, composition_b, temperature_K, pressure_Pa, suspended_phases,
+            composition_basis=composition_basis,
         )
     )
     if problems:
@@ -1062,6 +1110,7 @@ def calculate_property_diagram(
     problems = preflight.check_property_diagram_request(
         database, elements_composition, temperature_min_K, temperature_max_K,
         pressure_Pa, suspended_phases,
+        composition_basis=composition_basis,
     )
     if problems:
         return _preflight_failure(problems)
@@ -1331,6 +1380,7 @@ def calculate_isothermal_section(
     problems = preflight.check_isothermal_section_request(
         database, elements_composition, axis_element, axis_min, axis_max,
         temperature_K, pressure_Pa,
+        composition_basis=composition_basis,
     )
     if problems:
         return _preflight_failure(problems)
@@ -1594,6 +1644,7 @@ def calculate_scheil_solidification(
     problems = preflight.check_scheil_request(
         database, elements_composition, seed_temperature_K,
         temperature_min_K, pressure_Pa,
+        composition_basis=composition_basis,
     )
     if problems:
         return _preflight_failure(problems)
@@ -1763,6 +1814,7 @@ def calculate_phase_diagram(
     problems = preflight.check_phase_diagram_request(
         database, elements_composition, axis_element, axis_min, axis_max,
         temperature_min_K, temperature_max_K, seed_temperature_K, pressure_Pa,
+        composition_basis=composition_basis,
     )
     if problems:
         return _preflight_failure(problems)

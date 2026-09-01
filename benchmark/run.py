@@ -554,8 +554,15 @@ async def run_all(selected, semantic_check=True):
     async with stdio_client(params, errlog=devnull) as (read, write):
         async with ClientSession(read, write) as session:
             await asyncio.wait_for(session.initialize(), timeout=120)
+            # Wall clock from the moment the session is ready. The gap
+            # between one case ending and the next beginning is measured
+            # separately: a run that slows down inside its calls is a
+            # different problem from one that slows down between them.
+            kosum_basladi = time.time()
+            onceki_bitis = kosum_basladi
             for case in selected:
                 started = time.time()
+                bosluk = started - onceki_bitis
                 try:
                     raw = await asyncio.wait_for(
                         session.call_tool(case["tool"],
@@ -579,12 +586,20 @@ async def run_all(selected, semantic_check=True):
                 # kac vakada gorus bildirebildigi olcumun parcasi.
                 review = ((payload.get("verification") or {}).get("layer_b")
                           if isinstance(payload, dict) else None) or {}
+                bitti = time.time()
+                onceki_bitis = bitti
+                asamalar = ((payload.get("timings_ms") or {})
+                            if isinstance(payload, dict) else {})
                 results.append({
                     "id": case["id"],
                     "zorluk": case["zorluk"],
                     "passed": passed,
                     "note": note,
-                    "seconds": round(time.time() - started, 2),
+                    "seconds": round(bitti - started, 2),
+                    "gap_s": round(bosluk, 3),
+                    "stages_ms": asamalar,
+                    "backend": (payload.get("backend_used")
+                                if isinstance(payload, dict) else None),
                     "layer_b": (
                         None if not review else
                         "ulasilamadi" if not review.get("available") else
@@ -592,7 +607,84 @@ async def run_all(selected, semantic_check=True):
                          None: "okunamadi"}[review.get("passed")]
                     ),
                 })
-    return results
+    return results, time.time() - kosum_basladi
+
+
+def _yuzdelik(degerler, p):
+    if not degerler:
+        return 0.0
+    s = sorted(degerler)
+    i = min(int(round((len(s) - 1) * p)), len(s) - 1)
+    return s[i]
+
+
+def _zamanlama_ozeti(results, duvar_saati):
+    """Where the run's time actually went.
+
+    Two questions, and the answer to the first decides whether the second
+    is worth asking. Do the calls themselves get slower as the run goes on,
+    or do they stay the same size while the waiting between them grows?
+    "The full run is slow" has been said about this benchmark for weeks
+    without either being measured.
+    """
+    sureler = [r["seconds"] for r in results]
+    bosluklar = [r.get("gap_s", 0.0) for r in results]
+    if not sureler:
+        return
+
+    cagri_toplami = sum(sureler)
+    bosluk_toplami = sum(bosluklar)
+    print()
+    print("ZAMANLAMA")
+    print("  duvar saati        %8.1f s" % duvar_saati)
+    print("  cagrilarda         %8.1f s   (%%%.0f)"
+          % (cagri_toplami, 100 * cagri_toplami / max(duvar_saati, 1e-9)))
+    print("  cagrilar ARASINDA  %8.1f s   (%%%.0f)"
+          % (bosluk_toplami, 100 * bosluk_toplami / max(duvar_saati, 1e-9)))
+
+    print("  p50 %6.2f s   p95 %6.2f s   max %6.2f s  (%s)"
+          % (_yuzdelik(sureler, 0.50), _yuzdelik(sureler, 0.95),
+             max(sureler), max(results, key=lambda r: r["seconds"])["id"]))
+
+    # NOT first-ten against last-ten. The cases are ordered by category:
+    # the first are rejections that never reach the engine and the last are
+    # scans of two hundred points. Comparing those measures the running
+    # order, not degradation -- it reported "12.5x slower" on a run whose
+    # per-case times were entirely explained by which case it was.
+    #
+    # Degradation, if there is any, shows up WITHIN a kind of work. So the
+    # comparison is first half against second half of each backend.
+    arkalar = {}
+    for r in results:
+        arkalar.setdefault(r.get("backend") or "-", []).append(r["seconds"])
+    print("  arka uca gore (ayni is kendi icinde):")
+    for ad, xs in sorted(arkalar.items(), key=lambda kv: -sum(kv[1])):
+        if len(xs) < 4:
+            continue
+        yarim = len(xs) // 2
+        ilk = sum(xs[:yarim]) / yarim
+        son = sum(xs[yarim:]) / (len(xs) - yarim)
+        yon = ("YAVASLIYOR %.1fx" % (son / ilk)
+               if ilk > 0 and son > 1.5 * ilk else "sabit")
+        print("     %-26s %2d vaka  toplam %6.1f s  ilk yari %5.2f  "
+              "ikinci yari %5.2f  %s"
+              % (ad, len(xs), sum(xs), ilk, son, yon))
+
+    # En pahali bes vaka ve mumkunse hangi asamada
+    print("  en pahali bes vaka:")
+    for r in sorted(results, key=lambda x: -x["seconds"])[:5]:
+        asama = r.get("stages_ms") or {}
+        dagilim = ("  " + " ".join("%s=%dms" % (k, v)
+                                   for k, v in sorted(asama.items()))
+                   if asama else "")
+        print("     %-34s %6.2f s  %-24s%s"
+              % (r["id"], r["seconds"], r.get("backend") or "-", dagilim))
+
+    buyuk_bosluk = [r for r in results if r.get("gap_s", 0) > 1.0]
+    if buyuk_bosluk:
+        print("  1 saniyeden uzun bosluk: %d vaka oncesinde" % len(buyuk_bosluk))
+        for r in sorted(buyuk_bosluk, key=lambda x: -x["gap_s"])[:3]:
+            print("     %-34s %6.2f s beklendi" % (r["id"], r["gap_s"]))
 
 
 def _ayar_denetimi():
@@ -638,7 +730,8 @@ def main(argv):
         print("secilen vaka yok")
         return 2
 
-    results = asyncio.run(run_all(selected, semantic_check="--hizli" not in argv))
+    results, duvar_saati = asyncio.run(
+        run_all(selected, semantic_check="--hizli" not in argv))
 
     width = max(len(r["id"]) for r in results)
     for r in results:
@@ -658,6 +751,8 @@ def main(argv):
         if grup:
             ok = sum(1 for r in grup if r["passed"])
             print(f"  {zorluk:<6} {ok}/{len(grup)}")
+
+    _zamanlama_ozeti(results, duvar_saati)
 
     hakemli = [r for r in results if r.get("layer_b")]
     if hakemli:
