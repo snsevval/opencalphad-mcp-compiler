@@ -215,7 +215,7 @@ footer{
 <div class="page">
 
 <header>
-  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ f570668</p>
+  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ 63169fc</p>
   <h1>opencalphad-mcp-compiler</h1>
   <p class="standfirst">Kurallar nerede yaşıyor, derleyici onları nasıl bağlıyor, bir istek hangi aşamalardan geçiyor, motor hangi sırayla deniyor.</p>
 
@@ -226,8 +226,8 @@ footer{
     <div><span class="k">Motor zinciri</span><span class="v">6 cascade</span></div>
     <div><span class="k">Doğrulama</span><span class="v">8 verify · 7 beyan</span></div>
     <div><span class="k">Derleme</span><span class="v">11 durdurur · 3 uyarır</span></div>
-    <div><span class="k">Derlenmiş politika</span><span class="v">29 alan · 3 nesne</span></div>
-    <div><span class="k">Son commit</span><span class="v">2 Eyl 14:28</span></div>
+    <div><span class="k">Derlenmiş politika</span><span class="v">30 alan · 3 nesne</span></div>
+    <div><span class="k">Son commit</span><span class="v">2 Eyl 14:59</span></div>
   </div>
 </header>
 
@@ -509,7 +509,7 @@ footer{
         <tr><td><code>yon_bir</code></td><td>Dosyadaki her bölümün kodda bir okuyucusu var mı?</td><td>Yazılmış ama hiç bağlanmamış ayar</td></tr>
         <tr><td><code>yon_iki</code></td><td>Kodda, dosyaya taşınmış olması gereken kural kalmış mı?</td><td>Taşımanın geride bıraktığı kopya</td></tr>
         <tr><td><code>yon_uc</code></td><td>Yürütücünün dışarı açtığı her şey gerçekten çağrılıyor mu?</td><td>Çağıranı kaybolmuş fonksiyon — ve tersi</td></tr>
-        <tr><td><code>yon_dort</code></td><td>Ayarı <b>okuduğunu sanan</b> ama sessizce yedeğe düşen okuyucu var mı?</td><td>1 Eylül: iki gerçek düşüş</td></tr>
+        <tr><td><code>yon_dort</code></td><td>Ayarı <b>okuduğunu sanan</b> ama sessizce yedeğe düşen okuyucu var mı?</td><td>1 Eylül: iki gerçek düşüş · 2 Eylül: <code>output.toml</code> ve <b>iki yanlı ölçüm</b> eklendi</td></tr>
       </tbody>
     </table>
   </div>
@@ -517,6 +517,7 @@ footer{
   <div class="note">
     <span class="k">Dördüncü yön neden eklendi</span>
     <p>Bir okuyucu şöyle yazılır: <code>try: import settings_engine … except: return default</code>. Import başarısız olursa fonksiyon <b>bir şey söylemeden</b> yedeğine düşer. <code>semantic_check</code> içindeki iki fonksiyon tam olarak bunu yapıyordu. Biri, ayarı hiç okumadığı hâlde <b>doğru cevap veriyordu</b> — yedeği dosyadaki değerin aynısıydı. Yanlış cevap fark edilir; işi yapmadan varılan doğru cevap edilmez. Dördüncü yön bunu <b>deneyerek</b> ölçüyor: dosyadaki değeri değiştir, fonksiyonu çağır, cevabın takip edip etmediğine bak.</p>
+    <p><b>2 Eylül'de iki eksiği kapandı.</b> Yalnız değişiklikten <i>sonraki</i> değeri ölçüyordu — hep aynı cevabı döndüren bir fonksiyon bundan geçerdi; artık <b>önce de</b> ölçülüyor ve ikisinin farklı olması şart. Ve yalnız <code>execution.toml</code>'a bakıyordu; artık <code>output.toml</code>'u da uçtan uca deniyor: dosyadaki eşiği değiştir, yirmi noktanın biri hatalı gerçek bir yükü <code>verify_result</code>'a ver, kararın takip edip etmediğine bak. <b>İki bozma denemesi de yakalandı</b> — eşiği koda geri gömmek, ve <code>_declared</code>'ı elde tutulan bir kontrol listesine çevirmek.</p>
   </div>
 
   <p>İlk üç yön dosya ile kodun <b>ne olduğu</b> konusunda anlaşıp anlaşmadığını soruyor; dördüncüsü okuyucunun <b>gerçekten okuduğunu</b>. Tek yönlü sorulduğu dönemde üç kusur sessizce geçmişti — bunlardan biri, aylarca kimsenin çağırmadığı dokuz PREFLIGHT kuralıydı.</p>
@@ -686,7 +687,7 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
 
   <figure>
     <svg viewBox="0 0 1000 430" role="img" aria-label="Derlenmiş politikanın alan şeması: InputPolicy sekiz, ExecutionPlan on beş, OutputPlan altı alan taşıyor; sağdaki sayılar her alanın çalışan sistemdeki uzunluğu.">
-      <text class="t-hd" x="24" y="24">POLICY = compile_settings() · 29 ALAN · ÇALIŞMA ANININ OKUMASINA İZİN VERİLEN HER ŞEY</text>
+      <text class="t-hd" x="24" y="24">POLICY = compile_settings() · 30 ALAN · ÇALIŞMA ANININ OKUMASINA İZİN VERİLEN HER ŞEY</text>
       <rect class="n-toml" x="24" y="44" width="304" height="340" rx="3"/>
       <text class="t-b" x="40" y="70">POLICY.input</text>
       <text class="t-s" x="40" y="86">cevabı DEĞİŞTİREBİLİR</text>
@@ -748,12 +749,14 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
       <text class="t-s" x="960" y="131" text-anchor="end">7</text>
       <text class="t-m" x="688" y="150">verify</text>
       <text class="t-s" x="960" y="150" text-anchor="end">8</text>
-      <text class="t-m" x="688" y="169">honesty</text>
-      <text class="t-s" x="960" y="169" text-anchor="end">7</text>
-      <text class="t-m" x="688" y="188">conversion</text>
-      <text class="t-s" x="960" y="188" text-anchor="end">4</text>
-      <text class="t-m" x="688" y="207">floor</text>
-      <text class="t-s" x="960" y="207" text-anchor="end">5</text>
+      <text class="t-m" x="688" y="169">verification</text>
+      <text class="t-s" x="960" y="169" text-anchor="end">8</text>
+      <text class="t-m" x="688" y="188">honesty</text>
+      <text class="t-s" x="960" y="188" text-anchor="end">7</text>
+      <text class="t-m" x="688" y="207">conversion</text>
+      <text class="t-s" x="960" y="207" text-anchor="end">4</text>
+      <text class="t-m" x="688" y="226">floor</text>
+      <text class="t-s" x="960" y="226" text-anchor="end">5</text>
       <line class="s-line" x1="24" y1="404" x2="976" y2="404" opacity=".3"/>
       <text class="t-s" x="24" y="422">Sağdaki sayılar dosyadan sayılmadı — ayakta duran sunucunun POLICY nesnesinden okundu. Dosyada olup burada görünmeyen bir anahtar, derlemenin uyardığı şeydir.</text>
     </svg>
@@ -768,10 +771,10 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
    operations    set    6       cascades       dict   6      derive      dict  4
    defaults      dict   1       endpoint_recheck dict 5      notes       dict  7
    composition   dict   3       gap_detection  dict   2      verify      list  8
-   common        list  10       reviewers      list   2      honesty     dict  7
-   per_operation dict   6       reviewer_budget dict  4      conversion  dict  4
-   routes        dict   6       binary_order   list   2      floor       dict  5
-   preconditions list   1       weak_independence set 3
+   common        list  10       reviewers      list   2      verification      8
+   per_operation dict   6       reviewer_budget dict  4      honesty     dict  7
+   routes        dict   6       binary_order   list   2      conversion  dict  4
+   preconditions list   1       weak_independence set 3      floor       dict  5
    stop_rule     dict   5       signals        set    8
                                 scheil         dict   3
                                 engine_failures tuple 7
@@ -784,6 +787,12 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
   <p><code>common</code> alanındaki <b>10</b>, her işleme uygulanan giriş kuralı sayısı — ve
   her biri artık <code>(kural, yüklem)</code> <b>çifti</b>, düz bir sözlük değil. Yüklem
   zaten bağlı: çalışma anında aranacak bir ad kalmadı.</p>
+
+  <div class="note">
+    <span class="k">Katman A da artık derleme anında bağlı</span>
+    <p><code>output.toml</code> sekiz kontrolü <b>beyan ediyor</b>, <code>result_check.py</code> aritmetiğini <b>tutuyor</b>. İkisini birleştiren adım <b>her sonuçta</b> koşuyordu: tembel bir import, ham kuralları aşamaya göre süzme, ve kural başına bir sözlük araması. Güvensiz değildi — çözülmeyen bir ada derleme zaten izin vermiyor — ama <b>biçim yanlıştı</b>: adları çalışma anında tutup arayan bir kural motoru. Giriş kuralları derleyici geldiğinden beri bağlı geliyordu, bunlar gelmiyordu.</p>
+    <p>Artık <code>VerificationPlan</code> var: 8 kontrol, aşamaya göre anahtarlanmış (<code>result</code> 2 · <code>correspondence</code> 6), <b>beyan sırası korunmuş</b> — dosya kontrolleri koşacakları sırayla listeliyor, ve dosyayı okuyan kişi koşum sırasını okuyor olmalı.</p>
+  </div>
 
   <h3>Derlenmiş politikada bir işlem</h3>
   <p>Altı işlemin her biri için derleyici üç şeyi ayrı ayrı çözüyor: hangi giriş
