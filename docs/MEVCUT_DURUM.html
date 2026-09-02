@@ -215,7 +215,7 @@ footer{
 <div class="page">
 
 <header>
-  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ c7aa612</p>
+  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ f570668</p>
   <h1>opencalphad-mcp-compiler</h1>
   <p class="standfirst">Kurallar nerede yaşıyor, derleyici onları nasıl bağlıyor, bir istek hangi aşamalardan geçiyor, motor hangi sırayla deniyor.</p>
 
@@ -227,7 +227,7 @@ footer{
     <div><span class="k">Doğrulama</span><span class="v">8 verify · 7 beyan</span></div>
     <div><span class="k">Derleme</span><span class="v">11 durdurur · 3 uyarır</span></div>
     <div><span class="k">Derlenmiş politika</span><span class="v">29 alan · 3 nesne</span></div>
-    <div><span class="k">Son commit</span><span class="v">1 Eyl 18:32</span></div>
+    <div><span class="k">Son commit</span><span class="v">2 Eyl 14:28</span></div>
   </div>
 </header>
 
@@ -1063,24 +1063,36 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
   </div>
   <p>Her adımda davranışın değişmediği <b>550 istekli fark testi</b> ile doğrulandı: eski uygulamaya karşı reddetme davranışı birebir aynı.</p>
 
-  <h3>Kodda kalan — altı araç, 1.160 satır</h3>
+  <h3>Kodda kalan — altı araç, 1.167 satır</h3>
   <div class="scroll">
     <table>
       <thead><tr><th>Fonksiyon</th><th class="r">Satır</th><th>Konum</th></tr></thead>
       <tbody>
-        <tr><td><code>calculate_property_diagram</code></td><td class="r">262</td><td>1045</td></tr>
-        <tr><td><code>calculate_isothermal_section</code></td><td class="r">260</td><td>1312</td></tr>
-        <tr><td><code>calculate_phase_diagram</code></td><td class="r">181</td><td>1751</td></tr>
-        <tr><td><code>calculate_scheil_solidification</code></td><td class="r">169</td><td>1577</td></tr>
+        <tr><td><code>calculate_property_diagram</code></td><td class="r">269</td><td>1045</td></tr>
+        <tr><td><code>calculate_isothermal_section</code></td><td class="r">260</td><td>1319</td></tr>
+        <tr><td><code>calculate_phase_diagram</code></td><td class="r">181</td><td>1758</td></tr>
+        <tr><td><code>calculate_scheil_solidification</code></td><td class="r">169</td><td>1584</td></tr>
         <tr><td><code>compare_alloys</code></td><td class="r">167</td><td>873</td></tr>
         <tr><td><code>calculate_equilibrium</code></td><td class="r">121</td><td>735</td></tr>
       </tbody>
     </table>
   </div>
-  <p><code>server.py</code> toplam 1.935 satır, 26 üst düzey fonksiyon. Bu altısı dosyanın <b>%60'ı</b>. Notlar, <code>stop_rule</code> ve kapsama dosyadan okunuyor; boru hattını dizen sıra kodda.</p>
+  <p><code>server.py</code> toplam 1.943 satır, 26 üst düzey fonksiyon. Bu altısı dosyanın <b>%61'i</b>. Notlar, <code>stop_rule</code> ve kapsama dosyadan okunuyor; boru hattını dizen sıra kodda.</p>
 
-  <h3>Neden riskli</h3>
+  <h3>Neden riskli — ve bugün kapatılan yarısı</h3>
   <p>Altı fonksiyonun her biri kendi boru hattını <b>elle diziyor</b>. Bir kontrol o diziden düşerse hiçbir şey fark etmez — bu tam olarak <code>preflight.py</code>'da yaşandı: dokuz kural aylarca çağrılmadan durdu, düzenlense hiçbir etkisi olmayacaktı.</p>
+
+  <p><code>calculate_property_diagram</code>'da bu risk teorik değildi. Bitirme zinciri — kanonik faz adı, baz, karışık-baz notu, tarama özeti, kapsama — <b>iki kademede ayrı ayrı</b> yazılıydı, aralarında 110 satır vardı, ve ikisi <b>kasıtlı olarak</b> bir noktada ayrılıyordu: STEP kütle kesri bildiriyor, tek nokta döngüsü mol miktarı. Tehlikeli olan da tam bu — <b>kasıtlı fark ile düşmüş adım okuyucuya aynı görünüyor</b>, ve yalnız biri orada olmalı.</p>
+
+  <p><code>calculate_isothermal_section</code> yazıldığından beri doğru düzendeydi: yerel bir <code>_shape()</code> yükü kurup bitiriyor, iki kademe de onu çağırıyor. Aynı düzen artık diyagram tarafında da var, <b>gerçekten değişen tek şeye</b> (baz) parametrelenmiş.</p>
+
+  <div class="note">
+    <span class="k">Davranış değişmedi — tartışılmadı, ölçüldü</span>
+    <p>İki kıyaslama koşumu da her yükü <code>OC_CALL_LOG</code> üzerinden yazdı. <b>86 ayrı istek</b> alan adları, <b>alan sırası</b> ve nokta serisi dışındaki her değer üzerinden karşılaştırıldı — sıralaması bozulmuş bir sözlük ya da eksik bir adım tam orada görünür. <b>Sıfır fark.</b> Karşılaştırma değiştirilen iki dala da gerçek çağrıyla ulaşıyor: 8 diyagram <code>native_oc_step_gnuplot</code>, 2 diyagram <code>python_loop_matplotlib</code> ile döndü.</p>
+    <p><b>Karşılaştırmanın kendisi de denendi</b> — işini yapmadan geçen bir kontrol bu haftanın diğer dersi. Kaydedilmiş bir yükten <code>scan_summary</code> düşürüldüğünde (bir adım kaybolsa olacak şey) karşılaştırma o yükü ve değişen alan sırasını bildiriyor. Bir kez de düzeltilmesi gerekti: ilk koşumda <code>compare_alloys</code>'ta dört fark çıktı, hepsi motor süresinin 175 yerine 176 ms olmasıydı — bu araç iki tam sonucu etiket altına yuvalıyor, süreler süzgecin bir kat altında kalıyordu.</p>
+  </div>
+
+  <p>Bu refactor dosyayı <b>kısaltmadı</b> — fonksiyon 262'den 269 satıra çıktı, çünkü yardımcının neden var olduğunu anlatan 11 satırlık belgesi eklendi. Kazanılan şey satır değil: <b>iki kopya yerine bir kopya.</b></p>
 
   <figure>
     <svg viewBox="0 0 940 210" role="img" aria-label="Dört aşamalı doğrulama zinciri: sözdizimi, ayar denetimi, 550 istekli fark testi ve 86 vakalık kıyaslama. İki gerçek arıza ilk üç aşamayı da geçti ve yalnızca son aşamada yakalandı.">
@@ -1124,12 +1136,17 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
     <figcaption><b>Statik denetimler ve birim testleri sistemin çalıştığını göstermiyor.</b> Kıyaslama koşumu bu turda iki kez yeniden başlatıldı; iki arıza da yalnızca uçtan uca koşumda göründü. Birincisi MCP protokolünü, ikincisi kural sırasını gerektiriyordu. Düzeltmeden sonra koşum <b>86/86</b> — ve bu rapor yazılırken tekrar ölçüldü: kolay 30/30 · orta 35/35 · zor 21/21, 163,7 saniye. Havuz 88 vaka; ikisi <b>belgelenmiş açık kusur</b> olduğu için ayrı tutuluyor (askıya alınmış fazın yedek motoru yok · gaz fazı molekül türü olarak ayrıştırılıyor). Bayrağın kendisi bir yapılacak iş kaydı.</figcaption>
   </figure>
 
+  <div class="note">
+    <span class="k">Kasıtlı olarak yapılmayan — <code>tools/*.py</code> ayrımı</span>
+    <p>Planın 6. adımı altı hesap aracını ayrı dosyalara taşımayı da söylüyordu. Bunu haklı çıkaran gerekçe <b>ölçümden sağ çıkmadı</b>: kısmen düzeltmesi beklenen yavaş tam koşumların sebebi Katman B'nin ulaşılamayan hakemi 90 saniye beklemesiymiş, dosyanın büyüklüğüyle ilgisi yok. O büyüklükte bir taşıma, bu hafta zaten yaşanan <b>kayıt olmama riskini</b> taşıyor ve karşılığında ölçülmüş bir kazanç yok. Isıran kısım kopyaydı; giden de o oldu.</p>
+  </div>
+
   <h3>Kalan kod borcu</h3>
   <div class="scroll">
     <table>
       <thead><tr><th>Borç</th><th>Ölçü</th><th>Risk</th></tr></thead>
       <tbody>
-        <tr><td><code>server.py</code>'ın altı fonksiyonu</td><td>1.160 satır</td><td>Boru hattı elle diziliyor; düşen bir adım sessiz kalır</td></tr>
+        <tr><td><code>server.py</code>'ın altı fonksiyonu</td><td>1.167 satır</td><td>Boru hattı elle diziliyor. İki tarama aracında artık tek <code>_shape()</code>'ten geçiyor; diğer dördünde sıra hâlâ elle</td></tr>
         <tr><td><code>build_combined_series</code></td><td>302 satır, tek fonksiyon</td><td><code>native_step.py</code> içinde; hem hesap hem sunum taşıyor</td></tr>
         <tr><td>Faz adı kanonikleştirme</td><td>3 modülde ayrı tanım</td><td>Çıkışta tek yazıma indirildi (<code>e354894</code>); tanımlar hâlâ <code>native_step</code>, <code>native_map</code> ve <code>server</code>'da ayrı</td></tr>
       </tbody>
@@ -1183,9 +1200,8 @@ en pahali uc vaka                sure      verify_b       pay
 </section>
 
 <footer>
-  Kaynak: /root/projects/oc-mcp · WSL Ubuntu · main @ c7aa612 (1 Eylül 18:32) · 60 commit, 14'ü henüz gönderilmedi<br>
-  Her sayı 2 Eylül 2026'da ölçüldü: satır sayıları depodan, ayar sayıları <b>ayakta duran sunucunun POLICY nesnesinden</b>, kıyaslama o gün koşturulan turdan. Hiçbiri makaleden ya da docs/ altındaki belgelerden alınmadı.<br>
-  Çalışma ağacında tek değişiklik var: <code>_apply_review</code>'in belgesi, davranış değişikliği içermiyor.
+  Kaynak: /root/projects/oc-mcp · WSL Ubuntu · main @ f570668 (2 Eylül 14:28) · 62 commit, <b>hepsi gönderildi</b> — çalışma ağacı temiz<br>
+  Her sayı 2 Eylül 2026'da ölçüldü: satır sayıları depodan, ayar sayıları <b>ayakta duran sunucunun POLICY nesnesinden</b>, kıyaslama o gün koşturulan turdan. Hiçbiri makaleden ya da docs/ altındaki belgelerden alınmadı.
 </footer>
 
 </div>
