@@ -1134,6 +1134,35 @@ def calculate_property_diagram(
         "suspended_phases": suspended_phases,
     }
 
+    def _shape(points, backend, basis_field, extra):
+        """Build the payload and finish it -- once, whichever tier answered.
+
+        The finishing sequence used to be written out at both tiers, a
+        hundred lines apart, and the two differ on purpose: STEP reports
+        mass fractions, the single-point loop molar amounts. That is
+        exactly what makes two copies dangerous -- a deliberate difference
+        and a dropped step look identical to a reader, and only one of them
+        is meant to be there. Naming the single thing that varies leaves a
+        step nowhere to hide. isothermal_section has been shaped this way
+        since it was written; this is the same arrangement.
+        """
+        data = {
+            "database": os.path.basename(database),
+            "composition": elements_composition,
+            "pressure_Pa": pressure_Pa,
+            "suspended_phases": (list(suspended_phases)
+                                 if suspended_phases else []),
+            "points": points,
+            "backend_used": backend,
+        }
+        data.update(extra)
+        _canonical_phases(data)
+        _attach_basis(data, basis_field)
+        _attach_mixed_basis_note(data)
+        _attach_scan_summary(data, "temperature_K")
+        return _attach_coverage(data, "temperature_K", n_points,
+                                temperature_min_K, temperature_max_K)
+
     if not suspended_phases:
         try:
             db_path = (
@@ -1159,13 +1188,8 @@ def calculate_property_diagram(
                 for T, fractions, source in combined
             ]
             window_opened = native_step.open_interactive_window(combined, chart_title)
-            data = {
-                "database": os.path.basename(database),
-                "composition": elements_composition,
-                "pressure_Pa": pressure_Pa,
-                "suspended_phases": [],
-                "points": points,
-                "backend_used": "native_oc_step_gnuplot",
+            data = _shape(points, "native_oc_step_gnuplot",
+                          "phase_mass_fraction", {
                 "interactive_window_opened": window_opened,
                 "native_step_points": len(combined) - len(gap_filled_temperatures),
                 "gap_filled_points": len(gap_filled_temperatures),
@@ -1179,13 +1203,7 @@ def calculate_property_diagram(
                     "point's 'source' field."
                 ),
                 "chart_error": None,
-            }
-            _canonical_phases(data)
-            _attach_basis(data, "phase_mass_fraction")
-            _attach_mixed_basis_note(data)
-            _attach_scan_summary(data, "temperature_K")
-            _attach_coverage(data, "temperature_K", n_points,
-                             temperature_min_K, temperature_max_K)
+            })
             return [
                 _attach_verification(data, _diagram_args,
                                      declared_basis=_basis_report),
@@ -1279,26 +1297,15 @@ def calculate_property_diagram(
     else:
         chart_error = None
 
-    data = {
-        "database": os.path.basename(database),
-        "composition": elements_composition,
-        "pressure_Pa": pressure_Pa,
-        "suspended_phases": list(suspended_phases) if suspended_phases else [],
-        "points": points,
-        "backend_used": "python_loop_matplotlib",
-        "native_backend_error": native_backend_error,
-        "chart_error": chart_error,
-    }
     # This tier calls the single-point path once per temperature, so its
     # numbers are MOLAR amounts -- not the mass fractions the STEP series
     # carries. Same tool, same field name, different quantity depending on
     # which tier answered, which is the whole reason the basis is stated.
-    _canonical_phases(data)
-    _attach_basis(data, "phase_molar_amount")
-    _attach_mixed_basis_note(data)
-    _attach_scan_summary(data, "temperature_K")
-    _attach_coverage(data, "temperature_K", n_points,
-                     temperature_min_K, temperature_max_K)
+    data = _shape(points, "python_loop_matplotlib",
+                  "phase_molar_amount", {
+        "native_backend_error": native_backend_error,
+        "chart_error": chart_error,
+    })
     _attach_verification(data, _diagram_args,
                          declared_basis=_basis_report)
     if chart_bytes:
