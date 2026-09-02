@@ -154,6 +154,45 @@ def yon_uc(metinler):
 
 
 
+def _cagri(modul, fonksiyon):
+    """Bir fonksiyonun donusunu olcen deneme."""
+    def olc():
+        return getattr(__import__(modul), fonksiyon)()
+    return olc
+
+
+def _katman_a_esigi():
+    """Yirmi noktanin biri hatali: %5. Esik 0.10'ken sessiz, 0.0'ken sikayet.
+
+    Bu deneme oteki ikisinden farkli bir sey soruyor. Onlar bir okuyucunun
+    dosyayi okuyup okumadigini soruyor; bu, Katman A'nin BUTUN zincirinin
+    dosyadan geldigini: beyan output.toml'da, derleyici onu yuklemine
+    bagliyor, ve yuklem kuralin esigini gercekten kullaniyor. Elde tutulan
+    bir kontrol listesi ya da koda gomulmus bir esik buradan gecemez.
+    """
+    import result_check
+    yuk = {"points": [{"temperature_K": 900.0 + i} for i in range(20)]}
+    yuk["points"][0]["error"] = "olcum icin"
+    _, bulunan = result_check.verify_result(yuk)
+    return bool(bulunan)
+
+
+DENEMELER = [
+    ("semantic_check._max_tokens", "execution.toml",
+     "max_tokens = 4000", "max_tokens = 1234",
+     _cagri("semantic_check", "_max_tokens"), 1234, ("semantic_check",)),
+
+    ("semantic_check._transient_http", "execution.toml",
+     "transient_http = [429, 500, 502, 503, 504, 529]",
+     "transient_http = [418]",
+     _cagri("semantic_check", "_transient_http"), {418}, ("semantic_check",)),
+
+    ("Katman A esigi", "output.toml",
+     "max_failed_fraction = 0.10", "max_failed_fraction = 0.0",
+     _katman_a_esigi, True, ("result_check",)),
+]
+
+
 def yon_dort():
     """Ayari okudugunu SANAN ama sessizce yedege dusen okuyucu var mi?
 
@@ -173,40 +212,54 @@ def yon_dort():
     Iddiayi test etmenin tek yolu dosyayi degistirip cevabin degisip
     degismedigine bakmak. Degismiyorsa okumuyordur.
     """
-    YOL = os.path.join(SETTINGS, "execution.toml")
-    asil = io.open(YOL, encoding="utf-8").read()
     sorunlar = []
+    dokunulan = {}
 
-    DENEMELER = [
-        ("semantic_check", "_max_tokens",
-         "max_tokens = 4000", "max_tokens = 1234", 1234),
-        ("semantic_check", "_transient_http",
-         "transient_http = [429, 500, 502, 503, 504, 529]",
-         "transient_http = [418]", {418}),
-    ]
-    try:
-        for modul, fonksiyon, eski, yeni, beklenen in DENEMELER:
-            if eski not in asil:
-                continue
-            io.open(YOL, "w", encoding="utf-8").write(asil.replace(eski, yeni))
-            for m in (modul, "settings_engine"):
-                sys.modules.pop(m, None)
-            try:
-                mod = __import__(modul)
-                deger = getattr(mod, fonksiyon)()
-            except Exception as exc:                     # noqa: BLE001
-                sorunlar.append("%s.%s cagrilamadi: %s"
-                                % (modul, fonksiyon, exc))
-                continue
-            if deger != beklenen:
-                sorunlar.append(
-                    "%s.%s() ayari OKUMUYOR: dosyada %r yazarken %r donduruyor "
-                    "-- sessizce yedege dusuyor"
-                    % (modul, fonksiyon, beklenen, deger))
-    finally:
-        io.open(YOL, "w", encoding="utf-8").write(asil)
-        for m in ("semantic_check", "settings_engine"):
+    def tazele(moduller):
+        """Ayar okuyan her seyi unut, sonra yeniden yukle."""
+        for m in tuple(moduller) + ("settings_engine",):
             sys.modules.pop(m, None)
+
+    def olc(deneme):
+        etiket, dosya, eski, yeni, cagir, beklenen, moduller = deneme
+        yol = os.path.join(SETTINGS, dosya)
+        if yol not in dokunulan:
+            dokunulan[yol] = io.open(yol, encoding="utf-8").read()
+        asil = dokunulan[yol]
+        if eski not in asil:
+            return ["%s: %r dosyada yok -- deneme kosulamadi" % (etiket, eski)]
+
+        # ONCE: dosya el degmemis halde. Bu olculmezse hep ayni cevabi
+        # donduren bir fonksiyon denemeden gecer.
+        tazele(moduller)
+        try:
+            once = cagir()
+        except Exception as exc:                         # noqa: BLE001
+            return ["%s cagrilamadi (degistirmeden once): %s" % (etiket, exc)]
+
+        io.open(yol, "w", encoding="utf-8").write(asil.replace(eski, yeni))
+        tazele(moduller)
+        try:
+            sonra = cagir()
+        except Exception as exc:                         # noqa: BLE001
+            return ["%s cagrilamadi: %s" % (etiket, exc)]
+
+        if once == sonra:
+            return ["%s ayari OKUMUYOR: %s degistirildi, cevap %r olarak "
+                    "AYNI kaldi -- sessizce yedege dusuyor"
+                    % (etiket, dosya, once)]
+        if sonra != beklenen:
+            return ["%s dosyayi takip ediyor ama beklenmeyen deger: %r "
+                    "beklenirken %r" % (etiket, beklenen, sonra)]
+        return []
+
+    try:
+        for deneme in DENEMELER:
+            sorunlar += olc(deneme)
+    finally:
+        for yol, asil in dokunulan.items():
+            io.open(yol, "w", encoding="utf-8").write(asil)
+        tazele(("semantic_check", "result_check"))
     return sorunlar
 
 def main():

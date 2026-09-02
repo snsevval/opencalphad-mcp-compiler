@@ -397,14 +397,19 @@ VERIFY_PREDICATES = {
 def _declared(stage):
     """The checks declared for one stage, already bound to their predicates.
 
-    settings_engine imported lazily: it reaches into this module at compile
-    time to resolve the names, and this module must stay importable on its
-    own for that to work.
+    The binding is the compiler's and was made once, at import. This used
+    to do the resolving here instead, on every result: read the raw rules,
+    filter them by stage, and look each name up in VERIFY_PREDICATES. That
+    is the rule-engine shape -- the runtime holding names -- and it is what
+    the compiler exists to remove; the input rules stopped doing it when
+    the compiler went in and these had not caught up.
+
+    settings_engine is still imported lazily, and for the original reason:
+    it reaches into this module at compile time to resolve those names, so
+    this module must stay importable on its own.
     """
     import settings_engine
-    return [(rule, VERIFY_PREDICATES[rule["check"]])
-            for rule in settings_engine.POLICY.output.verify
-            if rule.get("stage") == stage]
+    return settings_engine.POLICY.output.verification.for_stage(stage)
 
 
 def verify_result(result):

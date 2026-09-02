@@ -404,13 +404,49 @@ class OutputPlan:
     """output.toml, resolved: the wording and the derivations, keyed the
     way the runtime asks for them."""
 
-    def __init__(self, derive, notes, conversion, floor, verify, honesty):
+    def __init__(self, derive, notes, conversion, floor, verify, honesty,
+                 verification=None):
         self.derive = derive
         self.notes = notes                    # {id: text}
-        self.verify = verify                  # [rule] -- Layer A, in order
+        self.verify = verify                  # [rule] -- Layer A, as declared
+        self.verification = verification      # the same, bound to predicates
         self.honesty = honesty                # {id: rule} -- our own output
         self.conversion = conversion          # {name: block}
         self.floor = floor
+
+
+class VerificationPlan:
+    """Layer A's checks, resolved to their predicates once, at compile time.
+
+    The declaration lives in output.toml and the arithmetic lives in
+    result_check; this is the join between them, and it used to be made on
+    every result -- a lazy import, a list comprehension and a dict lookup
+    per rule, per calculation. It was never unsafe, because compile_settings
+    refuses to start on a name that does not resolve. It was the rule-engine
+    shape: the runtime holding names and looking them up as it went. The
+    input rules have arrived pre-bound since the compiler went in, and these
+    had not caught up.
+
+    Keyed by stage because the two stages ask different questions and are
+    reported differently -- `result` asks whether this is a well-formed
+    thermodynamic answer, `correspondence` whether it answers the request
+    that was made.
+    """
+
+    def __init__(self, asamalar):
+        self._asamalar = asamalar             # {stage: [(rule, predicate)]}
+
+    def for_stage(self, stage):
+        """The checks declared for one stage, already bound. Order kept:
+        output.toml lists them in the order they should run and a reader
+        of the file should be reading the running order."""
+        return self._asamalar.get(stage, ())
+
+    def stages(self):
+        return sorted(self._asamalar)
+
+    def __len__(self):
+        return sum(len(v) for v in self._asamalar.values())
 
 
 class CompiledPolicy:
@@ -628,13 +664,13 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
     # exist. A check declared and unresolvable would otherwise be a check
     # that silently never runs -- the failure this compiler was built for.
     dogrulamalar = list(cikti.get("verify", []))
+    kayit = {}
     if dogrulamalar:
         try:
             import result_check
             kayit = result_check.VERIFY_PREDICATES
         except Exception as exc:                         # noqa: BLE001
             hatalar.append("verify: result_check okunamadi (%s)" % exc)
-            kayit = {}
         for rule in dogrulamalar:
             kimlik = rule.get("id", "<isimsiz>")
             if not rule.get("check"):
@@ -646,6 +682,18 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
             if rule.get("stage") not in ("result", "correspondence"):
                 hatalar.append("verify %r: stage=%r gecersiz"
                                % (kimlik, rule.get("stage")))
+
+    # The binding itself. Rules that failed a check above are skipped here
+    # and the error already recorded, so this never binds half a name --
+    # and `hatalar` stops the import before anything reads the plan anyway.
+    asamalar = {}
+    for rule in dogrulamalar:
+        yuklem = kayit.get(rule.get("check"))
+        if yuklem is None or rule.get("stage") not in (
+                "result", "correspondence"):
+            continue
+        asamalar.setdefault(rule["stage"], []).append((rule, yuklem))
+    dogrulama_plani = VerificationPlan(asamalar)
 
     # [honesty] declares invariants about OUR behaviour, each naming a
     # predicate in result_check. Resolved here for the same reason the
@@ -674,6 +722,7 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
         floor=dict(cikti.get("floor", {})),
         verify=dogrulamalar,
         honesty=durustluk,
+        verification=dogrulama_plani,
     )
 
     if hatalar:
