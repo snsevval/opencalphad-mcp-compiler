@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenCalphad MCP Mevcut Durum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+
+<style>
+:root {
+  --ground:#F5F7F8; --surface:#FFFFFF; --sunk:#EDF1F3;
+  --ink:#171C22; --muted:#5A646E; --faint:#8A949D;
+  --rule:#DCE3E7; --rule2:#BAC5CD;
+  --accent:#A85A32; --accent-ink:#8C4826; --accent-soft:#F6EAE2;
+  --ok:#2E7159; --wait:#8A6D1F; --bad:#A33A32;
+  --shadow:0 1px 2px rgba(23,28,34,.05), 0 10px 28px -20px rgba(23,28,34,.25);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#12161A; --surface:#181D22; --sunk:#1E242A;
+    --ink:#E6EBEF; --muted:#9AA5AF; --faint:#6D7883;
+    --rule:#2A323A; --rule2:#414C56;
+    --accent:#D98A5F; --accent-ink:#E8AD8B; --accent-soft:#2C2019;
+    --ok:#5FB18C; --wait:#C7A445; --bad:#D97066;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 28px -20px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#12161A; --surface:#181D22; --sunk:#1E242A;
+  --ink:#E6EBEF; --muted:#9AA5AF; --faint:#6D7883;
+  --rule:#2A323A; --rule2:#414C56;
+  --accent:#D98A5F; --accent-ink:#E8AD8B; --accent-soft:#2C2019;
+  --ok:#5FB18C; --wait:#C7A445; --bad:#D97066;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 28px -20px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink); margin:0;
+  padding:0 1.25rem 6rem;
+  font-family:"IBM Plex Serif",Georgia,serif; font-size:17px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.page{max-width:62rem;margin:0 auto;display:flex;flex-direction:column;gap:3rem}
+
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace; font-size:.72rem; font-weight:500;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:0;
+}
+h1{
+  font-family:Archivo,Arial,sans-serif; font-weight:700;
+  font-size:clamp(2rem,5vw,2.9rem); line-height:1.06; letter-spacing:-.022em;
+  margin:0; text-wrap:balance;
+}
+h2{
+  font-family:Archivo,Arial,sans-serif; font-weight:600; font-size:1.5rem;
+  line-height:1.15; letter-spacing:-.014em; margin:0; text-wrap:balance;
+}
+h3{
+  font-family:Archivo,Arial,sans-serif; font-weight:600; font-size:1rem;
+  margin:.4rem 0 -.4rem;
+}
+p{margin:0;max-width:70ch}
+header{padding-top:3.25rem;display:flex;flex-direction:column;gap:1.25rem}
+.standfirst{font-size:1.08rem;color:var(--muted);max-width:46ch}
+
+section{display:flex;flex-direction:column;gap:1.15rem}
+.sec-head{display:flex;align-items:baseline;gap:.8rem;border-top:1px solid var(--rule2);padding-top:1rem}
+.num{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--accent);padding-top:.3rem}
+
+/* ---- meta strip ---- */
+.meta{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden;
+}
+.meta div{background:var(--surface);padding:.8rem .95rem;display:flex;flex-direction:column;gap:.15rem}
+.meta .k{font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+.meta .v{font-size:.94rem;font-variant-numeric:tabular-nums}
+
+/* ---- figures ---- */
+figure{
+  margin:0;background:var(--surface);border:1px solid var(--rule);
+  border-radius:4px;box-shadow:var(--shadow);padding:1.5rem 1.35rem 1.1rem;
+  display:flex;flex-direction:column;gap:1rem;overflow-x:auto;
+}
+figure svg{display:block;width:100%;min-width:640px;max-width:100%;height:auto;color:var(--ink)}
+figcaption{
+  font-size:.88rem;color:var(--muted);max-width:74ch;
+  border-top:1px solid var(--rule);padding-top:.8rem;
+}
+figcaption b{color:var(--ink);font-weight:600}
+
+/* svg semantic classes */
+.n-box{fill:var(--surface);stroke:var(--rule2);stroke-width:1.5}
+.n-toml{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5}
+.n-sunk{fill:var(--sunk);stroke:var(--rule2);stroke-width:1.5}
+.n-head{fill:none;stroke:none}
+.s-line{stroke:currentColor;stroke-width:1.5;fill:none}
+.s-dash{stroke:currentColor;stroke-width:1.4;fill:none;stroke-dasharray:5 4;opacity:.75}
+.s-acc{stroke:var(--accent);stroke-width:1.8;fill:none}
+.t{font-family:Archivo,Arial,sans-serif;font-size:13px;fill:currentColor}
+.t-b{font-family:Archivo,Arial,sans-serif;font-size:13px;font-weight:600;fill:currentColor}
+.t-m{font-family:"IBM Plex Mono",monospace;font-size:11.5px;fill:currentColor}
+.t-s{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--faint)}
+.t-acc{font-family:"IBM Plex Mono",monospace;font-size:11px;fill:var(--accent-ink)}
+.t-hd{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;fill:var(--faint)}
+
+/* ---- tables ---- */
+.scroll{overflow-x:auto}
+table{
+  border-collapse:collapse;width:100%;min-width:32rem;font-size:.92rem;
+  background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+}
+th{
+  font-family:Archivo,sans-serif;font-weight:600;font-size:.72rem;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);text-align:left;vertical-align:bottom;
+  padding:.65rem .8rem;border-bottom:1px solid var(--rule2);background:var(--sunk);
+}
+td{padding:.65rem .8rem;border-bottom:1px solid var(--rule);vertical-align:top;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.r{text-align:right}
+
+code{
+  font-family:"IBM Plex Mono",monospace;font-size:.86em;background:var(--sunk);
+  border:1px solid var(--rule);border-radius:2px;padding:.06em .3em;white-space:nowrap;
+}
+pre{
+  font-family:"IBM Plex Mono",monospace;font-size:.8rem;line-height:1.6;
+  background:var(--surface);border:1px solid var(--rule);border-left:2px solid var(--rule2);
+  border-radius:3px;padding:.9rem 1rem;margin:0;overflow-x:auto;
+}
+pre code{background:none;border:0;padding:0;white-space:pre;font-size:inherit}
+
+ul,ol{margin:0;padding-left:1.3rem;max-width:70ch}
+li{margin-bottom:.45rem}
+li::marker{color:var(--faint)}
+
+.pill{
+  display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.66rem;
+  font-weight:500;letter-spacing:.07em;text-transform:uppercase;padding:.16em .48em;
+  border-radius:2px;border:1px solid currentColor;white-space:nowrap;
+}
+.pill.ok{color:var(--ok)} .pill.wait{color:var(--wait)}
+.pill.bad{color:var(--bad)} .pill.neu{color:var(--faint)}
+
+.note{
+  background:var(--accent-soft);border:1px solid var(--rule);border-radius:3px;
+  padding:.95rem 1.1rem;display:flex;flex-direction:column;gap:.55rem;
+}
+.note .k{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--accent-ink)}
+
+.key{
+  display:flex;flex-wrap:wrap;gap:1.1rem;font-family:"IBM Plex Mono",monospace;
+  font-size:.72rem;color:var(--muted);align-items:center;
+}
+.key span{display:flex;align-items:center;gap:.4rem}
+.sw{width:16px;height:11px;border-radius:2px;display:inline-block}
+.sw.toml{background:var(--accent-soft);border:1.5px solid var(--accent)}
+.sw.py{background:var(--surface);border:1.5px solid var(--rule2)}
+
+footer{
+  border-top:1px solid var(--rule2);padding-top:1rem;
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--faint);line-height:1.7;
+}
+
+/* ---- yazdirma ---- */
+@media print {
+  /* ekran temasi ne olursa olsun kagitta acik palet */
+  :root, :root[data-theme="dark"] {
+    --ground:#FFFFFF; --surface:#FFFFFF; --sunk:#F2F5F6;
+    --ink:#000000; --muted:#3A434B; --faint:#5C666E;
+    --rule:#C8D0D6; --rule2:#9AA6AE;
+    --accent:#8C4826; --accent-ink:#7A3D20; --accent-soft:#F6EAE2;
+    --ok:#1F5A44; --wait:#6B5314; --bad:#8A2B24;
+    --shadow:none;
+  }
+  @page { margin: 14mm 12mm; }
+
+  body { padding:0; font-size:10.5pt; line-height:1.45; background:#fff }
+  .page { max-width:none; gap:1.4rem }
+  header { padding-top:0 }
+  h1 { font-size:22pt }
+  h2 { font-size:14pt }
+  h3 { font-size:11pt }
+  p, li { max-width:none }
+
+  /* anlam tasiyan zeminler kagitta da bassin */
+  .n-toml, .n-sunk, .n-box, th, .note, .meta div, .sw, pre, table, figure {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  figure { box-shadow:none; break-inside:avoid; page-break-inside:avoid; padding:.8rem .7rem .6rem }
+  figure svg { min-width:0; width:100% }
+  figcaption { font-size:8.5pt }
+
+  section { break-inside:auto }
+  .sec-head { break-after:avoid; page-break-after:avoid }
+  h2, h3 { break-after:avoid; page-break-after:avoid }
+  table, pre, .note, .meta { break-inside:avoid; page-break-inside:avoid }
+  tr { break-inside:avoid; page-break-inside:avoid }
+  thead { display:table-header-group }
+  .scroll { overflow:visible }
+  table { min-width:0; font-size:8.8pt }
+  th, td { padding:.32rem .42rem }
+  code { font-size:8.6pt; white-space:normal; word-break:break-word }
+  pre { font-size:8.2pt; white-space:pre-wrap; word-break:break-word }
+  footer { break-inside:avoid }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ c7aa612</p>
+  <h1>opencalphad-mcp-compiler</h1>
+  <p class="standfirst">Kurallar nerede yaşıyor, derleyici onları nasıl bağlıyor, bir istek hangi aşamalardan geçiyor, motor hangi sırayla deniyor.</p>
+
+  <div class="meta">
+    <div><span class="k">Araç</span><span class="v">8 <span style="color:var(--faint)">(2 keşif · 6 hesap)</span></span></div>
+    <div><span class="k">Python</span><span class="v">8.158 satır · 14 modül</span></div>
+    <div><span class="k">Ayar</span><span class="v">1.637 satır · 3 dosya</span></div>
+    <div><span class="k">Motor zinciri</span><span class="v">6 cascade</span></div>
+    <div><span class="k">Doğrulama</span><span class="v">8 verify · 7 beyan</span></div>
+    <div><span class="k">Derleme</span><span class="v">11 durdurur · 3 uyarır</span></div>
+    <div><span class="k">Derlenmiş politika</span><span class="v">29 alan · 3 nesne</span></div>
+    <div><span class="k">Son commit</span><span class="v">1 Eyl 18:32</span></div>
+  </div>
+</header>
+
+
+<!-- ============ 1. KURAL NEREDE ============ -->
+<section>
+  <div class="sec-head"><span class="num">01</span><h2>Kural nerede yaşıyor</h2></div>
+  <p>Günlerdir karışan nokta bu. Üç katmanın üçü de aynı şeyi yaşamadı: <b>PREFLIGHT'ın içi boşaldı, VERIFY A'nın boşalmadı, Layer B hiç taşınmadı.</b></p>
+
+  <div class="key">
+    <span><i class="sw toml"></i> ayar dosyasında (TOML) — veri</span>
+    <span><i class="sw py"></i> Python'da — kod</span>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 980 400" role="img" aria-label="Üç katmanın kural listesi, kontrol gövdesi ve eski katman dosyası nerede yaşıyor: PREFLIGHT'ın hem listesi hem gövdesi ayarlarda ve eski dosyası boş; VERIFY A'nın listesi ayarlarda ama gövdesi Python'da; Layer B'nin ikisi de Python'da.">
+      <defs>
+        <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- headers -->
+      <text class="t-hd" x="176" y="34">KURAL LİSTESİ · EŞİK · GEREKÇE</text>
+      <text class="t-hd" x="452" y="34">KONTROLÜN GÖVDESİ</text>
+      <text class="t-hd" x="740" y="34">ESKİ KATMAN DOSYASI</text>
+      <line class="s-line" x1="16" y1="46" x2="964" y2="46" opacity=".35"/>
+
+      <!-- lane 1: PREFLIGHT -->
+      <text class="t-b" x="16" y="86">PREFLIGHT</text>
+      <text class="t-s" x="16" y="102">istek reddi</text>
+      <rect class="n-toml" x="176" y="62" width="256" height="72" rx="3"/>
+      <text class="t-m" x="192" y="88">settings/input.toml</text>
+      <text class="t-s" x="192" y="106">24 × [[reject]] + [[route]]</text>
+      <text class="t-s" x="192" y="122">database-exists, mass-balance…</text>
+      <rect class="n-toml" x="452" y="62" width="256" height="72" rx="3"/>
+      <text class="t-m" x="468" y="88">settings_engine.py</text>
+      <text class="t-s" x="468" y="106">genel işleyiciler</text>
+      <text class="t-s" x="468" y="122">_sum_within, _file_exists…</text>
+      <rect class="n-sunk" x="728" y="62" width="236" height="72" rx="3"/>
+      <text class="t-m" x="744" y="88">preflight.py — 155 satır</text>
+      <text class="t-acc" x="744" y="106">İÇİ BOŞ</text>
+      <text class="t-s" x="744" y="122">5 sarmalayıcı, kural gövdesi yok</text>
+
+      <!-- lane 2: VERIFY A -->
+      <text class="t-b" x="16" y="196">VERIFY A</text>
+      <text class="t-s" x="16" y="212">yapısal denetim</text>
+      <rect class="n-toml" x="176" y="172" width="256" height="72" rx="3"/>
+      <text class="t-m" x="192" y="198">settings/output.toml</text>
+      <text class="t-s" x="192" y="216">8 × [[verify]] + eşikler</text>
+      <text class="t-s" x="192" y="232">tolerance, minimum_covered…</text>
+      <rect class="n-box" x="452" y="172" width="256" height="72" rx="3"/>
+      <text class="t-m" x="468" y="198">result_check.py</text>
+      <text class="t-s" x="468" y="216">gerçek fonksiyonlar, CANLI</text>
+      <text class="t-s" x="468" y="232">check_mass_balance…</text>
+      <rect class="n-box" x="728" y="172" width="236" height="72" rx="3"/>
+      <text class="t-m" x="744" y="198">result_check.py — 684 satır</text>
+      <text class="t-s" x="744" y="216">DOLU — aynı dosya</text>
+      <text class="t-s" x="744" y="232">makalede 97 satırdı</text>
+      <!-- binding arrow -->
+      <line class="s-acc" x1="432" y1="208" x2="446" y2="208" marker-end="url(#ar1)" style="color:var(--accent)"/>
+      <text class="t-acc" x="316" y="262" text-anchor="middle">check = "mass_balance" adı</text>
+      <text class="t-acc" x="580" y="262" text-anchor="middle">VERIFY_PREDICATES ile bağlanıyor</text>
+
+      <!-- lane 3: LAYER B -->
+      <text class="t-b" x="16" y="316">LAYER B</text>
+      <text class="t-s" x="16" y="332">bağımsız hakem</text>
+      <rect class="n-box" x="176" y="292" width="256" height="72" rx="3"/>
+      <text class="t-m" x="192" y="318">semantic_check.py</text>
+      <text class="t-s" x="192" y="336">taşınmadı</text>
+      <text class="t-s" x="192" y="352">ayarda yalnız hakem zinciri+bütçe</text>
+      <rect class="n-box" x="452" y="292" width="256" height="72" rx="3"/>
+      <text class="t-m" x="468" y="318">semantic_check.py</text>
+      <text class="t-s" x="468" y="336">prompt, zincir, verdict ayrıştırma</text>
+      <rect class="n-box" x="728" y="292" width="236" height="72" rx="3"/>
+      <text class="t-m" x="744" y="318">semantic_check.py — 430 satır</text>
+      <text class="t-s" x="744" y="336">DOLU · artık KARAR VERMİYOR</text>
+      <text class="t-s" x="744" y="352">advisory_only = true</text>
+    </svg>
+    <figcaption><b>Taşınan şey, hangi kontrolün koşacağına karar veren yer.</b> PREFLIGHT'ta kuralın gövdesi de veriye dönüştü, o yüzden <code>preflight.py</code> boşaldı — bir süre ölü kopya kalmıştı, <code>3f7809d</code> onları sildi. VERIFY A'da yalnız kayıt/eşik/gerekçe taşındı; <code>mass_balance</code> gibi bir kontrol veriye dönüşmediği için gövdesi Python kaldı ve çalışıyor.</figcaption>
+  </figure>
+</section>
+
+
+<!-- ============ 2. BORU HATTI ============ -->
+<section>
+  <div class="sec-head"><span class="num">02</span><h2>Bir istek hangi aşamalardan geçiyor</h2></div>
+  <p>Çıktıda gördüğünüz <code>"stage"</code> etiketleri bunlar. Etiket kuralın nerede yazılı olduğunu değil, <b>hangi aşamanın iş gördüğünü</b> söylüyor — o yüzden kurallar TOML'a taşınınca da çıktıda kalmaya devam etti.</p>
+
+  <figure>
+    <svg viewBox="0 0 1040 330" role="img" aria-label="İstek boru hattı: PREFLIGHT, PRECONDITION, EXECUTION, VERIFY A, VERIFY B aşamaları soldan sağa; her birinden aşağı bir çıkış oku, reddedilen isteğin hangi etiketle döndüğünü gösteriyor.">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text class="t-hd" x="16" y="26">AŞAMA — server.py'ın sonuca yazdığı "stage" değeri</text>
+
+      <!-- stage boxes -->
+      <rect class="n-sunk" x="16" y="46" width="118" height="58" rx="3"/>
+      <text class="t-b" x="75" y="70" text-anchor="middle">İSTEK</text>
+      <text class="t-s" x="75" y="88" text-anchor="middle">MCP tool call</text>
+
+      <rect class="n-toml" x="164" y="46" width="118" height="58" rx="3"/>
+      <text class="t-b" x="223" y="70" text-anchor="middle">PREFLIGHT</text>
+      <text class="t-s" x="223" y="88" text-anchor="middle">input.toml</text>
+
+      <rect class="n-toml" x="312" y="46" width="118" height="58" rx="3"/>
+      <text class="t-b" x="371" y="70" text-anchor="middle">PRECONDITION</text>
+      <text class="t-s" x="371" y="88" text-anchor="middle">input.toml [[route]]</text>
+
+      <rect class="n-toml" x="460" y="46" width="118" height="58" rx="3"/>
+      <text class="t-b" x="519" y="70" text-anchor="middle">EXECUTION</text>
+      <text class="t-s" x="519" y="88" text-anchor="middle">execution.toml</text>
+
+      <rect class="n-box" x="608" y="46" width="118" height="58" rx="3"/>
+      <text class="t-b" x="667" y="70" text-anchor="middle">VERIFY A</text>
+      <text class="t-s" x="667" y="88" text-anchor="middle">output.toml + .py</text>
+
+      <rect class="n-box" x="756" y="46" width="118" height="58" rx="3"/>
+      <text class="t-b" x="815" y="70" text-anchor="middle">VERIFY B</text>
+      <text class="t-s" x="815" y="88" text-anchor="middle">semantic_check</text>
+
+      <rect class="n-sunk" x="904" y="46" width="118" height="58" rx="3"/>
+      <text class="t-b" x="963" y="70" text-anchor="middle">SONUÇ</text>
+      <text class="t-s" x="963" y="88" text-anchor="middle">+ verification</text>
+
+      <!-- forward arrows -->
+      <line class="s-line" x1="134" y1="75" x2="158" y2="75" marker-end="url(#ar2)"/>
+      <line class="s-line" x1="282" y1="75" x2="306" y2="75" marker-end="url(#ar2)"/>
+      <line class="s-line" x1="430" y1="75" x2="454" y2="75" marker-end="url(#ar2)"/>
+      <line class="s-line" x1="578" y1="75" x2="602" y2="75" marker-end="url(#ar2)"/>
+      <line class="s-line" x1="726" y1="75" x2="750" y2="75" marker-end="url(#ar2)"/>
+      <line class="s-line" x1="874" y1="75" x2="898" y2="75" marker-end="url(#ar2)"/>
+
+      <!-- exits -->
+      <line class="s-dash" x1="223" y1="104" x2="223" y2="176" marker-end="url(#ar2)"/>
+      <rect class="n-box" x="152" y="180" width="142" height="52" rx="3"/>
+      <text class="t-m" x="223" y="200" text-anchor="middle">stage: PREFLIGHT</text>
+      <text class="t-s" x="223" y="218" text-anchor="middle">motora hiç gitmedi</text>
+
+      <line class="s-dash" x1="371" y1="104" x2="371" y2="176" marker-end="url(#ar2)"/>
+      <rect class="n-box" x="300" y="180" width="142" height="52" rx="3"/>
+      <text class="t-m" x="371" y="200" text-anchor="middle">stage: PRECONDITION</text>
+      <text class="t-s" x="371" y="218" text-anchor="middle">+ başka araca yönlendirme</text>
+
+      <line class="s-dash" x1="519" y1="104" x2="519" y2="176" marker-end="url(#ar2)"/>
+      <rect class="n-box" x="448" y="180" width="142" height="52" rx="3"/>
+      <text class="t-m" x="519" y="200" text-anchor="middle">stage: EXECUTION</text>
+      <text class="t-s" x="519" y="218" text-anchor="middle">tüm kademeler tükendi</text>
+
+      <line class="s-dash" x1="667" y1="104" x2="667" y2="176" marker-end="url(#ar2)"/>
+      <rect class="n-box" x="596" y="180" width="142" height="52" rx="3"/>
+      <text class="t-m" x="667" y="200" text-anchor="middle">stage: DEBUGGER</text>
+      <text class="t-s" x="667" y="218" text-anchor="middle">8 arıza sınıfı, 2'si yeniden denenir</text>
+
+      <!-- layer b note -->
+      <line class="s-dash" x1="815" y1="104" x2="815" y2="150" marker-end="url(#ar2)"/>
+      <text class="t-acc" x="815" y="168" text-anchor="middle">itiraz etse bile sonucu düşürmez</text>
+      <text class="t-s" x="815" y="184" text-anchor="middle">advisory_only · Layer A'nın kararı durur</text>
+
+      <!-- footnote line -->
+      <line class="s-line" x1="16" y1="266" x2="1024" y2="266" opacity=".3"/>
+      <text class="t-s" x="16" y="288">Başarılı sonuçta stage = VERIFY_A → hakem koşarsa VERIFY_A+B olur.</text>
+      <text class="t-s" x="16" y="306">Keşif araçları (list_databases, inspect_database) bu hattın hiçbir aşamasına girmez — motor çalıştırmıyorlar.</text>
+    </svg>
+    <figcaption><b>Reddedilen bir istekle geçen bir istek farklı şekilde döner.</b> Reddedilende üst düzey alanlar <code>error · stage · problems</code>; geçende <code>verification</code> bloğu gelir. Bugün ölçüldü: birim vermeden istenen bir diyagram <code>stage: PREFLIGHT</code> ile geri döndü — <code>composition_basis</code> artık zorunlu.</figcaption>
+  </figure>
+</section>
+
+
+<!-- ============ 3. MOTOR KADEMELERİ ============ -->
+<section>
+  <div class="sec-head"><span class="num">03</span><h2>Motor hangi sırayla deniyor</h2></div>
+  <p>Altı işlemin her birinin kendi zinciri var. Hangi işleyicinin, hangi sinyalde devreye gireceği <code>execution.toml</code>'da <code>[[cascade]]</code> olarak yazılı; işleyicilerin kendisi Python.</p>
+
+  <figure>
+    <svg viewBox="0 0 1000 400" role="img" aria-label="Altı işlem için motor kademeleri: equilibrium ve compare iki kademeli, property_diagram ve isothermal_section üç kademeli, scheil tek işleyicinin üç çözünürlüğü, phase_diagram tek kademeli ve tükenince başka araca yönlendiriyor.">
+      <defs>
+        <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text class="t-hd" x="16" y="24">İŞLEM</text>
+      <text class="t-hd" x="212" y="24">KADEME 1</text>
+      <text class="t-hd" x="418" y="24">KADEME 2</text>
+      <text class="t-hd" x="624" y="24">KADEME 3</text>
+      <line class="s-line" x1="16" y1="34" x2="984" y2="34" opacity=".35"/>
+
+      <!-- row 1 equilibrium -->
+      <text class="t-b" x="16" y="62">equilibrium</text>
+      <rect class="n-box" x="212" y="42" width="166" height="34" rx="3"/>
+      <text class="t-m" x="295" y="64" text-anchor="middle">ocasi</text>
+      <line class="s-line" x1="378" y1="59" x2="412" y2="59" marker-end="url(#ar3)"/>
+      <rect class="n-box" x="418" y="42" width="166" height="34" rx="3"/>
+      <text class="t-m" x="501" y="64" text-anchor="middle">native_single</text>
+      <text class="t-s" x="600" y="63">4204 · crash · boş faz listesi</text>
+
+      <!-- row 2 compare -->
+      <text class="t-b" x="16" y="120">compare</text>
+      <rect class="n-box" x="212" y="100" width="166" height="34" rx="3"/>
+      <text class="t-m" x="295" y="122" text-anchor="middle">ocasi</text>
+      <line class="s-line" x1="378" y1="117" x2="412" y2="117" marker-end="url(#ar3)"/>
+      <rect class="n-box" x="418" y="100" width="166" height="34" rx="3"/>
+      <text class="t-m" x="501" y="122" text-anchor="middle">native_single</text>
+      <text class="t-s" x="600" y="121">iki denge, her biri kendi zincirinde</text>
+
+      <!-- row 3 property_diagram -->
+      <text class="t-b" x="16" y="178">property_diagram</text>
+      <rect class="n-box" x="212" y="158" width="166" height="34" rx="3"/>
+      <text class="t-m" x="295" y="180" text-anchor="middle">native_step</text>
+      <line class="s-line" x1="378" y1="175" x2="412" y2="175" marker-end="url(#ar3)"/>
+      <rect class="n-toml" x="418" y="158" width="166" height="34" rx="3"/>
+      <text class="t-m" x="501" y="180" text-anchor="middle">gap_fill</text>
+      <line class="s-line" x1="584" y1="175" x2="618" y2="175" marker-end="url(#ar3)"/>
+      <rect class="n-box" x="624" y="158" width="166" height="34" rx="3"/>
+      <text class="t-m" x="707" y="180" text-anchor="middle">python_loop</text>
+      <text class="t-s" x="806" y="179">line_terminated →</text>
+
+      <!-- row 4 isothermal -->
+      <text class="t-b" x="16" y="236">isothermal_section</text>
+      <rect class="n-box" x="212" y="216" width="166" height="34" rx="3"/>
+      <text class="t-m" x="295" y="238" text-anchor="middle">native_step</text>
+      <line class="s-line" x1="378" y1="233" x2="412" y2="233" marker-end="url(#ar3)"/>
+      <rect class="n-toml" x="418" y="216" width="166" height="34" rx="3"/>
+      <text class="t-m" x="501" y="238" text-anchor="middle">gap_fill</text>
+      <line class="s-line" x1="584" y1="233" x2="618" y2="233" marker-end="url(#ar3)"/>
+      <rect class="n-box" x="624" y="216" width="166" height="34" rx="3"/>
+      <text class="t-m" x="707" y="238" text-anchor="middle">single_point_scan</text>
+      <text class="t-s" x="806" y="237">bileşim ekseni ikizi</text>
+
+      <!-- row 5 scheil -->
+      <text class="t-b" x="16" y="294">scheil</text>
+      <rect class="n-box" x="212" y="274" width="372" height="34" rx="3"/>
+      <text class="t-m" x="398" y="296" text-anchor="middle">native_scheil × 3 — adım 5.0 / 2.0 / 1.0 K</text>
+      <text class="t-s" x="600" y="293">fallback değil; en az sıvı bırakan tutulur</text>
+
+      <!-- row 6 phase_diagram -->
+      <text class="t-b" x="16" y="352">phase_diagram</text>
+      <rect class="n-box" x="212" y="332" width="166" height="34" rx="3"/>
+      <text class="t-m" x="295" y="354" text-anchor="middle">native_map</text>
+      <line class="s-dash" x1="378" y1="349" x2="412" y2="349" marker-end="url(#ar3)"/>
+      <rect class="n-sunk" x="418" y="332" width="240" height="34" rx="3"/>
+      <text class="t-m" x="538" y="354" text-anchor="middle">→ isothermal_section önerilir</text>
+      <text class="t-s" x="674" y="352">ikinci kademe yok; tükenirse yönlendirir</text>
+    </svg>
+    <figcaption><b>Bakır çerçeveli <code>gap_fill</code> bir yedek değil, tamamlayıcı</b> (<code>mode = "complete"</code>): STEP'in hiç ulaşmadığı konumları ekler, ulaştıklarının üzerine asla yazmaz. Kademe geçişini tetikleyen sinyaller <code>execution.toml</code>'da <code>[signals]</code> altında adlandırılmış: <code>did_not_converge</code>, <code>engine_crashed</code>, <code>no_stable_phases</code>, <code>line_terminated</code>, <code>endpoint_disagrees</code>, <code>unsupported_request</code>, <code>no_boundaries_traced</code>, <code>timed_out</code>.</figcaption>
+  </figure>
+</section>
+
+
+<!-- ============ 4. AYAR DOSYALARI ============ -->
+<section>
+  <div class="sec-head"><span class="num">04</span><h2>Üç ayar dosyası ve garantileri</h2></div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Dosya</th><th class="r">Satır</th><th>İçerik</th><th>Garanti</th></tr></thead>
+      <tbody>
+        <tr><td><code>input.toml</code></td><td class="r">555</td><td>24 × <code>[[reject]]</code>, <code>[[route]]</code>, <code>[accept]</code>, <code>[accept.composition.basis]</code></td><td>Fiziği <b>değiştirebilir</b> — hangi isteğin motora gideceğine karar veriyor</td></tr>
+        <tr><td><code>execution.toml</code></td><td class="r">459</td><td>6 × <code>[[cascade]]</code>, <code>[signals]</code>, <code>[binary]</code>, <code>[[reviewer]]</code>, <code>[timeouts]</code>, <code>[tolerances]</code></td><td>Hangi işleyici, hangi sırayla, hangi bütçeyle</td></tr>
+        <tr><td><code>output.toml</code></td><td class="r">623</td><td>8 × <code>[[verify]]</code>, <code>[honesty]</code> (7), 7 × <code>[[note]]</code>, <code>[conversion]</code>, <code>[floor]</code>, <code>[derive]</code></td><td>Fiziği <b>değiştiremez</b> — birim ve sunum. Her ayarı permüte et, fizik bayt bayt aynı gelmeli</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="k">status alanı — sessizliğin anlamını söylüyor</span>
+    <p>Bir bölümün okunmuyor olması, unutulduğu mu kasıtlı mı olduğunu söylemiyordu. Dört değer bunu çözüyor: <b>yok</b> = kod okuyor, çalışıyor · <b>"code"</b> = asla taşınmayacak, burada belge · <b>"todo"</b> = taşınabilir, yapılmadı · <b>"planned"</b> = taşıma değil, yeni iş. <code>settings_audit.py</code> bu alandan okuyor — elle tutulan "bunlar sessiz olmalı" listesi yok.</p>
+  </div>
+
+  <p><code>settings_audit.py</code> (227 satır) <b>dört ayrı soru</b> soruyor. Dördü de aynı arıza sınıfına bakıyor: <i>kod çalışıyor, test geçiyor, ama bir şey bağlı değil.</i></p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Yön</th><th>Sorduğu</th><th>Yakaladığı</th></tr></thead>
+      <tbody>
+        <tr><td><code>yon_bir</code></td><td>Dosyadaki her bölümün kodda bir okuyucusu var mı?</td><td>Yazılmış ama hiç bağlanmamış ayar</td></tr>
+        <tr><td><code>yon_iki</code></td><td>Kodda, dosyaya taşınmış olması gereken kural kalmış mı?</td><td>Taşımanın geride bıraktığı kopya</td></tr>
+        <tr><td><code>yon_uc</code></td><td>Yürütücünün dışarı açtığı her şey gerçekten çağrılıyor mu?</td><td>Çağıranı kaybolmuş fonksiyon — ve tersi</td></tr>
+        <tr><td><code>yon_dort</code></td><td>Ayarı <b>okuduğunu sanan</b> ama sessizce yedeğe düşen okuyucu var mı?</td><td>1 Eylül: iki gerçek düşüş</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="k">Dördüncü yön neden eklendi</span>
+    <p>Bir okuyucu şöyle yazılır: <code>try: import settings_engine … except: return default</code>. Import başarısız olursa fonksiyon <b>bir şey söylemeden</b> yedeğine düşer. <code>semantic_check</code> içindeki iki fonksiyon tam olarak bunu yapıyordu. Biri, ayarı hiç okumadığı hâlde <b>doğru cevap veriyordu</b> — yedeği dosyadaki değerin aynısıydı. Yanlış cevap fark edilir; işi yapmadan varılan doğru cevap edilmez. Dördüncü yön bunu <b>deneyerek</b> ölçüyor: dosyadaki değeri değiştir, fonksiyonu çağır, cevabın takip edip etmediğine bak.</p>
+  </div>
+
+  <p>İlk üç yön dosya ile kodun <b>ne olduğu</b> konusunda anlaşıp anlaşmadığını soruyor; dördüncüsü okuyucunun <b>gerçekten okuduğunu</b>. Tek yönlü sorulduğu dönemde üç kusur sessizce geçmişti — bunlardan biri, aylarca kimsenin çağırmadığı dokuz PREFLIGHT kuralıydı.</p>
+
+<pre><code>$ python settings_audit.py
+AYAR DENETIMI: temiz -- dosya ile kod ayni seyi soyluyor
+
+$ python -c "import settings_engine as se; print(se.compile_settings().report())"
+DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
+</section>
+
+
+<!-- ============ DERLEYICI ============ -->
+<section>
+  <div class="sec-head"><span class="num">05</span><h2>Derleyici — sistemin kalbi</h2></div>
+  <p>Ayarlar taşındı, ama taşımak tek başına yetmiyor. <b>Yazılmış ama uygulanmayan bir kural, hiç olmayan kuraldan kötüdür</b> — çünkü garanti gibi okunur. <code>settings_engine.py</code>'ın işi tam olarak bu: üç TOML dosyasını <i>belge</i> olmaktan çıkarıp <i>taşıyıcı</i> hale getirmek.</p>
+
+  <h3>Kural motoru mu, derleyici mi — beş ölçüt</h3>
+  <p>İkisi de aynı TOML dosyalarını okuyabilir. Fark <b>ne zaman</b> ve <b>bir ad çözülemezse ne olduğu</b>.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Ölçüt</th><th>Kural motoru <span class="pill neu">önce</span></th><th>Derleyici <span class="pill ok">şimdi</span></th></tr></thead>
+      <tbody>
+        <tr><td>Ad ne zaman çözülür</td><td>Her istekte, yeniden</td><td><code>import</code> anında, <b>bir kez</b></td></tr>
+        <tr><td>Çözülemeyen ad</td><td><code>.get()</code> → <code>None</code>, döngü devam eder</td><td><code>SettingsError</code> — <b>süreç ayağa kalkmaz</b></td></tr>
+        <tr><td>Çalışma anının gördüğü</td><td>Ham TOML sözlüğü</td><td>Yükleme <b>bağlanmış</b> <code>(kural, yüklem)</code> çifti</td></tr>
+        <tr><td>Beyan edilip okunmayan anahtar</td><td>Görünmez</td><td>stderr'e uyarı — <code>_consume_unread()</code></td></tr>
+        <tr><td>Hatanın maliyeti</td><td>Kimsenin sorgulamadığı <b>yanlış cevap</b></td><td>Kötü bir sabah</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Neden var — ölçülmüş arıza</h3>
+  <p>Ayarlar önce her istekte tek tek okunuyordu. Bu bir <b>kural motoru</b>, derleyici değil — ve sessizce bozuluyor. <code>PREDICATES.get(rule["check"])</code> olmayan bir ad için <code>None</code> döner, döngü devam eder, kural yok olur.</p>
+
+  <figure>
+    <svg viewBox="0 0 1000 250" role="img" aria-label="Bir harflik yazım hatasının iki mimaride izlediği yol: kural motorunda sessizce kaybolup sıfır şikâyete düşüyor, derleyicide açılışta yakalanıp sunucuyu açtırmıyor.">
+      <defs>
+        <marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text class="t-hd" x="30" y="24">AYNI YAZIM HATASI: check = "min_nonzero_kount"</text>
+
+      <text class="t-b" x="30" y="52">ÖNCE · kural motoru</text>
+      <rect class="n-sunk" x="30" y="64" width="168" height="46" rx="3"/>
+      <text class="t-m" x="114" y="84" text-anchor="middle">her istekte oku</text>
+      <text class="t-s" x="114" y="100" text-anchor="middle">yükleme denetimi yok</text>
+      <line class="s-line" x1="198" y1="87" x2="216" y2="87" marker-end="url(#ar5)"/>
+      <rect class="n-box" x="222" y="64" width="168" height="46" rx="3"/>
+      <text class="t-m" x="306" y="84" text-anchor="middle">PREDICATES.get(ad)</text>
+      <text class="t-s" x="306" y="100" text-anchor="middle">→ None</text>
+      <line class="s-line" x1="390" y1="87" x2="408" y2="87" marker-end="url(#ar5)"/>
+      <rect class="n-box" x="414" y="64" width="168" height="46" rx="3"/>
+      <text class="t-m" x="498" y="84" text-anchor="middle">döngü devam eder</text>
+      <text class="t-s" x="498" y="100" text-anchor="middle">hata yok, iz yok</text>
+      <line class="s-line" x1="582" y1="87" x2="600" y2="87" marker-end="url(#ar5)"/>
+      <rect class="n-box" x="606" y="64" width="168" height="46" rx="3"/>
+      <text class="t-m" x="690" y="84" text-anchor="middle">kural yok oldu</text>
+      <text class="t-s" x="690" y="100" text-anchor="middle">sunucu açılır</text>
+      <line class="s-line" x1="774" y1="87" x2="792" y2="87" marker-end="url(#ar5)"/>
+      <rect class="n-sunk" x="798" y="64" width="172" height="46" rx="3"/>
+      <text class="t-m" x="884" y="84" text-anchor="middle">1 şikâyet → 0</text>
+      <text class="t-s" x="884" y="100" text-anchor="middle">yanlış cevap, kimse sormaz</text>
+
+      <line class="s-line" x1="30" y1="132" x2="970" y2="132" opacity=".3"/>
+
+      <text class="t-b" x="30" y="162">SONRA · derleyici</text>
+      <rect class="n-toml" x="30" y="174" width="168" height="46" rx="3"/>
+      <text class="t-m" x="114" y="194" text-anchor="middle">açılışta bir kez</text>
+      <text class="t-s" x="114" y="210" text-anchor="middle">compile_settings()</text>
+      <line class="s-line" x1="198" y1="197" x2="216" y2="197" marker-end="url(#ar5)"/>
+      <rect class="n-box" x="222" y="174" width="168" height="46" rx="3"/>
+      <text class="t-m" x="306" y="194" text-anchor="middle">PREDICATES.get(ad)</text>
+      <text class="t-s" x="306" y="210" text-anchor="middle">→ None</text>
+      <line class="s-acc" x1="390" y1="197" x2="408" y2="197" marker-end="url(#ar5)" style="color:var(--accent)"/>
+      <rect class="n-toml" x="414" y="174" width="168" height="46" rx="3"/>
+      <text class="t-m" x="498" y="194" text-anchor="middle">SettingsError</text>
+      <text class="t-s" x="498" y="210" text-anchor="middle">"diye bir yüklem yok"</text>
+      <line class="s-acc" x1="582" y1="197" x2="600" y2="197" marker-end="url(#ar5)" style="color:var(--accent)"/>
+      <rect class="n-toml" x="606" y="174" width="364" height="46" rx="3"/>
+      <text class="t-m" x="788" y="194" text-anchor="middle">SUNUCU AÇILMAZ</text>
+      <text class="t-s" x="788" y="210" text-anchor="middle">hata, kimsenin haber verilebileceği anda söylenir</text>
+    </svg>
+    <figcaption><b>Ölçüldü.</b> Sağlam dosyada tek elementli bir istek 1 şikâyet üretiyordu; <code>check</code> adındaki tek harflik hatadan sonra <b>yükleme hatası yok</b> ve aynı istek <b>0 şikâyet</b> üretiyordu. Bu, <code>preflight.py</code>'ın dokuz çağrılmayan kuralla yaşadığı arızanın aynısı. Kodun kendi yorumuyla: <i>"Sunucunun açılmaması kötü bir sabahtır. Bir kural eksik açılması, kimsenin sorgulamadığı yanlış bir cevaptır."</i></figcaption>
+  </figure>
+
+  <h3>Derleme akışı</h3>
+
+  <figure>
+    <svg viewBox="0 0 1000 390" role="img" aria-label="Derleme akışı: üç TOML dosyası compile_settings tarafından çözülüp CompiledPolicy nesnesine dönüşüyor; çalışma anı yalnızca bu nesneyi okuyor. İki çıkış var: kuralı sessizce çalıştırmayacak hatalar sunucuyu açtırmıyor, beyan edilip okunmayan anahtarlar uyarı olarak yazılıyor.">
+      <defs>
+        <marker id="ar6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text class="t-hd" x="24" y="24">KAYNAK</text>
+      <text class="t-hd" x="266" y="24">DERLEME · import anında bir kez</text>
+      <text class="t-hd" x="586" y="24">POLICY</text>
+      <text class="t-hd" x="832" y="24">ÇALIŞMA ANI</text>
+
+      <rect class="n-toml" x="24" y="44" width="176" height="52" rx="3"/>
+      <text class="t-m" x="112" y="68" text-anchor="middle">input.toml</text>
+      <text class="t-s" x="112" y="84" text-anchor="middle">24 reject · route · accept</text>
+      <rect class="n-toml" x="24" y="110" width="176" height="52" rx="3"/>
+      <text class="t-m" x="112" y="134" text-anchor="middle">execution.toml</text>
+      <text class="t-s" x="112" y="150" text-anchor="middle">6 cascade · signals · binary</text>
+      <rect class="n-toml" x="24" y="176" width="176" height="52" rx="3"/>
+      <text class="t-m" x="112" y="200" text-anchor="middle">output.toml</text>
+      <text class="t-s" x="112" y="216" text-anchor="middle">8 verify · 7 honesty · 7 note</text>
+
+      <line class="s-line" x1="200" y1="70" x2="256" y2="110" marker-end="url(#ar6)"/>
+      <line class="s-line" x1="200" y1="136" x2="256" y2="136" marker-end="url(#ar6)"/>
+      <line class="s-line" x1="200" y1="202" x2="256" y2="162" marker-end="url(#ar6)"/>
+
+      <rect class="n-box" x="262" y="44" width="196" height="184" rx="3"/>
+      <text class="t-b" x="360" y="70" text-anchor="middle">compile_settings()</text>
+      <text class="t-s" x="278" y="94">1 · applies → işlem var mı</text>
+      <text class="t-s" x="278" y="112">2 · check → yüklem var mı</text>
+      <text class="t-s" x="278" y="130">3 · on → sinyal var mı</text>
+      <text class="t-s" x="278" y="148">4 · verify → result_check'te</text>
+      <text class="t-s" x="278" y="166">5 · honesty → değişmez var mı</text>
+      <text class="t-s" x="278" y="184">6 · message → şikâyet üretir mi</text>
+      <text class="t-s" x="278" y="202">7 · okunmayan anahtar var mı</text>
+
+      <line class="s-line" x1="458" y1="136" x2="514" y2="136" marker-end="url(#ar6)"/>
+
+      <rect class="n-box" x="520" y="44" width="200" height="52" rx="3"/>
+      <text class="t-m" x="620" y="68" text-anchor="middle">InputPolicy</text>
+      <text class="t-s" x="620" y="84" text-anchor="middle">kural + yüklem çiftleri</text>
+      <rect class="n-box" x="520" y="110" width="200" height="52" rx="3"/>
+      <text class="t-m" x="620" y="134" text-anchor="middle">ExecutionPlan</text>
+      <text class="t-s" x="620" y="150" text-anchor="middle">kademe sırası + sabitler</text>
+      <rect class="n-box" x="520" y="176" width="200" height="52" rx="3"/>
+      <text class="t-m" x="620" y="200" text-anchor="middle">OutputPlan</text>
+      <text class="t-s" x="620" y="216" text-anchor="middle">not · türetme · doğrulama</text>
+
+      <line class="s-line" x1="720" y1="70" x2="776" y2="110" marker-end="url(#ar6)"/>
+      <line class="s-line" x1="720" y1="136" x2="776" y2="136" marker-end="url(#ar6)"/>
+      <line class="s-line" x1="720" y1="202" x2="776" y2="162" marker-end="url(#ar6)"/>
+
+      <rect class="n-sunk" x="782" y="90" width="194" height="92" rx="3"/>
+      <text class="t-m" x="879" y="116" text-anchor="middle">POLICY.input</text>
+      <text class="t-m" x="879" y="136" text-anchor="middle">POLICY.execution</text>
+      <text class="t-m" x="879" y="156" text-anchor="middle">POLICY.output</text>
+      <text class="t-s" x="879" y="174" text-anchor="middle">ada göre arama YOK</text>
+
+      <!-- iki cikis -->
+      <line class="s-acc" x1="330" y1="228" x2="330" y2="272" marker-end="url(#ar6)" style="color:var(--accent)"/>
+      <rect class="n-toml" x="188" y="276" width="284" height="60" rx="3"/>
+      <text class="t-m" x="330" y="300" text-anchor="middle">SettingsError — sunucu açılmaz</text>
+      <text class="t-s" x="330" y="318" text-anchor="middle">bir kuralın sessizce koşmamasına yol açan her şey</text>
+
+      <line class="s-dash" x1="420" y1="228" x2="600" y2="272" marker-end="url(#ar6)"/>
+      <rect class="n-box" x="504" y="276" width="284" height="60" rx="3"/>
+      <text class="t-m" x="646" y="300" text-anchor="middle">uyarı — sunucu açılır</text>
+      <text class="t-s" x="646" y="318" text-anchor="middle">beyan edilmiş ama okunmayan anahtar, stderr'e</text>
+
+      <line class="s-line" x1="24" y1="358" x2="976" y2="358" opacity=".3"/>
+      <text class="t-s" x="24" y="378">Sertlik ayrımı düzen değil SONUÇ'a göre: kuralı sessizce yok eden şey durdurur, beyan edilip kullanılmayan şey uyarır.</text>
+    </svg>
+    <figcaption><b>Çalışma anı ada göre hiçbir arama yapmıyor.</b> Kurallar <code>check()</code>'e zaten ayrılmış ve zaten yüklemine bağlanmış olarak geliyor; hiçbir şeye çözülemeyen bir ad zaten import'u durdurmuş olurdu. <code>POLICY = compile_settings()</code> modül seviyesinde çalışıyor, yani sunucu ayakta demek ayarlar tutarlı demek.</figcaption>
+  </figure>
+
+  <figure>
+    <svg viewBox="0 0 1000 430" role="img" aria-label="Derlenmiş politikanın alan şeması: InputPolicy sekiz, ExecutionPlan on beş, OutputPlan altı alan taşıyor; sağdaki sayılar her alanın çalışan sistemdeki uzunluğu.">
+      <text class="t-hd" x="24" y="24">POLICY = compile_settings() · 29 ALAN · ÇALIŞMA ANININ OKUMASINA İZİN VERİLEN HER ŞEY</text>
+      <rect class="n-toml" x="24" y="44" width="304" height="340" rx="3"/>
+      <text class="t-b" x="40" y="70">POLICY.input</text>
+      <text class="t-s" x="40" y="86">cevabı DEĞİŞTİREBİLİR</text>
+      <text class="t-m" x="40" y="112">operations</text>
+      <text class="t-s" x="312" y="112" text-anchor="end">6</text>
+      <text class="t-m" x="40" y="131">defaults</text>
+      <text class="t-s" x="312" y="131" text-anchor="end">1</text>
+      <text class="t-m" x="40" y="150">composition</text>
+      <text class="t-s" x="312" y="150" text-anchor="end">3</text>
+      <text class="t-m" x="40" y="169">common</text>
+      <text class="t-s" x="312" y="169" text-anchor="end">10</text>
+      <text class="t-m" x="40" y="188">per_operation</text>
+      <text class="t-s" x="312" y="188" text-anchor="end">6</text>
+      <text class="t-m" x="40" y="207">routes</text>
+      <text class="t-s" x="312" y="207" text-anchor="end">6</text>
+      <text class="t-m" x="40" y="226">preconditions</text>
+      <text class="t-s" x="312" y="226" text-anchor="end">1</text>
+      <text class="t-m" x="40" y="245">stop_rule</text>
+      <text class="t-s" x="312" y="245" text-anchor="end">5</text>
+      <rect class="n-toml" x="348" y="44" width="304" height="340" rx="3"/>
+      <text class="t-b" x="364" y="70">POLICY.execution</text>
+      <text class="t-s" x="364" y="86">yalnız ULAŞILABİLİRLİĞİ değiştirir</text>
+      <text class="t-m" x="364" y="112">cascades</text>
+      <text class="t-s" x="636" y="112" text-anchor="end">6</text>
+      <text class="t-m" x="364" y="131">endpoint_recheck</text>
+      <text class="t-s" x="636" y="131" text-anchor="end">5</text>
+      <text class="t-m" x="364" y="150">gap_detection</text>
+      <text class="t-s" x="636" y="150" text-anchor="end">2</text>
+      <text class="t-m" x="364" y="169">reviewers</text>
+      <text class="t-s" x="636" y="169" text-anchor="end">2</text>
+      <text class="t-m" x="364" y="188">reviewer_budget</text>
+      <text class="t-s" x="636" y="188" text-anchor="end">4</text>
+      <text class="t-m" x="364" y="207">binary_order</text>
+      <text class="t-s" x="636" y="207" text-anchor="end">2</text>
+      <text class="t-m" x="364" y="226">weak_independence</text>
+      <text class="t-s" x="636" y="226" text-anchor="end">3</text>
+      <text class="t-m" x="364" y="245">signals</text>
+      <text class="t-s" x="636" y="245" text-anchor="end">8</text>
+      <text class="t-m" x="364" y="264">scheil</text>
+      <text class="t-s" x="636" y="264" text-anchor="end">3</text>
+      <text class="t-m" x="364" y="283">engine_failures</text>
+      <text class="t-s" x="636" y="283" text-anchor="end">7</text>
+      <text class="t-m" x="364" y="302">timeouts</text>
+      <text class="t-s" x="636" y="302" text-anchor="end">6</text>
+      <text class="t-m" x="364" y="321">tolerances</text>
+      <text class="t-s" x="636" y="321" text-anchor="end">4</text>
+      <text class="t-m" x="364" y="340">retry_http</text>
+      <text class="t-s" x="636" y="340" text-anchor="end">6</text>
+      <text class="t-m" x="364" y="359">validator_reviewers</text>
+      <text class="t-s" x="636" y="359" text-anchor="end">2</text>
+      <text class="t-m" x="364" y="378">vision_reviewers</text>
+      <text class="t-s" x="636" y="378" text-anchor="end">2</text>
+      <rect class="n-toml" x="672" y="44" width="304" height="340" rx="3"/>
+      <text class="t-b" x="688" y="70">POLICY.output</text>
+      <text class="t-s" x="688" y="86">sayılara DOKUNAMAZ</text>
+      <text class="t-m" x="688" y="112">derive</text>
+      <text class="t-s" x="960" y="112" text-anchor="end">4</text>
+      <text class="t-m" x="688" y="131">notes</text>
+      <text class="t-s" x="960" y="131" text-anchor="end">7</text>
+      <text class="t-m" x="688" y="150">verify</text>
+      <text class="t-s" x="960" y="150" text-anchor="end">8</text>
+      <text class="t-m" x="688" y="169">honesty</text>
+      <text class="t-s" x="960" y="169" text-anchor="end">7</text>
+      <text class="t-m" x="688" y="188">conversion</text>
+      <text class="t-s" x="960" y="188" text-anchor="end">4</text>
+      <text class="t-m" x="688" y="207">floor</text>
+      <text class="t-s" x="960" y="207" text-anchor="end">5</text>
+      <line class="s-line" x1="24" y1="404" x2="976" y2="404" opacity=".3"/>
+      <text class="t-s" x="24" y="422">Sağdaki sayılar dosyadan sayılmadı — ayakta duran sunucunun POLICY nesnesinden okundu. Dosyada olup burada görünmeyen bir anahtar, derlemenin uyardığı şeydir.</text>
+    </svg>
+    <figcaption><b>Bu liste sözleşmenin kendisi.</b> Çalışma anı bu 29 alanın dışına çıkamaz: ham TOML sözlüğü artık kimseye açık değil. Üç nesnenin altbaşlıkları rastgele değil — <code>input</code> hangi isteğin motora gideceğine karar verdiği için <b>fiziği değiştirebilir</b>; <code>execution</code> yalnızca hangi motorun ne kadar süre deneyeceğini söyler, yani bir cevabın <b>gelip gelmediğini</b> değiştirir, <b>ne olduğunu</b> değil; <code>output</code> ise motordan çıkan sayıya dokunamaz, yalnızca onu sunar ve denetler.</figcaption>
+  </figure>
+  <h3>Derleyicinin çıktısı — canlı döküm</h3>
+  <p>Şema soyut değil. Ayakta duran sunucudan okunduğunda görünen tam olarak bu:</p>
+
+<pre><code>$ python -c "import settings_engine as se; ... vars(se.POLICY.input) ..."
+
+=== InputPolicy ===          === ExecutionPlan ===        === OutputPlan ===
+   operations    set    6       cascades       dict   6      derive      dict  4
+   defaults      dict   1       endpoint_recheck dict 5      notes       dict  7
+   composition   dict   3       gap_detection  dict   2      verify      list  8
+   common        list  10       reviewers      list   2      honesty     dict  7
+   per_operation dict   6       reviewer_budget dict  4      conversion  dict  4
+   routes        dict   6       binary_order   list   2      floor       dict  5
+   preconditions list   1       weak_independence set 3
+   stop_rule     dict   5       signals        set    8
+                                scheil         dict   3
+                                engine_failures tuple 7
+                                timeouts       dict   6
+                                tolerances     dict   4
+                                retry_http     set    6
+                                validator_reviewers list 2
+                                vision_reviewers    list 2</code></pre>
+
+  <p><code>common</code> alanındaki <b>10</b>, her işleme uygulanan giriş kuralı sayısı — ve
+  her biri artık <code>(kural, yüklem)</code> <b>çifti</b>, düz bir sözlük değil. Yüklem
+  zaten bağlı: çalışma anında aranacak bir ad kalmadı.</p>
+
+  <h3>Derlenmiş politikada bir işlem</h3>
+  <p>Altı işlemin her biri için derleyici üç şeyi ayrı ayrı çözüyor: hangi giriş
+  kuralları uygulanır, reddedilirse hangi yönlendirme verilir, ve motor hangi
+  sırayla denenir. Aşağıdaki sayılar da çalışan <code>POLICY</code>'den:</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>İşlem</th><th class="r">Özel kural</th><th class="r">Rota</th><th>Kademe zinciri</th></tr></thead>
+      <tbody>
+        <tr><td><code>equilibrium</code></td><td class="r">1</td><td class="r">0</td><td><code>ocasi → native_single</code></td></tr>
+        <tr><td><code>compare</code></td><td class="r">1</td><td class="r">0</td><td><code>ocasi → native_single</code></td></tr>
+        <tr><td><code>property_diagram</code></td><td class="r">2</td><td class="r">0</td><td><code>native_step → gap_fill → python_loop</code></td></tr>
+        <tr><td><code>isothermal_section</code></td><td class="r">6</td><td class="r">3</td><td><code>native_step → gap_fill → single_point_scan</code></td></tr>
+        <tr><td><code>scheil</code></td><td class="r">3</td><td class="r">0</td><td><code>native_scheil</code></td></tr>
+        <tr><td><code>phase_diagram</code></td><td class="r">6</td><td class="r">0</td><td><code>native_map</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Bunların üstüne <b>10 ortak kural</b> geliyor — altısına da uygulanıyor. Yani
+  <code>isothermal_section</code> bir istekte 16 kural görüyor, <code>equilibrium</code> 11.</p>
+
+  <div class="note">
+    <span class="k">Üç rotanın hepsi bir işlemde</span>
+    <p>Yönlendirme sayısı yalnız <code>isothermal_section</code>'da sıfırdan büyük, ve bu
+    kasıtlı: yönlendirme <b>yanlış araç seçildiğinde</b> verilir, imkânsız bir istekte
+    değil. Bileşim ekseni isteyip aslında sıcaklık taraması tarif eden bir çağrı
+    düzeltilebilir; olmayan bir veritabanı düzeltilemez. Bu üç rotanın <b>ikisi</b>
+    derleme aşaması eklenene kadar hiç bağlanmamıştı — ölü bir liste onları
+    sakladığı için kayıp görünmüyordu.</p>
+  </div>
+
+  <h3>Adın çözüldüğü an — modüller arası bağ</h3>
+  <p>Derleyicinin en az göze çarpan, en önemli işi bu. <code>output.toml</code>'daki
+  <code>check = "mass_balance"</code> sadece bir <b>metin</b>. Onu gerçek bir Python
+  fonksiyonuna bağlayan adım <b>derleme anında</b> koşuyor — çalışma anında değil.</p>
+
+  <figure>
+    <svg viewBox="0 0 1000 350" role="img" aria-label="Üç ayrı beyan, üç ayrı kayıt defteri, üç ayrı bağ: giriş kuralları settings_engine.PREDICATES'e, doğrulamalar result_check.VERIFY_PREDICATES'e, dürüstlük beyanları result_check.OUTPUT_INVARIANTS'a import anında bağlanıyor; ad bulunamazsa süreç ayağa kalkmıyor.">
+      <defs>
+        <marker id="ar7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text class="t-hd" x="24" y="22">BEYAN · dosyada, metin</text>
+      <text class="t-hd" x="356" y="22">KAYIT DEFTERİ · kodda, sözlük</text>
+      <text class="t-hd" x="676" y="22">BAĞ · derlemenin çıktısı</text>
+
+      <rect class="n-toml" x="24" y="36" width="290" height="52" rx="3"/>
+      <text class="t-m" x="38" y="58">input.toml · [[reject]]</text>
+      <text class="t-s" x="38" y="76">check = "min_nonzero_count"</text>
+      <rect class="n-box" x="356" y="36" width="272" height="52" rx="3"/>
+      <text class="t-m" x="370" y="58">settings_engine.PREDICATES</text>
+      <text class="t-s" x="370" y="76">giriş kuralı yüklemleri</text>
+      <rect class="n-sunk" x="676" y="36" width="300" height="52" rx="3"/>
+      <text class="t-m" x="690" y="58">InputPolicy.common · per_operation</text>
+      <text class="t-s" x="690" y="76">(kural, yüklem) çifti — 10 + 19</text>
+
+      <rect class="n-toml" x="24" y="100" width="290" height="52" rx="3"/>
+      <text class="t-m" x="38" y="122">output.toml · [[verify]]</text>
+      <text class="t-s" x="38" y="140">check = "mass_balance"</text>
+      <rect class="n-box" x="356" y="100" width="272" height="52" rx="3"/>
+      <text class="t-m" x="370" y="122">result_check.VERIFY_PREDICATES</text>
+      <text class="t-s" x="370" y="140">8 kontrol — Katman A</text>
+      <rect class="n-sunk" x="676" y="100" width="300" height="52" rx="3"/>
+      <text class="t-m" x="690" y="122">OutputPlan.verify</text>
+      <text class="t-s" x="690" y="140">sırası korunmuş 8 kural</text>
+
+      <rect class="n-toml" x="24" y="164" width="290" height="52" rx="3"/>
+      <text class="t-m" x="38" y="186">output.toml · [honesty.*]</text>
+      <text class="t-s" x="38" y="204">check = "boundaries_are_brackets"</text>
+      <rect class="n-box" x="356" y="164" width="272" height="52" rx="3"/>
+      <text class="t-m" x="370" y="186">result_check.OUTPUT_INVARIANTS</text>
+      <text class="t-s" x="370" y="204">7 değişmez — kendi davranışımız</text>
+      <rect class="n-sunk" x="676" y="164" width="300" height="52" rx="3"/>
+      <text class="t-m" x="690" y="186">OutputPlan.honesty</text>
+      <text class="t-s" x="690" y="204">{id: kural} — 7 beyan</text>
+
+      <line class="s-line" x1="314" y1="62" x2="350" y2="62" marker-end="url(#ar7)"/>
+      <line class="s-line" x1="314" y1="126" x2="350" y2="126" marker-end="url(#ar7)"/>
+      <line class="s-line" x1="314" y1="190" x2="350" y2="190" marker-end="url(#ar7)"/>
+      <line class="s-line" x1="628" y1="62" x2="670" y2="62" marker-end="url(#ar7)"/>
+      <line class="s-line" x1="628" y1="126" x2="670" y2="126" marker-end="url(#ar7)"/>
+      <line class="s-line" x1="628" y1="190" x2="670" y2="190" marker-end="url(#ar7)"/>
+
+      <line class="s-acc" x1="492" y1="216" x2="492" y2="256" marker-end="url(#ar7)" style="color:var(--accent)"/>
+      <rect class="n-toml" x="24" y="260" width="952" height="60" rx="3"/>
+      <text class="t-m" x="500" y="284" text-anchor="middle">ad üç defterin hiçbirinde yoksa → SettingsError → SÜREÇ AYAĞA KALKMAZ</text>
+      <text class="t-s" x="500" y="304" text-anchor="middle">"beyan edilip hiç koşmayacak doğrulama" · "beyan edilip hiç denetlenmeyecek söz" — derleyicinin kendi hata metinleri</text>
+
+      <text class="t-s" x="24" y="342">result_check hiçbir şey import etmiyor; derleyici bu yüzden ona döngü riski olmadan uzanabiliyor.</text>
+    </svg>
+    <figcaption><b>Ad, haber verilecek biri hâlâ varken çözülüyor.</b> Sunucu ayaktayken
+    çözülmeyen bir ad, hiç koşmayan bir kontrole dönüşür — ve hiç koşmayan bir kontrol,
+    hiç yazılmamış olandan kötüdür, çünkü çıktıda garanti gibi durur.
+    <code>[honesty]</code> beyanları bu yüzden aynı sertlikte bağlanıyor: <b>sessizce
+    tutulmayan bir söz, hiç verilmemiş sözden kötüdür.</b></figcaption>
+  </figure>
+
+  <h3>Ne durdurur, ne uyarır</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Denetim</th><th>Sonuç</th><th>Neyi engelliyor</th></tr></thead>
+      <tbody>
+        <tr><td><code>applies</code> tanımsız işlem adı</td><td><span class="pill bad">durdurur</span></td><td>Hiçbir işleme uygulanmayan kural</td></tr>
+        <tr><td><code>check</code> tanımsız yüklem</td><td><span class="pill bad">durdurur</span></td><td><b>Kuralın sessizce koşmaması</b> — bu derleyicinin var oluş sebebi</td></tr>
+        <tr><td><code>message</code> yok</td><td><span class="pill bad">durdurur</span></td><td>Reddedip sebebini söyleyemeyen kural</td></tr>
+        <tr><td><code>route_note</code> var, eşleşecek işaret yok</td><td><span class="pill bad">durdurur</span></td><td>Hiç tetiklenmeyecek yönlendirme</td></tr>
+        <tr><td><code>signals.engine_failures</code> boş</td><td><span class="pill bad">durdurur</span></td><td>Her motor arızası kendi kademesinde kalır, hiçbir yedek devreye giremez</td></tr>
+        <tr><td><code>cascade.on</code> tanımsız sinyal</td><td><span class="pill bad">durdurur</span></td><td><b>Asla girilemeyecek kademe</b></td></tr>
+        <tr><td>Kademesiz ya da handler'sız cascade</td><td><span class="pill bad">durdurur</span></td><td>Boş zincir</td></tr>
+        <tr><td><code>verify.check</code> <code>result_check</code>'te yok</td><td><span class="pill bad">durdurur</span></td><td>Beyan edilip hiç koşmayacak doğrulama</td></tr>
+        <tr><td><code>verify.stage</code> ≠ result / correspondence</td><td><span class="pill bad">durdurur</span></td><td>Hiçbir aşamaya bağlanmayan kontrol</td></tr>
+        <tr><td><code>honesty.check</code> değişmez yok</td><td><span class="pill bad">durdurur</span></td><td>Beyan edilip hiç denetlenmeyecek söz</td></tr>
+        <tr><td><code>precondition</code> id ya da message yok</td><td><span class="pill bad">durdurur</span></td><td>Aranamayan ya da konuşamayan önkoşul</td></tr>
+        <tr><td>Dosyada var, derleyici okumuyor</td><td><span class="pill wait">uyarır</span></td><td>Beyan edilmiş ölü anahtar</td></tr>
+        <tr><td><code>binary.order</code> için <code>paths</code> yok</td><td><span class="pill wait">uyarır</span></td><td>Adı geçen ama yolu olmayan ikili</td></tr>
+        <tr><td>Notun metni boş</td><td><span class="pill wait">uyarır</span></td><td>Sessiz not</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Modüller arası ad çözümleme</h3>
+  <p>Derleyicinin en az belli olan ama en önemli işi bu: <code>output.toml</code>'daki <code>check = "mass_balance"</code> yazısı, <code>result_check.VERIFY_PREDICATES</code> sözlüğündeki gerçek fonksiyona <b>derleme anında</b> bağlanıyor. <code>[honesty]</code> beyanları da aynı şekilde <code>result_check.OUTPUT_INVARIANTS</code>'a.</p>
+  <p>Kodun gerekçesi: <i>"bir adın çözülmesi, haber verilecek biri hâlâ varken olur."</i> Sunucu ayaktayken çözülmeyen bir ad, hiç koşmayan bir kontrole dönüşür — ki derleyici tam olarak bunun için yazıldı.</p>
+
+  <h3>Okunmayan anahtar denetimi</h3>
+  <p><code>_consume_unread()</code> derleyicinin talep etmediği her anahtarı bildiriyor. Ama yalnızca <code>status</code> taşımayan bölümler için: <b>neden okunmadığını söyleyen bir bölüm bu soruyu zaten cevaplamıştır.</b></p>
+  <p>Bu denetim olmadığı için <code>accept.defaults</code> dosyada dururken kodda <b>on üç elle yazılmış kopyası</b> vardı. Ayrıca <code>because</code>, <code>status</code>, <code>id</code>, <code>applies</code>, <code>message</code> gibi belgeleyen anahtarlar ayrı tutuluyor — her yerde bulunuyorlar ve hiçbir şey tarafından tüketilmiyorlar, bu bir eksiklik işareti değil.</p>
+
+  <h3>Kasıtlı olarak kodda kalanlar</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Ne</th><th>Neden dosyaya taşınmadı</th></tr></thead>
+      <tbody>
+        <tr><td><code>is_engine_failure()</code> içindeki <code>isinstance</code> bloğu</td><td>O sınıfların <b>alt sınıfları</b> var; bir ad listesi alt sınıf yakalayamaz. <code>NameError</code>, <code>TypeError</code>, <code>KeyError</code> gibi <b>bizim hatalarımız yüzeye çıkmalı</b> — yoksa yavaş kademeye düşüp makul görünen bir sonuç olarak geri gelirler.</td></tr>
+        <tr><td>Yeni <b>türde</b> bir kural</td><td>Ayarlarda zaten var olan türden bir kural eklemek yalnız TOML değişikliği. Hiç var olmamış bir tür, buraya küçük bir fonksiyon da gerektiriyor — <i>"dosyayla kural"</i> iddiasının dürüst sınırı, ve eklenen kuralların kabaca <b>beşte biri</b>.</td></tr>
+        <tr><td><code>execution_setting()</code> yükseltmez, geri düşer</td><td>Okunamayan bir ayar dosyası bir hesabı durdurmamalı; oradaki her varsayılan zaten dosyanın söylediği sayı. Taşımanın amacı tek yerde okunur kılmaktı, sunucuya yeni bir çökme yolu eklemek değil.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="k">Derlemenin ortaya çıkardıkları</span>
+    <p>Derleme aşaması eklenince kapatılanlar: dosyada tanımlı olup <b>hiç üretilmeyen üç not</b>, kodda <b>13 kopyası</b> bulunan bir varsayılan, iki yerde tekrar eden bir hakem listesi, ve <b>dört ölü sabit</b>. Bozma denemeleri de tekrarlandı — <code>check = "min_nonzero_kount"</code> ve <code>applies = "isothermal_sektion"</code> — ikisinde de sunucu açılmadı.</p>
+  </div>
+
+  <h3>Çalışma anı ne yapıyor</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Fonksiyon</th><th>İşi</th><th>Not</th></tr></thead>
+      <tbody>
+        <tr><td><code>check(operation, **request)</code></td><td>Bir işlemin giriş kurallarını uygular, şikâyet listesi döner</td><td>Önce ortak kurallar, sonra işleme özel. Eksik/okunamaz veritabanı <b>yalnız ortak olanları</b> durdurur</td></tr>
+        <tr><td><code>route_for(operation, problems)</code></td><td>Reddedilen isteği başka bir araca yönlendirir</td><td>Yalnız "yanlış araç" sınıfı için. İmkânsız isteğe rota verilmez</td></tr>
+        <tr><td><code>run_cascade(operation, handlers)</code></td><td>Kademe sırasını yürütür</td><td>Sıra dosyadan, işleyiciler kodda</td></tr>
+        <tr><td><code>is_engine_failure(exc)</code></td><td>Bu arıza bir kademe ilerletebilir mi</td><td><code>unnamed_failure = "surface"</code> — adı geçmeyen arıza kademe ilerletmez</td></tr>
+        <tr><td><code>note(id, **fields)</code></td><td>Bir notu dosyadan alıp alanlarla doldurur</td><td>Metin dosyada, biçimlendirme burada</td></tr>
+        <tr><td><code>resolve_composition(comp, basis)</code></td><td>Bileşimi bildirilen birimden çözer</td><td>Ağırlık % ↔ mol kesri</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="k">Fuzzing'in bulduğu kapsam hatası</span>
+    <p><code>check()</code> yazılırken kapsam ilk seferde yanlış kuruldu. Özgün kod ortak yardımcıdan erken dönüyor, ama <b>ondan sonraki işleme özel kontroller yine koşuyordu.</b> Yani var olmayan bir veritabanı <b>ve</b> negatif bir sıcaklık içeren istek <b>ikisini birden</b> bildiriyor. Elle yazılmış vakalar bu ikisini hiç birleştirmemişti; fuzzing yakaladı.</p>
+  </div>
+</section>
+
+<!-- ============ 5. DOĞRULAMA ============ -->
+<section>
+  <div class="sec-head"><span class="num">06</span><h2>Sonuç nasıl doğrulanıyor</h2></div>
+  <p>VERIFY A iki ayrı soru soruyor ve bunlar <code>output.toml</code>'da <code>stage</code> alanıyla ayrılmış: <b>result</b> — bu düzgün bir termodinamik sonuç mu · <b>correspondence</b> — sorulan sorunun sonucu mu.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Kontrol</th><th>Aşama</th><th>Eşik</th><th>Ne yakalıyor</th></tr></thead>
+      <tbody>
+        <tr><td><code>phase-fraction-sums</code></td><td>result</td><td>1e-3</td><td>Toplamı 1 etmeyen faz kesirleri, NaN, aralık dışı</td></tr>
+        <tr><td><code>failed-points</code></td><td>result</td><td>0.10</td><td>Gelen noktaların kaçı hata taşıyor</td></tr>
+        <tr><td><code>requested-elements</code></td><td>correspondence</td><td>—</td><td>Fe-0.1Ni istendi, saf demir döndü — makro yazamadığı elementi sessizce düşürmüştü</td></tr>
+        <tr><td><code>mass-balance</code></td><td>correspondence</td><td>2e-4</td><td>Koşulları yanlış sırayla yazan makro, başka bir alaşım için yakınsamış cevap üretir</td></tr>
+        <tr><td><code>suspended-phases-absent</code></td><td>correspondence</td><td>—</td><td>Kapatılan faz yalnız OCASI yolunda onurlandırılıyor; alt kademede hiçbir şey kapatılmamış gibi döner</td></tr>
+        <tr><td><code>requested-positions</code></td><td>correspondence</td><td>0.9</td><td>20 noktalık tarama 2 nokta döndürdü ve "doğrulandı" dedi — ikisi de sağlamdı</td></tr>
+        <tr><td><code>reported-conditions</code></td><td>correspondence</td><td>—</td><td>Uyarı veren veritabanı motoru RETURN'de bekletir, makronun koşul satırı o istemi cevaplar, hesap koşulsuz koşar: DOF 6, G = 0.0</td></tr>
+        <tr><td><code>degrees-of-freedom</code></td><td>correspondence</td><td>—</td><td>Tam koşullanmış dengede DOF sıfır olmalı</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Son ikisi <code>reports_availability = true</code>: motorun kendi bastığı koşul dökümünü okuyorlar. OCASI fonksiyon argümanlarıyla çağrıldığı için böyle bir döküm basmıyor — <b>eksik kontrol "geçti" değil, "ulaşılamadı" olarak kaydediliyor.</b></p>
+
+  <p>Bunların üstünde <code>[honesty]</code> altındaki <b>7 beyan</b> var; bunları <b>6</b> <code>inv_*</code> fonksiyonu denetliyor (biri <code>check_floor_fields</code>'e düşüyor). Çalışma anındaki <code>checked: 7</code> beyan sayısını sayıyor. Biri şu: <code>inv_review_does_not_decide</code> — Layer B'nin karar vermediği artık denetleniyor.</p>
+
+<pre><code>"verification": {
+  "stage": "VERIFY_A+B",
+  "passed": true,
+  "correspondence": {
+    "checked":     ["elements","mass_balance","suspended_phases","requested_positions"],
+    "unavailable": ["conditions","degrees_of_freedom"],
+    "unavailable_reason": "this engine tier is called through function
+                           arguments and prints no account…"
+  },
+  "independent_review": { "objected": false, "advisory_only": true },
+  "output_invariants":  { "passed": true, "checked": 7 }
+}</code></pre>
+</section>
+
+
+<!-- ============ 6. ARAÇLAR VE MODÜLLER ============ -->
+<section>
+  <div class="sec-head"><span class="num">07</span><h2>Araçlar ve modüller</h2></div>
+
+  <h3>8 MCP aracı</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Araç</th><th>Tür</th><th>Boru hattı</th><th>Kademe</th></tr></thead>
+      <tbody>
+        <tr><td><code>list_databases</code></td><td>keşif</td><td><span class="pill neu">girmez</span></td><td>—</td></tr>
+        <tr><td><code>inspect_database</code></td><td>keşif</td><td><span class="pill neu">girmez</span></td><td>—</td></tr>
+        <tr><td><code>calculate_equilibrium</code></td><td>hesap</td><td>tam</td><td>2</td></tr>
+        <tr><td><code>compare_alloys</code></td><td>hesap</td><td>tam ×2</td><td>2 (her biri)</td></tr>
+        <tr><td><code>calculate_property_diagram</code></td><td>hesap</td><td>tam</td><td>3</td></tr>
+        <tr><td><code>calculate_isothermal_section</code></td><td>hesap</td><td>tam</td><td>3</td></tr>
+        <tr><td><code>calculate_scheil_solidification</code></td><td>hesap</td><td>tam</td><td>1 × 3 çözünürlük</td></tr>
+        <tr><td><code>calculate_phase_diagram</code></td><td>hesap</td><td>tam</td><td>1 + yönlendirme</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Makale (7 Ağustos) beş araç yazıyor. Scheil ve MAP orada "kapsam dışı" olarak listelenmişti; ikisi de artık var.</p>
+
+  <h3>Çalışan modüller — 14 dosya, 8.158 satır</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Modül</th><th class="r">Satır</th><th>Sorumluluk</th></tr></thead>
+      <tbody>
+        <tr><td><code>server.py</code></td><td class="r">1935</td><td>Araç tanımları, boru hattı düzenlemesi</td></tr>
+        <tr><td><code>settings_engine.py</code></td><td class="r">1162</td><td>Derleyici: <code>compile_settings</code>, <code>check</code>, <code>route_for</code>, <code>run_cascade</code>, <code>note</code>, <code>resolve_composition</code></td></tr>
+        <tr><td><code>native_step.py</code></td><td class="r">1100</td><td>STEP, boşluk doldurma, normalleştirme, gnuplot</td></tr>
+        <tr><td><code>result_check.py</code></td><td class="r">684</td><td>8 VERIFY A yüklemi + 7 çıktı değişmezi — <b>hiçbir şey import etmiyor</b>, derleyici bu yüzden ona uzanabiliyor</td></tr>
+        <tr><td><code>native_fallback.py</code></td><td class="r">497</td><td>Kademe 2 — makro üretimi, sınırlı okuma, metin ayrıştırma</td></tr>
+        <tr><td><code>native_map.py</code></td><td class="r">495</td><td>MAP — iki boyutlu faz diyagramı</td></tr>
+        <tr><td><code>native_scheil.py</code></td><td class="r">432</td><td>Scheil–Gulliver katılaşma</td></tr>
+        <tr><td><code>semantic_check.py</code></td><td class="r">430</td><td>Layer B çekirdeği</td></tr>
+        <tr><td><code>oc_service.py</code></td><td class="r">413</td><td>Kademe 1 — OCASI</td></tr>
+        <tr><td><code>scan_summary.py</code></td><td class="r">331</td><td>Tarama özeti</td></tr>
+        <tr><td><code>settings_audit.py</code></td><td class="r">227</td><td><b>Dört yönlü</b> ayar↔kod denetimi</td></tr>
+        <tr><td><code>preflight.py</code></td><td class="r">155</td><td><b>Yalnız 5 giriş noktası</b> — kurallar burada değil</td></tr>
+        <tr><td><code>call_log.py</code></td><td class="r">149</td><td>Çağrı kaydı</td></tr>
+        <tr><td><code>failure_classify.py</code></td><td class="r">148</td><td>DEBUGGER — 8 arıza sınıfı</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Bu on dört dosya sunucunun kendisi. Depoda ayrıca <code>verification/validator.py</code>
+  (659 satır, kıyaslamanın Katman C'si), kıyaslama koşucusu ve prob araçları var —
+  37 dosyada toplam <b>11.213 satır</b>. Rapordaki her sayı bu ayrımı koruyor:
+  <b>8.158</b> çalışan sistem, <b>11.213</b> depo.</p>
+</section>
+
+
+<!-- ============ 7. SERVER.PY ============ -->
+<section>
+  <div class="sec-head"><span class="num">08</span><h2>server.py — taşımanın neresinde</h2></div>
+  <p>Kurallar üç dosyaya ayrıldı, derleyici eklendi. <code>server.py</code> bu taşımanın <b>yarısında</b>: ayarları okuyor, ama altı hesap aracının gövdesi hâlâ elle dizilmiş kod.</p>
+
+  <h3>Nereden gelindi</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th></th><th>Önce</th><th>Şimdi</th></tr></thead>
+      <tbody>
+        <tr><td>Kurallar</td><td>Koda gömülü — <code>server.py</code>'da try/except zincirleri, sabit toleranslar</td><td><b>28 ayar bölümü: 26'sı bağlı</b> · 2 <code>"code"</code> işaretli <span style="color:var(--faint)">(<code>policy</code>, <code>reviewer_note</code>)</span></td></tr>
+        <tr><td><code>preflight.py</code></td><td>351 satır, kural gövdeleriyle</td><td>155 satır, <b>sıfır kural</b></td></tr>
+        <tr><td>Ayar okuma</td><td>Her istekte tek tek — kural motoru, derleyici değil</td><td>Açılışta bir kez derlenip doğrulanıyor</td></tr>
+        <tr><td>Bozuk ayar</td><td>Tek harflik yazım hatası kuralı <b>sessizce siliyordu</b> — yükleme hatası yok, aynı istek 1 şikâyet yerine 0 şikâyet</td><td><code>SettingsError</code> — sunucu <b>açılmıyor</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Her adımda davranışın değişmediği <b>550 istekli fark testi</b> ile doğrulandı: eski uygulamaya karşı reddetme davranışı birebir aynı.</p>
+
+  <h3>Kodda kalan — altı araç, 1.160 satır</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Fonksiyon</th><th class="r">Satır</th><th>Konum</th></tr></thead>
+      <tbody>
+        <tr><td><code>calculate_property_diagram</code></td><td class="r">262</td><td>1045</td></tr>
+        <tr><td><code>calculate_isothermal_section</code></td><td class="r">260</td><td>1312</td></tr>
+        <tr><td><code>calculate_phase_diagram</code></td><td class="r">181</td><td>1751</td></tr>
+        <tr><td><code>calculate_scheil_solidification</code></td><td class="r">169</td><td>1577</td></tr>
+        <tr><td><code>compare_alloys</code></td><td class="r">167</td><td>873</td></tr>
+        <tr><td><code>calculate_equilibrium</code></td><td class="r">121</td><td>735</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>server.py</code> toplam 1.935 satır, 26 üst düzey fonksiyon. Bu altısı dosyanın <b>%60'ı</b>. Notlar, <code>stop_rule</code> ve kapsama dosyadan okunuyor; boru hattını dizen sıra kodda.</p>
+
+  <h3>Neden riskli</h3>
+  <p>Altı fonksiyonun her biri kendi boru hattını <b>elle diziyor</b>. Bir kontrol o diziden düşerse hiçbir şey fark etmez — bu tam olarak <code>preflight.py</code>'da yaşandı: dokuz kural aylarca çağrılmadan durdu, düzenlense hiçbir etkisi olmayacaktı.</p>
+
+  <figure>
+    <svg viewBox="0 0 940 210" role="img" aria-label="Dört aşamalı doğrulama zinciri: sözdizimi, ayar denetimi, 550 istekli fark testi ve 86 vakalık kıyaslama. İki gerçek arıza ilk üç aşamayı da geçti ve yalnızca son aşamada yakalandı.">
+      <defs>
+        <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text class="t-hd" x="28" y="22">İKİ GERÇEK ARIZA — ilk üç denetimden de geçti</text>
+      <line class="s-acc" x1="28" y1="40" x2="690" y2="40" marker-end="url(#ar4)" style="color:var(--accent)"/>
+      <line class="s-acc" x1="700" y1="26" x2="700" y2="54" style="color:var(--accent)"/>
+      <text class="t-acc" x="712" y="44">burada yakalandı</text>
+
+      <rect class="n-box" x="28" y="66" width="200" height="52" rx="3"/>
+      <text class="t-m" x="128" y="88" text-anchor="middle">sözdizimi denetimi</text>
+      <text class="t-s" x="128" y="106" text-anchor="middle">geçti</text>
+
+      <rect class="n-box" x="256" y="66" width="200" height="52" rx="3"/>
+      <text class="t-m" x="356" y="88" text-anchor="middle">settings_audit.py</text>
+      <text class="t-s" x="356" y="106" text-anchor="middle">geçti</text>
+
+      <rect class="n-box" x="484" y="66" width="200" height="52" rx="3"/>
+      <text class="t-m" x="584" y="88" text-anchor="middle">550 istekli fark testi</text>
+      <text class="t-s" x="584" y="106" text-anchor="middle">geçti</text>
+
+      <rect class="n-toml" x="712" y="66" width="200" height="52" rx="3"/>
+      <text class="t-m" x="812" y="88" text-anchor="middle">86 vakalık kıyaslama</text>
+      <text class="t-s" x="812" y="106" text-anchor="middle">gerçek MCP protokolü</text>
+
+      <line class="s-line" x1="228" y1="92" x2="250" y2="92" marker-end="url(#ar4)"/>
+      <line class="s-line" x1="456" y1="92" x2="478" y2="92" marker-end="url(#ar4)"/>
+      <line class="s-line" x1="684" y1="92" x2="706" y2="92" marker-end="url(#ar4)"/>
+
+      <line class="s-line" x1="28" y1="142" x2="912" y2="142" opacity=".3"/>
+      <text class="t-s" x="28" y="164">ARIZA 1 · yardımcı fonksiyonlar dekoratör ile fonksiyon arasına girmiş —</text>
+      <text class="t-s" x="28" y="178">calculate_equilibrium MCP'ye hiç kaydolmamıştı</text>
+      <text class="t-s" x="484" y="164">ARIZA 2 · baz dönüşümü PREFLIGHT'tan ÖNCE koşuyordu —</text>
+      <text class="t-s" x="484" y="178">normalize edilen bileşim, ölçek kuralına görünmeden geçti</text>
+    </svg>
+    <figcaption><b>Statik denetimler ve birim testleri sistemin çalıştığını göstermiyor.</b> Kıyaslama koşumu bu turda iki kez yeniden başlatıldı; iki arıza da yalnızca uçtan uca koşumda göründü. Birincisi MCP protokolünü, ikincisi kural sırasını gerektiriyordu. Düzeltmeden sonra koşum <b>86/86</b> — ve bu rapor yazılırken tekrar ölçüldü: kolay 30/30 · orta 35/35 · zor 21/21, 163,7 saniye. Havuz 88 vaka; ikisi <b>belgelenmiş açık kusur</b> olduğu için ayrı tutuluyor (askıya alınmış fazın yedek motoru yok · gaz fazı molekül türü olarak ayrıştırılıyor). Bayrağın kendisi bir yapılacak iş kaydı.</figcaption>
+  </figure>
+
+  <h3>Kalan kod borcu</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Borç</th><th>Ölçü</th><th>Risk</th></tr></thead>
+      <tbody>
+        <tr><td><code>server.py</code>'ın altı fonksiyonu</td><td>1.160 satır</td><td>Boru hattı elle diziliyor; düşen bir adım sessiz kalır</td></tr>
+        <tr><td><code>build_combined_series</code></td><td>302 satır, tek fonksiyon</td><td><code>native_step.py</code> içinde; hem hesap hem sunum taşıyor</td></tr>
+        <tr><td>Faz adı kanonikleştirme</td><td>3 modülde ayrı tanım</td><td>Çıkışta tek yazıma indirildi (<code>e354894</code>); tanımlar hâlâ <code>native_step</code>, <code>native_map</code> ve <code>server</code>'da ayrı</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>1 Eylül akşamı iki borç kapandı.</b> <code>c7aa612</code> <code>verification/validator.py</code> içindeki ikinci Katman B kopyasını sildi — kendi model zinciri, kendi token bütçesi, kendi verdict ayrıştırıcısı vardı ve iki kopyanın ayrışacağı gibi ayrışmıştı: canlı yol Ağustos'ta 4000'e çıkarılmışken kopya 1500'de kalmıştı. <code>e354894</code> faz adı yazımını sonucun çıktığı sınırda tekleştirdi; bir kıyaslama vakasına mal olmuştu, çünkü yavaş kademeye düşen bir tarama <code>FCC_A1</code> yerine <code>FCC_A1#1</code> döndürünce arıza farklı bir faz gibi görünüyordu.</p>
+
+  <h3>Aylardır açık olan yavaşlama — teşhis kondu</h3>
+  <p>Tam koşum, hızlı koşumun yirmi katı sürüyordu ve sebebi bilinmiyordu. Elenmişti:
+  başıboş gnuplot penceresi, artık Windows süreci, bellek, yük, kademe kodu, ayar
+  motoru. Hiçbiri değildi. Aşama başına süre ölçülünce sebep <b>tek satırda</b> ortaya
+  çıktı.</p>
+
+<pre><code>--hizli    141,1 s     Katman B KAPALI
+tam       2915,8 s     Katman B ACIK          oran 20,7x
+
+en pahali uc vaka                sure      verify_b       pay
+   S2_ozet_erime_araligi        115,88 s   90.726 ms     %78
+   C3_steel1_genis_tarama       111,63 s   89.289 ms     %80
+   H1_krom_taramasi             104,02 s   90.698 ms     %87</code></pre>
+
+  <p>Her birinde <b>tam 90 saniye</b>. Bu bir tesadüf değil, bir tavan:
+  <code>execution.toml</code>'da <code>reviewer_budget.stage_deadline_s = 90</code>.
+  Hesabın kendisi saniyeler sürüyor; <b>ulaşılamayan bir hakemi beklemek</b> 90 saniye.
+  Koşumun <b>%37'si</b> buydu.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Elenen ihtimal</th><th>Nasıl elendi</th></tr></thead>
+      <tbody>
+        <tr><td>Zamanla bozulma — süreç yaşlandıkça yavaşlıyor</td>
+            <td>Her arka uç için ilk yarı / ikinci yarı ayrı ölçüldü: dördü de <b>sabit</b></td></tr>
+        <tr><td>Çağrılar arasındaki yük — sunucu kurulumu, süreç toplama</td>
+            <td>Zamanın <b>%100'ü çağrıların içinde</b>, <b>%0'ı arasında</b></td></tr>
+        <tr><td>Hesabın kendisi</td>
+            <td>Aynı vakalar <code>--hizli</code>'da saniyeler içinde bitiyor</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="k">Bunun mimari sonucu</span>
+    <p>Katman B <b>karar vermiyor</b> — <code>advisory_only</code>. Yani koşumun %37'si,
+    sonucu değiştirmeyen bir görüşü beklemekle geçiyordu. Ulaşılamayan hakem zaten
+    "ulaşılamadı" olarak kaydediliyor ve Katman A'nın kararı ayakta kalıyor; ölçüm
+    <b>bekleme süresinin</b> bir tercih olduğunu gösterdi, bir zorunluluk değil.
+    <b>Refactor'a önce girilseydi bu bulunmazdı:</b> sebep <code>server.py</code>'da
+    değildi.</p>
+  </div>
+</section>
+
+<footer>
+  Kaynak: /root/projects/oc-mcp · WSL Ubuntu · main @ c7aa612 (1 Eylül 18:32) · 60 commit, 14'ü henüz gönderilmedi<br>
+  Her sayı 2 Eylül 2026'da ölçüldü: satır sayıları depodan, ayar sayıları <b>ayakta duran sunucunun POLICY nesnesinden</b>, kıyaslama o gün koşturulan turdan. Hiçbiri makaleden ya da docs/ altındaki belgelerden alınmadı.<br>
+  Çalışma ağacında tek değişiklik var: <code>_apply_review</code>'in belgesi, davranış değişikliği içermiyor.
+</footer>
+
+</div>
+</body>
+</html>

@@ -527,10 +527,13 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
 
 
 def _apply_review(verification: dict, review: dict, problems: list) -> None:
-    """Fold a Layer B outcome into the verification record. A reviewer that
-    objected fails the result; a reviewer that could not be reached, or
-    whose verdict could not be read, leaves Layer A's decision standing --
-    an absent opinion is not a negative one."""
+    """Fold a Layer B outcome into the verification record. The review is
+    recorded and framed; it never decides. An objection is written down as
+    advisory_only and Layer A's verdict stands, because a wrong objection
+    presented as a verdict once cost a caller eight correct numbers. A
+    reviewer that could not be reached, or whose verdict could not be read,
+    leaves the record untouched -- an absent opinion is not a negative one.
+    The invariant is checked: result_check.inv_review_does_not_decide."""
     if review.get("available") and review.get("passed") is False:
         # Recorded, framed, and not acted on. The review reports; it does
         # not decide. See output.toml, honesty.review_is_advisory_not_a_verdict:
