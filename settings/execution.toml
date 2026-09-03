@@ -228,16 +228,32 @@ where it sampled sparsely. Below that it is ordinary spacing variation."""
 [binary]
 order = ["bundled_6058", "built_6120"]
 because = """
-The bundled 6.058 build solves steel1 Fe-C at 1200 K from a cold start in
-eleven iterations, matching the known-correct G = -56563.789 J/mol exactly.
-The 6.120 build we compiled ourselves does not converge there at all, in
-either grid-minimiser mode. Same engine family, measurably different
-solver -- so the older one is tried first wherever it is present.
+This list is about the CONSOLE binary -- the one driven by a macro through
+stdin. It is not about the engine version, and the difference matters
+enough that the earlier wording here sent a day's work down the wrong path.
 
-Tried in order, and the first one actually on disk wins: a machine without
-the separately-installed CAE GUI simply falls to the build we made. The
-OC_BINARY environment variable still overrides everything, which is how a
-single run is pinned to one engine for comparison."""
+The bundled 6.058 console solves steel1 Fe-C at 1200 K from a cold start in
+eleven iterations, matching the known-correct G = -56563.789 J/mol exactly.
+Our own 6.120 console does not: it reports 4204 "Too many iterations" (501
+against a cap of 500), prints "the results below are not a valid
+equilibrium", and gives up -- with `calculate equilibrium` and with
+`calculate carefully` alike, and on a single point as much as on a step.
+It is worth knowing that the number it computed before giving up is
+-5.65638E+04, the correct one; what fails is the convergence criterion,
+not the arithmetic.
+
+The version is NOT the problem, and this is the part the old wording got
+wrong. OCASI is the same 6.120, linked against the same libOC.so.0, and it
+solves that case correctly -- because oc_service calls
+calculateEquilibriumRobust, which routes to the tqce_native_retry entry
+point added to OCisoCbinding/liboctq.F90 for exactly this failure. The
+library path has a 4204 recovery; the console path does not reach it.
+
+So: 6.058 first wherever it is present, and the first one actually on disk
+wins -- a machine without the separately-installed CAE GUI falls to the
+build we made, and on that machine the macro-driven tiers will not work
+for these alloys. OC_BINARY still overrides everything, which is how a run
+is pinned to one engine for comparison."""
 
 [binary.paths]
 bundled_6058 = "/mnt/c/OpenCalphad_CAE_0_1_0/Console/Windows/oc6P.exe"
@@ -412,6 +428,7 @@ single_point_s   = 12
 scheil_s         = 180
 map_s            = 240
 gap_fill_s       = 15
+step_silence_s   = 30
 chart_render_s   = 30
 process_reap_s   = 5
 because = """
@@ -434,6 +451,21 @@ A timeout that fires is reported as `timed_out`, which [signals] lists and
 ## system reports noise as a finding; too loose and a genuine disagreement
 ## between two engines is averaged away.
 ## ---------------------------------------------------------------------
+
+## `step_silence_s` is a different kind of limit from the ones above, and
+## it is here because the others could not do its job. A stalled STEP does
+## not run slowly -- it stops. Measured: the output of a healthy scan grows
+## until the run ends, and its longest internal pause is 8.0 s, and it does not grow with the scan: measured at 20, 50, 100, 200 and 400 points, the worst pause was 8.0 s and it came from a 20-point run; a stalled one
+## goes quiet within the first second and stays quiet for the full 150 s.
+## The two are told apart by the pause, not by the clock.
+##
+## Why not simply lower step_timeout_s: because a large scan legitimately
+## takes longer than a small one, so any single deadline is either too
+## short for the big ones or too generous for a stall. The silence rule
+## does not care how long the scan is, only whether it is still producing.
+##
+## step_timeout_s stays as the backstop. The silence rule cannot catch a
+## run that keeps writing and never finishes, and that has happened here.
 
 [tolerances]
 duplicate_axis_position = 1e-6

@@ -305,8 +305,15 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
                 stderr=stderr_f,
                 env=env,
             )
-            deadline = time.monotonic() + timeout
+            basladi = time.monotonic()
+            deadline = basladi + timeout
             finished = False
+            # When the output last GREW. A run that went quiet after three
+            # seconds and one that was still writing at the deadline are
+            # different failures, and the timeout alone cannot tell them
+            # apart. The size comes from a read this loop already does.
+            son_boyut, son_degisim = -1, 0.0
+            takilma, sessizlikten = "", False
             try:
                 while time.monotonic() < deadline:
                     if proc.poll() is not None:
@@ -314,15 +321,30 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
                         break  # exited on its own
                     try:
                         with open(stdout_path, errors="ignore") as probe:
-                            if end_marker in probe.read():
-                                finished = True
-                                break
+                            govde = probe.read()
+                        if len(govde) != son_boyut:
+                            son_boyut = len(govde)
+                            son_degisim = time.monotonic() - basladi
+                        if end_marker in govde:
+                            finished = True
+                            break
                     except OSError:
                         pass
                     if os.path.isfile(csv_path) and os.path.getsize(csv_path) > 0:
                         finished = True
                         break
+                    # Give up on silence rather than on the clock. A stalled
+                    # run stops producing; a slow one does not.
+                    if (time.monotonic() - basladi) - son_degisim > STEP_SILENCE_S:
+                        sessizlikten = True
+                        break
                     time.sleep(0.2)
+                if not finished:
+                    takilma = _stall_probe(proc, stdout_path, csv_path,
+                                           son_degisim,
+                                           time.monotonic() - basladi)
+                    if sessizlikten:
+                        takilma = "sessizlik>%ss " % STEP_SILENCE_S + takilma
             finally:
                 proc.kill()
                 try:
@@ -346,10 +368,20 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
         # back to scanning single points, the property diagram to its own
         # Python loop. Slower and reliable beats fast and unverifiable.
         if not finished:
+            # The stall report rides along in the message because the
+            # message already reaches the payload as native_backend_error,
+            # and from there the call log -- so a run that stalls is
+            # diagnosable afterwards without having been watched live.
+            nicin = (
+                f"STEP stopped producing output for more than "
+                f"{STEP_SILENCE_S}s and was stopped"
+                if sessizlikten else
+                f"STEP did not finish within {timeout}s and was stopped")
             raise NativeStepError(
-                f"STEP did not finish within {timeout}s and was stopped. "
-                "Whatever it had written by then may be incomplete, so it "
-                "is discarded rather than passed on as a full scan."
+                nicin + ". Whatever it had written by then may be "
+                "incomplete, so it is discarded rather than passed on as a "
+                "full scan."
+                + (f" [stall: {takilma}]" if takilma else "")
             )
 
 
@@ -478,10 +510,80 @@ def _policy_number(bolum, anahtar, default):
 
 
 GAP_FILL_TIMEOUT_S = _policy_number("timeouts", "gap_fill_s", 15)
+STEP_SILENCE_S = _policy_number("timeouts", "step_silence_s", 30)
 REAP_TIMEOUT_S = _policy_number("timeouts", "process_reap_s", 5)
 DUP_TOL = _policy_number("tolerances", "duplicate_axis_position", 1e-6)
 SUM_TOL = _policy_number("tolerances", "combined_sum", 1e-5)
 AGREE_TOL = _policy_number("tolerances", "fractions_agree", 1e-4)
+
+
+def _stall_probe(proc, stdout_path, csv_path, son_degisim, gecen):
+    """What the engine was doing when the deadline arrived.
+
+    Called once, only on the failing path, just before the process is
+    killed. Everything here is read-only and every failure is swallowed:
+    a diagnostic that turns a handled timeout into an unhandled crash is
+    worse than no diagnostic.
+
+    What is deliberately NOT reported when the engine is the bundled
+    Windows build: process state, CPU and wchan. WSL2 runs that .exe
+    through process interop, so the pid we hold is a Linux-side stub and
+    the work happens in a Windows process /proc cannot see. The stub reads
+    S / 0.0 s / do_sys_poll on a healthy run and on a hung one alike --
+    measured both ways. A field that reads the same whatever happened is
+    worse than a missing one, because it looks like evidence. On the
+    native Linux build those three do mean what they say, so they are
+    reported there: R with cpu near the wall clock is computing, S with
+    cpu near zero is waiting and no timeout will ever be long enough.
+
+    Output progress is independent of all that and is always reported.
+    """
+    import os
+
+    rapor = {"gecen_s": round(gecen, 1)}
+
+    if son_degisim is not None:
+        rapor["son_cikti_t"] = round(son_degisim, 1)
+        rapor["sessiz_s"] = round(gecen - son_degisim, 1)
+
+    if OC_BINARY.lower().endswith(".exe"):
+        rapor["surec"] = "wsl_interop_sapi(cpu/durum_okunamaz)"
+    else:
+        try:
+            with open("/proc/%d/stat" % proc.pid) as f:
+                ham = f.read()
+            alanlar = ham[ham.rindex(")") + 2:].split()
+            rapor["durum"] = alanlar[0]                  # R S D Z T
+            tik = os.sysconf("SC_CLK_TCK")
+            rapor["cpu_s"] = round(
+                (int(alanlar[11]) + int(alanlar[12])) / tik, 1)
+        except Exception:                                # noqa: BLE001
+            pass
+
+        try:
+            with open("/proc/%d/wchan" % proc.pid) as f:
+                bekleme = f.read().strip()
+            if bekleme and bekleme != "0":
+                rapor["bekliyor"] = bekleme[:40]
+        except Exception:                                # noqa: BLE001
+            pass
+
+    try:
+        rapor["cikti_b"] = os.path.getsize(stdout_path)
+        with open(stdout_path, errors="ignore") as f:
+            satirlar = [x.strip() for x in f.read().split("\n") if x.strip()]
+        if satirlar:
+            rapor["son_satir"] = satirlar[-1][:70]
+    except Exception:                                    # noqa: BLE001
+        pass
+
+    try:
+        rapor["csv_b"] = (os.path.getsize(csv_path)
+                          if os.path.isfile(csv_path) else 0)
+    except Exception:                                    # noqa: BLE001
+        pass
+
+    return " ".join("%s=%s" % (k, v) for k, v in rapor.items())
 
 
 def _dedupe_sorted(points, tol=DUP_TOL):
