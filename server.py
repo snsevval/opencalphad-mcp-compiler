@@ -1693,105 +1693,100 @@ def calculate_scheil_solidification(
     if temperature_min_K is None:
         temperature_min_K = max(seed_temperature_K - 800.0, 1.0)
 
-    problems = preflight.check_scheil_request(
-        database, elements_composition, seed_temperature_K,
-        temperature_min_K, pressure_Pa,
-        composition_basis=composition_basis,
-    )
-    if problems:
-        return _preflight_failure(problems)
+    def _body(elements_composition, _basis_report):
+        db_path = (
+            database if os.path.isabs(database)
+            else os.path.join(oc_service.DEFAULT_DB_DIR, database)
+        )
 
-    # After the rejection rules, not before.
-    elements_composition, _basis_report, _red = _canonical_composition(
-        elements_composition, composition_basis)
-    if _red is not None:
-        return _red
+        # Scheil's own precondition, checked by computing it rather than by
+        # hoping. The engine states it plainly ("you must have calculated an
+        # equilibrium in the liquid") and then, given a seed that is already
+        # part solid, fails somewhere deep in its line tracer with an error
+        # code that says nothing about the real problem. One equilibrium is far
+        # cheaper than one simulation, and it can name what was stable instead.
+        seed = _calc_one(database, elements_composition, seed_temperature_K,
+                         pressure_Pa, None)
+        if "error" not in seed:
+            amounts = seed.get("phase_molar_amounts") or {}
+            solid = [name for name, amount in amounts.items()
+                     if amount > 1e-6 and not name.upper().startswith("LIQUID")]
+            if solid:
+                return {
+                    "error": settings_engine.precondition(
+                        "scheil-seed-is-liquid",
+                        seed=format(seed_temperature_K, "g"),
+                        phases=sorted(solid),
+                    ),
+                    "stage": "PRECONDITION",
+                    "phases_at_seed": {k: float(f"{v:.6g}") for k, v in amounts.items()},
+                    "seed_temperature_K": seed_temperature_K,
+                }
 
-    db_path = (
-        database if os.path.isabs(database)
-        else os.path.join(oc_service.DEFAULT_DB_DIR, database)
-    )
+        _scheil_args = {
+            "database": database,
+            "elements_composition": elements_composition,
+            "temperature_K": seed_temperature_K,
+            "pressure_Pa": pressure_Pa,
+        }
 
-    # Scheil's own precondition, checked by computing it rather than by
-    # hoping. The engine states it plainly ("you must have calculated an
-    # equilibrium in the liquid") and then, given a seed that is already
-    # part solid, fails somewhere deep in its line tracer with an error
-    # code that says nothing about the real problem. One equilibrium is far
-    # cheaper than one simulation, and it can name what was stable instead.
-    seed = _calc_one(database, elements_composition, seed_temperature_K,
-                     pressure_Pa, None)
-    if "error" not in seed:
-        amounts = seed.get("phase_molar_amounts") or {}
-        solid = [name for name, amount in amounts.items()
-                 if amount > 1e-6 and not name.upper().startswith("LIQUID")]
-        if solid:
+        try:
+            result = native_scheil.run_with_step_ladder(
+                db_path, elements_composition, seed_temperature_K,
+                temperature_min_K, pressure_Pa,
+                temperature_step_K=temperature_step_K,
+                timeout=CALC_TIMEOUT_S,
+            )
+        except Exception as exc:
             return {
-                "error": settings_engine.precondition(
-                    "scheil-seed-is-liquid",
-                    seed=format(seed_temperature_K, "g"),
-                    phases=sorted(solid),
-                ),
-                "stage": "PRECONDITION",
-                "phases_at_seed": {k: float(f"{v:.6g}") for k, v in amounts.items()},
-                "seed_temperature_K": seed_temperature_K,
+                "error": f"The Scheil simulation could not be run: {exc}",
+                "stage": "EXECUTION",
             }
 
-    _scheil_args = {
-        "database": database,
-        "elements_composition": elements_composition,
-        "temperature_K": seed_temperature_K,
-        "pressure_Pa": pressure_Pa,
-    }
+        points = [
+            {
+                "temperature_K": p["temperature_K"],
+                "liquid_fraction": float(f"{p['liquid_fraction']:.6g}"),
+                "liquid_composition": {
+                    el: float(f"{v:.6g}") for el, v in p["liquid_composition"].items()
+                },
+            }
+            for p in result["points"]
+        ]
 
-    try:
-        result = native_scheil.run_with_step_ladder(
-            db_path, elements_composition, seed_temperature_K,
+        data = {
+            "database": os.path.basename(database),
+            "composition": elements_composition,
+            "pressure_Pa": pressure_Pa,
+            "seed_temperature_K": seed_temperature_K,
+            "liquidus_K": result["liquidus_K"],
+            "solid_phases_formed": result["solid_phases"],
+            "points": points,
+            "completed": result["completed"],
+            "final_liquid_fraction": result["final_liquid_fraction"],
+            "final_temperature_K": result["final_temperature_K"],
+            "termination_reason": result["termination_reason"],
+            "temperature_step_K": result["temperature_step_K"],
+            "steps_tried": result["steps_tried"],
+            "backend_used": "native_oc_scheil",
+            "note": (
+                "Scheil is a path, not an equilibrium: each point depends on "
+                "all the solid removed above it. A temperature the simulation "
+                "did not reach cannot be filled in by computing it separately, "
+                "which is why an incomplete run is reported as incomplete "
+                "rather than completed by other means."
+            ),
+        }
+        return _attach_verification(data, _scheil_args,
+                                    declared_basis=_basis_report)
+
+    return _tool_frame(
+        lambda: preflight.check_scheil_request(
+            database, elements_composition, seed_temperature_K,
             temperature_min_K, pressure_Pa,
-            temperature_step_K=temperature_step_K,
-            timeout=CALC_TIMEOUT_S,
-        )
-    except Exception as exc:
-        return {
-            "error": f"The Scheil simulation could not be run: {exc}",
-            "stage": "EXECUTION",
-        }
-
-    points = [
-        {
-            "temperature_K": p["temperature_K"],
-            "liquid_fraction": float(f"{p['liquid_fraction']:.6g}"),
-            "liquid_composition": {
-                el: float(f"{v:.6g}") for el, v in p["liquid_composition"].items()
-            },
-        }
-        for p in result["points"]
-    ]
-
-    data = {
-        "database": os.path.basename(database),
-        "composition": elements_composition,
-        "pressure_Pa": pressure_Pa,
-        "seed_temperature_K": seed_temperature_K,
-        "liquidus_K": result["liquidus_K"],
-        "solid_phases_formed": result["solid_phases"],
-        "points": points,
-        "completed": result["completed"],
-        "final_liquid_fraction": result["final_liquid_fraction"],
-        "final_temperature_K": result["final_temperature_K"],
-        "termination_reason": result["termination_reason"],
-        "temperature_step_K": result["temperature_step_K"],
-        "steps_tried": result["steps_tried"],
-        "backend_used": "native_oc_scheil",
-        "note": (
-            "Scheil is a path, not an equilibrium: each point depends on "
-            "all the solid removed above it. A temperature the simulation "
-            "did not reach cannot be filled in by computing it separately, "
-            "which is why an incomplete run is reported as incomplete "
-            "rather than completed by other means."
+            composition_basis=composition_basis,
         ),
-    }
-    return _attach_verification(data, _scheil_args,
-                                declared_basis=_basis_report)
+        elements_composition, composition_basis, _body)
 
 
 @mcp.tool()
