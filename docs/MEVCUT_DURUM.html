@@ -215,7 +215,7 @@ footer{
 <div class="page">
 
 <header>
-  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ 63169fc</p>
+  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ 47aa32e</p>
   <h1>opencalphad-mcp-compiler</h1>
   <p class="standfirst">Kurallar nerede yaşıyor, derleyici onları nasıl bağlıyor, bir istek hangi aşamalardan geçiyor, motor hangi sırayla deniyor.</p>
 
@@ -227,7 +227,7 @@ footer{
     <div><span class="k">Doğrulama</span><span class="v">8 verify · 7 beyan</span></div>
     <div><span class="k">Derleme</span><span class="v">11 durdurur · 3 uyarır</span></div>
     <div><span class="k">Derlenmiş politika</span><span class="v">30 alan · 3 nesne</span></div>
-    <div><span class="k">Son commit</span><span class="v">2 Eyl 14:59</span></div>
+    <div><span class="k">Son commit</span><span class="v">2 Eyl akşam</span></div>
   </div>
 </header>
 
@@ -1150,6 +1150,47 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
     <p>Planın 6. adımı altı hesap aracını ayrı dosyalara taşımayı da söylüyordu. Bunu haklı çıkaran gerekçe <b>ölçümden sağ çıkmadı</b>: kısmen düzeltmesi beklenen yavaş tam koşumların sebebi Katman B'nin ulaşılamayan hakemi 90 saniye beklemesiymiş, dosyanın büyüklüğüyle ilgisi yok. O büyüklükte bir taşıma, bu hafta zaten yaşanan <b>kayıt olmama riskini</b> taşıyor ve karşılığında ölçülmüş bir kazanç yok. Isıran kısım kopyaydı; giden de o oldu.</p>
   </div>
 
+  <h3>STEP takılması — teşhis ve kapanış</h3>
+  <p>Aylardır <i>"her koşumda başka bir vaka takılıyor, sebep bilinmiyor"</i> diye taşınan arıza. İki ayrı şeymiş, ve öncülü yanlışmış.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Sanılan</th><th>Ölçülen</th></tr></thead>
+      <tbody>
+        <tr><td>Her seferinde farklı bir vaka</td><td>Dört koşumda <b>hep aynı üç istek</b> — 4/4, 3/4, 3/4</td></tr>
+        <tr><td>Hepsi aynı arıza</td><td><code>alni-4slx</code> <b>takılmıyor</b>: 5/5 deterministik, 0,3 s'de temiz hata (<code>Too many stable phases</code>). Motorun o alaşımdaki sınırı, arıza değil</td></tr>
+        <tr><td>Cevabı bozuyor olabilir</td><td>Bozmuyor. Faz sınırları <b>2–10 K</b> içinde örtüşüyor, ikisi de doğrulamayı geçiyor</td></tr>
+        <tr><td>Motor yavaş / yakınsamıyor</td><td>Hesap <b>bitiyor</b> — 135 denge, 0,06 s CPU. Kilitlenme sonucu dışa aktarırken</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>Takılmanın tam yeri bulundu.</b> Motorun son bastığı satır <code>Dependent values /NP(*)/:</code>; sağlıklı koşum oradan <code>Output on screen</code> ile devam edip tabloyu basıyor. Sekiz sağlıklı koşum <b>bayt bayt aynı</b> (11.297 bayt, 31 istem); takılan 4.951 baytta, 28 istemde duruyor. Beklediği makro satırı <b>dosyada duruyor, okunmamış</b> — girdi tükenmemiş, <b>ulaşmamış</b>.</p>
+
+  <p>Aktarım Windows tarafındaki interop katmanında ve <code>/proc</code>'tan izlenemiyor: elimizdeki süreç <code>/init</code> sapı, <code>poll(nfds=5, timeout=-1)</code> ile <b>sonsuz</b> bekliyor, sıfır CPU harcıyor. <b>Mekanizmanın son adımı kapatılamadı.</b></p>
+
+  <div class="note">
+    <span class="k">Ama mekanizmayı bilmek gerekmedi</span>
+    <p>STEP alt süreci <b>2,7 saniye</b> (75 koşumun ortancası). Takılınca 30 saniye bekleyip alt kademeye inmek — aynı isteği 215 yerine <b>100 nokta</b> ile cevaplamak — demekti. Üç saniye ödeyip iyi cevabı korumak bariz takas, ve köprünün nasıl tıkandığını bilmeyi gerektirmiyor.</p>
+    <p><b>Tekrar yalnızca takılmada.</b> Deterministik motor hatası (<code>alni</code>, 5/5, 0,3 s) tekrar denenmiyor — üç yönden doğrulandı: eşik zorlanınca <b>2</b> doğurma, normalde <b>1</b>, <code>alni</code>'de <b>1</b>.</p>
+  </div>
+
+<pre><code>ONCE   150 s bosuna bekle  ->  alt kademe  ->  100 nokta, kaba
+SIMDI   30 s sessizlikte vazgec  ->  motoru yeniden kur  ->  2,7 s  ->  215 nokta
+
+esik tahmin degil: saglikli kosumun en uzun ic sessizligi 8,0 s
+                   20/50/100/200/400 noktada olculdu, boyutla ARTMIYOR
+                   30 s = 3,75 kat marj</code></pre>
+
+  <p>Elenen sekiz hipotez, hepsi ölçümle: makine yükü, motor sürümü, alaşım, süreç yaşı, <code>.exe</code> doğurma sayısı, biriken gnuplot pencereleri, makro kayması, hesabın kendisi.</p>
+
+  <div class="note">
+    <span class="k">Duran mimari borç — ve dört ölçüm hatası</span>
+    <p>Konsol etkileşimi hâlâ <b>konumsal</b>: makro sabit sayıda boş satırla sabit sayıda istem varsayıyor. Bugünkü düzeltme sonucu tolere ediyor, varsayımı kaldırmıyor. Kalıcı çözüm, motorun sorduğu isteme göre cevap yazan bir sürücü.</p>
+    <p>Ayrıca <b>başarılı bir tekrar yükte iz bırakmıyor</b>, yani takılma oranı artık çağrı kaydından okunamıyor — bu projedeki her oran öyle ölçülmüştü.</p>
+    <p>Bu teşhis dört yanlış ara sonuçtan geçti ve <b>dördü de kendi ölçüm aletimden</b> çıktı: bir Windows sürecini göremeyen CPU okuması, dosyanın sonu yerine başını raporlayan bir kesit, bitmiş bir koşumu takılmış sanan bir izleyici, ve iki takılmayla kirlenmiş bir hız karşılaştırması. Dördü de bir sonraki ölçümle yakalandı; hiçbiri okumayla.</p>
+  </div>
+
   <h3>Kalan kod borcu</h3>
   <div class="scroll">
     <table>
@@ -1209,7 +1250,7 @@ en pahali uc vaka                sure      verify_b       pay
 </section>
 
 <footer>
-  Kaynak: /root/projects/oc-mcp · WSL Ubuntu · main @ f570668 (2 Eylül 14:28) · 62 commit, <b>hepsi gönderildi</b> — çalışma ağacı temiz<br>
+  Kaynak: /root/projects/oc-mcp · WSL Ubuntu · main @ f570668 (2 Eylül 14:28) · 67 commit, <b>hepsi gönderildi</b> — çalışma ağacı temiz<br>
   Her sayı 2 Eylül 2026'da ölçüldü: satır sayıları depodan, ayar sayıları <b>ayakta duran sunucunun POLICY nesnesinden</b>, kıyaslama o gün koşturulan turdan. Hiçbiri makaleden ya da docs/ altındaki belgelerden alınmadı.
 </footer>
 
