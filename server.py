@@ -853,48 +853,39 @@ def calculate_equilibrium(
     # rejection is what lets the caller repair it.
     named_phases = list(suspended_phases or []) + list(dormant_phases or []) \
         + list(fixed_phases or {})
-    problems = preflight.check_equilibrium_request(
-        database, elements_composition, temperature_K, pressure_Pa,
-        named_phases or None,
-        composition_basis=composition_basis,
-    )
-    if problems:
-        return _preflight_failure(problems)
+    def _body(elements_composition, _basis_report):
+        result = _calc_one(
+            database, elements_composition, temperature_K, pressure_Pa,
+            suspended_phases, dormant_phases, fixed_phases,
+        )
+        distribution = _element_distribution(result, elements_composition)
+        if distribution is not None:
+            result["element_distribution"] = distribution
+        notes = _phase_notes(result, elements_composition)
+        if notes:
+            result["phase_notes"] = notes
+        # A single-point equilibrium returns molar amounts of each phase, and
+        # the engine that produced it is its provenance.
+        _canonical_phases(result)
+        _attach_basis(result, "phase_molar_amount",
+                      source=result.get("backend_used"))
+        return _attach_verification(result, {
+            "database": database,
+            "elements_composition": elements_composition,
+            "temperature_K": temperature_K,
+            "pressure_Pa": pressure_Pa,
+            "suspended_phases": suspended_phases,
+            "dormant_phases": dormant_phases,
+            "fixed_phases": fixed_phases,
+        }, declared_basis=_basis_report)
 
-    # Basis resolution runs AFTER the request has been judged, not before.
-    # Normalising first would hand every rule an already-tidied composition
-    # -- composition-scale-plausible exists to catch {FE: 99, C: 1} as a
-    # possible mistake, and it cannot do that once the numbers have been
-    # divided by their sum.
-    elements_composition, _basis_report, _red = _canonical_composition(
-        elements_composition, composition_basis)
-    if _red is not None:
-        return _red
-
-    result = _calc_one(
-        database, elements_composition, temperature_K, pressure_Pa,
-        suspended_phases, dormant_phases, fixed_phases,
-    )
-    distribution = _element_distribution(result, elements_composition)
-    if distribution is not None:
-        result["element_distribution"] = distribution
-    notes = _phase_notes(result, elements_composition)
-    if notes:
-        result["phase_notes"] = notes
-    # A single-point equilibrium returns molar amounts of each phase, and
-    # the engine that produced it is its provenance.
-    _canonical_phases(result)
-    _attach_basis(result, "phase_molar_amount",
-                  source=result.get("backend_used"))
-    return _attach_verification(result, {
-        "database": database,
-        "elements_composition": elements_composition,
-        "temperature_K": temperature_K,
-        "pressure_Pa": pressure_Pa,
-        "suspended_phases": suspended_phases,
-        "dormant_phases": dormant_phases,
-        "fixed_phases": fixed_phases,
-    }, declared_basis=_basis_report)
+    return _tool_frame(
+        lambda: preflight.check_equilibrium_request(
+            database, elements_composition, temperature_K, pressure_Pa,
+            named_phases or None,
+            composition_basis=composition_basis,
+        ),
+        elements_composition, composition_basis, _body)
 
 
 def _same_elements(composition_a: dict, composition_b: dict) -> bool:
@@ -981,104 +972,116 @@ def compare_alloys(
     # Both sides are read in the same declared basis: comparing an alloy
     # given by weight against one given by mole would compare two things
     # nobody asked about together.
-    problems = (
-        preflight.check_equilibrium_request(
-            database, composition_a, temperature_K, pressure_Pa, suspended_phases,
-            composition_basis=composition_basis,
-        )
-        + preflight.check_equilibrium_request(
-            database, composition_b, temperature_K, pressure_Pa, suspended_phases,
-            composition_basis=composition_basis,
-        )
-    )
-    if problems:
-        return _preflight_failure(problems)
+    def _body(composition_a, _basis_a):
+        nonlocal composition_b
 
-    # After the rejection rules, not before -- see calculate_equilibrium.
-    composition_a, _basis_a, _red = _canonical_composition(
-        composition_a, composition_basis, label_a)
-    if _red is not None:
-        return _red
-    composition_b, _basis_b, _red = _canonical_composition(
-        composition_b, composition_basis, label_b)
-    if _red is not None:
-        return _red
+        # nonlocal because the line below rebinds it, and rebinding an
+        # enclosing function's parameter inside a nested one makes it
+        # local there -- the read would raise UnboundLocalError before
+        # the assignment. Measured twice today: once on axis_step, and
+        # again here, because the check written after the first time
+        # only looked at 'x = ...' and this is 'a, b, c = ...'.
 
-    # Both sides get the same verification treatment. That means two Layer B
-    # round trips when it's enabled, which roughly doubles this tool's
-    # latency -- accepted rather than special-cased, since a comparison
-    # whose two halves were checked differently would be worth less than
-    # the seconds saved. OC_SEMANTIC_CHECK=0 turns it off when that matters.
-    def _args_for(composition):
+        # The second composition is resolved here rather than in the
+        # frame. The frame takes one, and generalising it to take two
+        # would be the first step toward a frame that knows all six
+        # shapes -- which is the thing it was deliberately kept away
+        # from. Nothing is lost: the body only runs once preflight has
+        # passed, so resolving here is still after the rejection rules,
+        # which is the order being protected.
+        composition_b, _basis_b, _red = _canonical_composition(
+            composition_b, composition_basis, label_b)
+        if _red is not None:
+            return _red
+
+        # Both sides get the same verification treatment. That means two Layer B
+        # round trips when it's enabled, which roughly doubles this tool's
+        # latency -- accepted rather than special-cased, since a comparison
+        # whose two halves were checked differently would be worth less than
+        # the seconds saved. OC_SEMANTIC_CHECK=0 turns it off when that matters.
+        def _args_for(composition):
+            return {
+                "database": database,
+                "elements_composition": composition,
+                "temperature_K": temperature_K,
+                "pressure_Pa": pressure_Pa,
+                "suspended_phases": suspended_phases,
+            }
+
+        result_a = _attach_verification(
+            _calc_one(database, composition_a, temperature_K, pressure_Pa, suspended_phases),
+            _args_for(composition_a), declared_basis=_basis_a,
+        )
+        result_b = _attach_verification(
+            _calc_one(database, composition_b, temperature_K, pressure_Pa, suspended_phases),
+            _args_for(composition_b), declared_basis=_basis_b,
+        )
+
+        if "error" in result_a or "error" in result_b:
+            comparison = {
+                "note": (
+                    "Comparison skipped because at least one side failed to "
+                    f"converge — see the '{label_a}'/'{label_b}' error field above."
+                )
+            }
+        else:
+            # Canonicalize before comparing, or the same phase counts as two
+            # different ones. Measured on Fe-20Cr against Fe-20Cr-2Mo at
+            # 1273 K: both are single-phase ferrite, and the summary said
+            # phases_only_in_A ["BCC_A2"], phases_only_in_B ["BCC_A2#1"],
+            # phases_in_both [] -- reporting that two alloys share no phase at
+            # all when their phase content is identical. "#1" is a phase's
+            # default composition set and the engine prints it inconsistently
+            # depending on the path a result came through; native_step and
+            # native_map already strip it, and this comparison was the one
+            # place still working on the raw spelling.
+            canon = native_step._strip_default_composition_set
+            phases_a = {canon(name) for name in result_a["phase_molar_amounts"]}
+            phases_b = {canon(name) for name in result_b["phase_molar_amounts"]}
+            comparison = {
+                "gibbs_energy_difference_J": result_b["gibbs_energy_J"] - result_a["gibbs_energy_J"],
+                "phases_only_in_" + label_a: sorted(phases_a - phases_b),
+                "phases_only_in_" + label_b: sorted(phases_b - phases_a),
+                "phases_in_both": sorted(phases_a & phases_b),
+            }
+            # Say what the difference means, because the field name alone says
+            # something false. "Lower Gibbs energy" is how stability is decided
+            # BETWEEN STATES OF ONE SYSTEM -- which phases a given composition
+            # adopts. Between two different compositions there is no such
+            # comparison: each G is the energy of a different system relative
+            # to its own elements' reference states, so swapping 2% Fe for 2%
+            # Mo moves G by the reference contribution of that swap and says
+            # nothing about how favourable either alloy is.
+            #
+            # Measured: asked which of Fe-20Cr and Fe-20Cr-2Mo is more stable
+            # at 1273 K, the client model read this field correctly (-569 J)
+            # and concluded the molybdenum alloy was more stable. Both are
+            # single-phase ferrite; neither is more stable than the other. It
+            # took the framing the field name offered, and there was none
+            # anywhere else to take.
+            kimlik = ("gibbs-difference-is-a-ranking"
+                      if _same_elements(composition_a, composition_b)
+                      else "gibbs-difference-is-not-a-ranking")
+            comparison["gibbs_energy_difference_note"] = settings_engine.note(kimlik)
+
         return {
-            "database": database,
-            "elements_composition": composition,
-            "temperature_K": temperature_K,
-            "pressure_Pa": pressure_Pa,
-            "suspended_phases": suspended_phases,
+            label_a: result_a,
+            label_b: result_b,
+            "comparison": comparison,
         }
 
-    result_a = _attach_verification(
-        _calc_one(database, composition_a, temperature_K, pressure_Pa, suspended_phases),
-        _args_for(composition_a), declared_basis=_basis_a,
-    )
-    result_b = _attach_verification(
-        _calc_one(database, composition_b, temperature_K, pressure_Pa, suspended_phases),
-        _args_for(composition_b), declared_basis=_basis_b,
-    )
-
-    if "error" in result_a or "error" in result_b:
-        comparison = {
-            "note": (
-                "Comparison skipped because at least one side failed to "
-                f"converge — see the '{label_a}'/'{label_b}' error field above."
+    return _tool_frame(
+        lambda: (
+            preflight.check_equilibrium_request(
+                database, composition_a, temperature_K, pressure_Pa, suspended_phases,
+                composition_basis=composition_basis,
             )
-        }
-    else:
-        # Canonicalize before comparing, or the same phase counts as two
-        # different ones. Measured on Fe-20Cr against Fe-20Cr-2Mo at
-        # 1273 K: both are single-phase ferrite, and the summary said
-        # phases_only_in_A ["BCC_A2"], phases_only_in_B ["BCC_A2#1"],
-        # phases_in_both [] -- reporting that two alloys share no phase at
-        # all when their phase content is identical. "#1" is a phase's
-        # default composition set and the engine prints it inconsistently
-        # depending on the path a result came through; native_step and
-        # native_map already strip it, and this comparison was the one
-        # place still working on the raw spelling.
-        canon = native_step._strip_default_composition_set
-        phases_a = {canon(name) for name in result_a["phase_molar_amounts"]}
-        phases_b = {canon(name) for name in result_b["phase_molar_amounts"]}
-        comparison = {
-            "gibbs_energy_difference_J": result_b["gibbs_energy_J"] - result_a["gibbs_energy_J"],
-            "phases_only_in_" + label_a: sorted(phases_a - phases_b),
-            "phases_only_in_" + label_b: sorted(phases_b - phases_a),
-            "phases_in_both": sorted(phases_a & phases_b),
-        }
-        # Say what the difference means, because the field name alone says
-        # something false. "Lower Gibbs energy" is how stability is decided
-        # BETWEEN STATES OF ONE SYSTEM -- which phases a given composition
-        # adopts. Between two different compositions there is no such
-        # comparison: each G is the energy of a different system relative
-        # to its own elements' reference states, so swapping 2% Fe for 2%
-        # Mo moves G by the reference contribution of that swap and says
-        # nothing about how favourable either alloy is.
-        #
-        # Measured: asked which of Fe-20Cr and Fe-20Cr-2Mo is more stable
-        # at 1273 K, the client model read this field correctly (-569 J)
-        # and concluded the molybdenum alloy was more stable. Both are
-        # single-phase ferrite; neither is more stable than the other. It
-        # took the framing the field name offered, and there was none
-        # anywhere else to take.
-        kimlik = ("gibbs-difference-is-a-ranking"
-                  if _same_elements(composition_a, composition_b)
-                  else "gibbs-difference-is-not-a-ranking")
-        comparison["gibbs_energy_difference_note"] = settings_engine.note(kimlik)
-
-    return {
-        label_a: result_a,
-        label_b: result_b,
-        "comparison": comparison,
-    }
+            + preflight.check_equilibrium_request(
+                database, composition_b, temperature_K, pressure_Pa, suspended_phases,
+                composition_basis=composition_basis,
+            )
+        ),
+        composition_a, composition_basis, _body)
 
 
 @mcp.tool()
