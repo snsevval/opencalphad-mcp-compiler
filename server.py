@@ -1155,207 +1155,202 @@ def calculate_property_diagram(
     if n_points < 2:
         n_points = 2
 
-    problems = preflight.check_property_diagram_request(
-        database, elements_composition, temperature_min_K, temperature_max_K,
-        pressure_Pa, suspended_phases,
-        composition_basis=composition_basis,
-    )
-    if problems:
-        return _preflight_failure(problems)
-
-    # After the rejection rules, not before.
-    elements_composition, _basis_report, _red = _canonical_composition(
-        elements_composition, composition_basis)
-    if _red is not None:
-        return _red
-
-    _diagram_args = {
-        "database": database,
-        "elements_composition": elements_composition,
-        "temperature_min_K": temperature_min_K,
-        "temperature_max_K": temperature_max_K,
-        "n_points": n_points,
-        "pressure_Pa": pressure_Pa,
-        "suspended_phases": suspended_phases,
-    }
-
-    def _shape(points, backend, basis_field, extra):
-        """Build the payload and finish it -- once, whichever tier answered.
-
-        The finishing sequence used to be written out at both tiers, a
-        hundred lines apart, and the two differ on purpose: STEP reports
-        mass fractions, the single-point loop molar amounts. That is
-        exactly what makes two copies dangerous -- a deliberate difference
-        and a dropped step look identical to a reader, and only one of them
-        is meant to be there. Naming the single thing that varies leaves a
-        step nowhere to hide. isothermal_section has been shaped this way
-        since it was written; this is the same arrangement.
-        """
-        data = {
-            "database": os.path.basename(database),
-            "composition": elements_composition,
+    def _body(elements_composition, _basis_report):
+        _diagram_args = {
+            "database": database,
+            "elements_composition": elements_composition,
+            "temperature_min_K": temperature_min_K,
+            "temperature_max_K": temperature_max_K,
+            "n_points": n_points,
             "pressure_Pa": pressure_Pa,
-            "suspended_phases": (list(suspended_phases)
-                                 if suspended_phases else []),
-            "points": points,
-            "backend_used": backend,
+            "suspended_phases": suspended_phases,
         }
-        data.update(extra)
-        _canonical_phases(data)
-        _attach_basis(data, basis_field)
-        _attach_mixed_basis_note(data)
-        _attach_scan_summary(data, "temperature_K")
-        return _attach_coverage(data, "temperature_K", n_points,
-                                temperature_min_K, temperature_max_K)
 
-    if not suspended_phases:
-        try:
-            db_path = (
-                database if os.path.isabs(database)
-                else os.path.join(oc_service.DEFAULT_DB_DIR, database)
-            )
-            combined, gap_filled_temperatures = native_step.build_combined_series(
-                db_path, elements_composition, temperature_min_K,
-                temperature_max_K, n_points, pressure_Pa,
-            )
-            chart_title = f"{os.path.basename(database)} property diagram"
-            with tempfile.TemporaryDirectory() as tmpdir:
-                png_path = os.path.join(tmpdir, "diagram.png")
-                chart_bytes = native_step.render_gnuplot_png(
-                    combined, chart_title, png_path,
+        def _shape(points, backend, basis_field, extra):
+            """Build the payload and finish it -- once, whichever tier answered.
+
+            The finishing sequence used to be written out at both tiers, a
+            hundred lines apart, and the two differ on purpose: STEP reports
+            mass fractions, the single-point loop molar amounts. That is
+            exactly what makes two copies dangerous -- a deliberate difference
+            and a dropped step look identical to a reader, and only one of them
+            is meant to be there. Naming the single thing that varies leaves a
+            step nowhere to hide. isothermal_section has been shaped this way
+            since it was written; this is the same arrangement.
+            """
+            data = {
+                "database": os.path.basename(database),
+                "composition": elements_composition,
+                "pressure_Pa": pressure_Pa,
+                "suspended_phases": (list(suspended_phases)
+                                     if suspended_phases else []),
+                "points": points,
+                "backend_used": backend,
+            }
+            data.update(extra)
+            _canonical_phases(data)
+            _attach_basis(data, basis_field)
+            _attach_mixed_basis_note(data)
+            _attach_scan_summary(data, "temperature_K")
+            return _attach_coverage(data, "temperature_K", n_points,
+                                    temperature_min_K, temperature_max_K)
+
+        if not suspended_phases:
+            try:
+                db_path = (
+                    database if os.path.isabs(database)
+                    else os.path.join(oc_service.DEFAULT_DB_DIR, database)
                 )
-            points = [
-                {
+                combined, gap_filled_temperatures = native_step.build_combined_series(
+                    db_path, elements_composition, temperature_min_K,
+                    temperature_max_K, n_points, pressure_Pa,
+                )
+                chart_title = f"{os.path.basename(database)} property diagram"
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    png_path = os.path.join(tmpdir, "diagram.png")
+                    chart_bytes = native_step.render_gnuplot_png(
+                        combined, chart_title, png_path,
+                    )
+                points = [
+                    {
+                        "temperature_K": T,
+                        "phase_molar_amounts": fractions,
+                        "source": source,
+                    }
+                    for T, fractions, source in combined
+                ]
+                window_opened = native_step.open_interactive_window(combined, chart_title)
+                data = _shape(points, "native_oc_step_gnuplot",
+                              "phase_mass_fraction", {
+                    "interactive_window_opened": window_opened,
+                    "native_step_points": len(combined) - len(gap_filled_temperatures),
+                    "gap_filled_points": len(gap_filled_temperatures),
+                    "note": (
+                        "Phase values from OpenCalphad's native STEP are mass "
+                        "fractions; temperatures where STEP's own solver could "
+                        "not converge were filled in with independent "
+                        "single-point native equilibrium calls instead (molar "
+                        "amounts) so the chart has no gaps -- both are scaled "
+                        "0-1 and shown together as an approximation, see each "
+                        "point's 'source' field."
+                    ),
+                    "chart_error": None,
+                })
+                return [
+                    _attach_verification(data, _diagram_args,
+                                         declared_basis=_basis_report),
+                    Image(data=chart_bytes, format="png"),
+                ]
+            except Exception as exc:
+                # settings/execution.toml, policy.unnamed_failure = "surface":
+                # only an engine failure moves us to the next tier. Ours is
+                # re-raised, because a fallback that absorbs a typo returns a
+                # slower answer and no sign that anything went wrong.
+                if not settings_engine.is_engine_failure(exc):
+                    raise
+                native_backend_error = str(exc)
+        else:
+            native_backend_error = (
+                "native STEP backend does not support suspended_phases yet; "
+                "used the matplotlib fallback instead."
+            )
+
+        step = (temperature_max_K - temperature_min_K) / (n_points - 1)
+        temperatures = [temperature_min_K + i * step for i in range(n_points)]
+
+        points = []
+        phase_series: dict[str, list] = {}
+        for T in temperatures:
+            result = _calc_one(database, elements_composition, T, pressure_Pa, suspended_phases)
+            if "error" in result or not result.get("phase_molar_amounts"):
+                points.append({
                     "temperature_K": T,
-                    "phase_molar_amounts": fractions,
-                    "source": source,
-                }
-                for T, fractions, source in combined
-            ]
-            window_opened = native_step.open_interactive_window(combined, chart_title)
-            data = _shape(points, "native_oc_step_gnuplot",
-                          "phase_mass_fraction", {
-                "interactive_window_opened": window_opened,
-                "native_step_points": len(combined) - len(gap_filled_temperatures),
-                "gap_filled_points": len(gap_filled_temperatures),
-                "note": (
-                    "Phase values from OpenCalphad's native STEP are mass "
-                    "fractions; temperatures where STEP's own solver could "
-                    "not converge were filled in with independent "
-                    "single-point native equilibrium calls instead (molar "
-                    "amounts) so the chart has no gaps -- both are scaled "
-                    "0-1 and shown together as an approximation, see each "
-                    "point's 'source' field."
-                ),
-                "chart_error": None,
-            })
-            return [
-                _attach_verification(data, _diagram_args,
-                                     declared_basis=_basis_report),
-                Image(data=chart_bytes, format="png"),
-            ]
-        except Exception as exc:
-            # settings/execution.toml, policy.unnamed_failure = "surface":
-            # only an engine failure moves us to the next tier. Ours is
-            # re-raised, because a fallback that absorbs a typo returns a
-            # slower answer and no sign that anything went wrong.
-            if not settings_engine.is_engine_failure(exc):
-                raise
-            native_backend_error = str(exc)
-    else:
-        native_backend_error = (
-            "native STEP backend does not support suspended_phases yet; "
-            "used the matplotlib fallback instead."
-        )
-
-    step = (temperature_max_K - temperature_min_K) / (n_points - 1)
-    temperatures = [temperature_min_K + i * step for i in range(n_points)]
-
-    points = []
-    phase_series: dict[str, list] = {}
-    for T in temperatures:
-        result = _calc_one(database, elements_composition, T, pressure_Pa, suspended_phases)
-        if "error" in result or not result.get("phase_molar_amounts"):
+                    "source": "python_loop",
+                    "error": result.get("error") or (
+                        "Calculation returned no stable phases (likely an "
+                        "unreliable/degenerate solve at this point)."
+                    ),
+                })
+                continue
+            amounts = result["phase_molar_amounts"]
             points.append({
                 "temperature_K": T,
+                "gibbs_energy_J": result["gibbs_energy_J"],
+                "phase_molar_amounts": amounts,
+                # Every point names what produced it. The other two tiers did
+                # this already; this one was missed, and the floor invariant is
+                # what surfaced it.
                 "source": "python_loop",
-                "error": result.get("error") or (
-                    "Calculation returned no stable phases (likely an "
-                    "unreliable/degenerate solve at this point)."
-                ),
             })
-            continue
-        amounts = result["phase_molar_amounts"]
-        points.append({
-            "temperature_K": T,
-            "gibbs_energy_J": result["gibbs_energy_J"],
-            "phase_molar_amounts": amounts,
-            # Every point names what produced it. The other two tiers did
-            # this already; this one was missed, and the floor invariant is
-            # what surfaced it.
-            "source": "python_loop",
+            for phase in amounts:
+                phase_series.setdefault(phase, [None] * n_points)
+
+        for i, point in enumerate(points):
+            amounts = point.get("phase_molar_amounts", {})
+            for phase, series in phase_series.items():
+                series[i] = amounts.get(phase, 0.0) if "error" not in point else None
+
+        gibbs_series = [
+            p["gibbs_energy_J"] if "error" not in p else None for p in points
+        ]
+
+        chart_bytes = None
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+
+            # Two panels always: phase molar amount (top) and Gibbs energy
+            # (bottom). A single-phase sweep makes the top panel a flat line,
+            # but the bottom panel (which always varies with T) keeps the chart
+            # informative on its own, without needing a second, separate plot.
+            fig, (ax_phase, ax_gibbs) = plt.subplots(
+                2, 1, figsize=(7, 7), sharex=True, height_ratios=[1.2, 1]
+            )
+            for phase, series in phase_series.items():
+                ax_phase.plot(temperatures, series, marker="o", label=phase)
+            ax_phase.set_ylabel("Phase molar amount")
+            ax_phase.set_title(f"{os.path.basename(database)} property diagram")
+            ax_phase.legend(fontsize="small")
+            ax_phase.grid(True, alpha=0.3)
+
+            ax_gibbs.plot(temperatures, gibbs_series, marker="o", color="tab:red")
+            ax_gibbs.set_xlabel("Temperature (K)")
+            ax_gibbs.set_ylabel("Gibbs energy (J/mol)")
+            ax_gibbs.grid(True, alpha=0.3)
+
+            fig.tight_layout()
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
+            plt.close(fig)
+            chart_bytes = buf.getvalue()
+        except Exception as exc:  # chart is a bonus, never fail the whole call over it
+            chart_error = str(exc)
+        else:
+            chart_error = None
+
+        # This tier calls the single-point path once per temperature, so its
+        # numbers are MOLAR amounts -- not the mass fractions the STEP series
+        # carries. Same tool, same field name, different quantity depending on
+        # which tier answered, which is the whole reason the basis is stated.
+        data = _shape(points, "python_loop_matplotlib",
+                      "phase_molar_amount", {
+            "native_backend_error": native_backend_error,
+            "chart_error": chart_error,
         })
-        for phase in amounts:
-            phase_series.setdefault(phase, [None] * n_points)
+        _attach_verification(data, _diagram_args,
+                             declared_basis=_basis_report)
+        if chart_bytes:
+            return [data, Image(data=chart_bytes, format="png")]
+        return data
 
-    for i, point in enumerate(points):
-        amounts = point.get("phase_molar_amounts", {})
-        for phase, series in phase_series.items():
-            series[i] = amounts.get(phase, 0.0) if "error" not in point else None
-
-    gibbs_series = [
-        p["gibbs_energy_J"] if "error" not in p else None for p in points
-    ]
-
-    chart_bytes = None
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-
-        # Two panels always: phase molar amount (top) and Gibbs energy
-        # (bottom). A single-phase sweep makes the top panel a flat line,
-        # but the bottom panel (which always varies with T) keeps the chart
-        # informative on its own, without needing a second, separate plot.
-        fig, (ax_phase, ax_gibbs) = plt.subplots(
-            2, 1, figsize=(7, 7), sharex=True, height_ratios=[1.2, 1]
-        )
-        for phase, series in phase_series.items():
-            ax_phase.plot(temperatures, series, marker="o", label=phase)
-        ax_phase.set_ylabel("Phase molar amount")
-        ax_phase.set_title(f"{os.path.basename(database)} property diagram")
-        ax_phase.legend(fontsize="small")
-        ax_phase.grid(True, alpha=0.3)
-
-        ax_gibbs.plot(temperatures, gibbs_series, marker="o", color="tab:red")
-        ax_gibbs.set_xlabel("Temperature (K)")
-        ax_gibbs.set_ylabel("Gibbs energy (J/mol)")
-        ax_gibbs.grid(True, alpha=0.3)
-
-        fig.tight_layout()
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
-        plt.close(fig)
-        chart_bytes = buf.getvalue()
-    except Exception as exc:  # chart is a bonus, never fail the whole call over it
-        chart_error = str(exc)
-    else:
-        chart_error = None
-
-    # This tier calls the single-point path once per temperature, so its
-    # numbers are MOLAR amounts -- not the mass fractions the STEP series
-    # carries. Same tool, same field name, different quantity depending on
-    # which tier answered, which is the whole reason the basis is stated.
-    data = _shape(points, "python_loop_matplotlib",
-                  "phase_molar_amount", {
-        "native_backend_error": native_backend_error,
-        "chart_error": chart_error,
-    })
-    _attach_verification(data, _diagram_args,
-                         declared_basis=_basis_report)
-    if chart_bytes:
-        return [data, Image(data=chart_bytes, format="png")]
-    return data
+    return _tool_frame(
+        lambda: preflight.check_property_diagram_request(
+            database, elements_composition, temperature_min_K, temperature_max_K,
+            pressure_Pa, suspended_phases,
+            composition_basis=composition_basis,
+        ),
+        elements_composition, composition_basis, _body)
 
 
 @mcp.tool()
@@ -1432,195 +1427,190 @@ def calculate_isothermal_section(
     if n_points < 2:
         n_points = 2
 
-    problems = preflight.check_isothermal_section_request(
-        database, elements_composition, axis_element, axis_min, axis_max,
-        temperature_K, pressure_Pa,
-        composition_basis=composition_basis,
-    )
-    if problems:
-        return _preflight_failure(problems)
-
-    # After the rejection rules, not before.
-    elements_composition, _basis_report, _red = _canonical_composition(
-        elements_composition, composition_basis)
-    if _red is not None:
-        return _red
-
-    _section_args = {
-        "database": database,
-        "elements_composition": elements_composition,
-        "axis_element": axis_element,
-        "axis_min": axis_min,
-        "axis_max": axis_max,
-        "temperature_K": temperature_K,
-        "n_points": n_points,
-        "pressure_Pa": pressure_Pa,
-    }
-    db_path = (
-        database if os.path.isabs(database)
-        else os.path.join(oc_service.DEFAULT_DB_DIR, database)
-    )
-    symbol = axis_element.upper()
-    chart_title = (
-        f"{os.path.basename(database)} isothermal section at {temperature_K:g} K"
-    )
-    x_label = f"x({symbol})"
-
-    def _shape(combined, source_counts, backend, extra):
-        points = [
-            {
-                "x": x,
-                "axis_element": symbol,
-                "temperature_K": temperature_K,
-                "phase_molar_amounts": fractions,
-                "source": source,
-            }
-            for x, fractions, source in combined
-        ]
-        data = {
-            "database": os.path.basename(database),
-            "composition": elements_composition,
-            "axis_element": symbol,
+    def _body(elements_composition, _basis_report):
+        _section_args = {
+            "database": database,
+            "elements_composition": elements_composition,
+            "axis_element": axis_element,
             "axis_min": axis_min,
             "axis_max": axis_max,
             "temperature_K": temperature_K,
+            "n_points": n_points,
             "pressure_Pa": pressure_Pa,
-            "points": points,
-            "backend_used": backend,
         }
-        data.update(source_counts)
-        data.update(extra)
-        _attach_axis_basis(data)
-        _canonical_phases(data)
-        _attach_basis(data, "phase_mass_fraction")
-        _attach_mixed_basis_note(data)
-        _attach_scan_summary(data, "x", to_weight_percent=lambda v:
-                             settings_engine.axis_weight_percent(
-                                 elements_composition, symbol, v))
-        return _attach_coverage(data, "x", n_points, axis_min, axis_max)
+        db_path = (
+            database if os.path.isabs(database)
+            else os.path.join(oc_service.DEFAULT_DB_DIR, database)
+        )
+        symbol = axis_element.upper()
+        chart_title = (
+            f"{os.path.basename(database)} isothermal section at {temperature_K:g} K"
+        )
+        x_label = f"x({symbol})"
 
-    try:
-        combined, gap_filled = native_step.build_combined_series(
-            db_path, elements_composition, temperature_K, temperature_K,
-            n_points, pressure_Pa,
-            axis_element=symbol, axis_min=axis_min, axis_max=axis_max,
-        )
-        with tempfile.TemporaryDirectory() as tmpdir:
-            png_path = os.path.join(tmpdir, "section.png")
-            chart_bytes = native_step.render_gnuplot_png(
-                combined, chart_title, png_path, x_label=x_label,
+        def _shape(combined, source_counts, backend, extra):
+            points = [
+                {
+                    "x": x,
+                    "axis_element": symbol,
+                    "temperature_K": temperature_K,
+                    "phase_molar_amounts": fractions,
+                    "source": source,
+                }
+                for x, fractions, source in combined
+            ]
+            data = {
+                "database": os.path.basename(database),
+                "composition": elements_composition,
+                "axis_element": symbol,
+                "axis_min": axis_min,
+                "axis_max": axis_max,
+                "temperature_K": temperature_K,
+                "pressure_Pa": pressure_Pa,
+                "points": points,
+                "backend_used": backend,
+            }
+            data.update(source_counts)
+            data.update(extra)
+            _attach_axis_basis(data)
+            _canonical_phases(data)
+            _attach_basis(data, "phase_mass_fraction")
+            _attach_mixed_basis_note(data)
+            _attach_scan_summary(data, "x", to_weight_percent=lambda v:
+                                 settings_engine.axis_weight_percent(
+                                     elements_composition, symbol, v))
+            return _attach_coverage(data, "x", n_points, axis_min, axis_max)
+
+        try:
+            combined, gap_filled = native_step.build_combined_series(
+                db_path, elements_composition, temperature_K, temperature_K,
+                n_points, pressure_Pa,
+                axis_element=symbol, axis_min=axis_min, axis_max=axis_max,
             )
-        window_opened = native_step.open_interactive_window(
-            combined, chart_title, x_label=x_label
-        )
+            with tempfile.TemporaryDirectory() as tmpdir:
+                png_path = os.path.join(tmpdir, "section.png")
+                chart_bytes = native_step.render_gnuplot_png(
+                    combined, chart_title, png_path, x_label=x_label,
+                )
+            window_opened = native_step.open_interactive_window(
+                combined, chart_title, x_label=x_label
+            )
+            data = _shape(
+                combined,
+                {
+                    "native_step_points": len(combined) - len(gap_filled),
+                    "gap_filled_points": len(gap_filled),
+                },
+                "native_oc_step_gnuplot",
+                {
+                    "interactive_window_opened": window_opened,
+                    "note": (
+                        "Values from native STEP are phase mass fractions; "
+                        "positions its line did not reach, and its two "
+                        "endpoints where a second reading disagreed, come from "
+                        "single-point equilibrium calls converted to the same "
+                        "basis. See each point's 'source' field."
+                    ),
+                    "chart_error": None,
+                },
+            )
+            return [
+                _attach_verification(data, _section_args,
+                                     declared_basis=_basis_report),
+                Image(data=chart_bytes, format="png"),
+            ]
+        except Exception as exc:
+            if not settings_engine.is_engine_failure(exc):
+                raise
+            native_backend_error = str(exc)
+
+        # Native STEP could not run at all. The axis is still perfectly
+        # scannable one position at a time -- that is what fills its gaps in
+        # the normal path anyway -- so the fallback is the same calculation
+        # without the continuation, not a different or lesser answer.
+        combined = []
+        failures = []
+        for i in range(n_points):
+            x = axis_min + (axis_max - axis_min) * i / (n_points - 1)
+            try:
+                point_composition = native_step.composition_at(
+                    elements_composition, symbol, x
+                )
+            except Exception as exc:
+                failures.append({"x": x, "error": str(exc)})
+                continue
+            result = _calc_one(
+                database, point_composition, temperature_K, pressure_Pa, None
+            )
+            if "error" in result or not result.get("phase_molar_amounts"):
+                failures.append({
+                    "x": x,
+                    "error": result.get("error") or (
+                        "Calculation returned no stable phases at this position."
+                    ),
+                })
+                continue
+            # Same spelling as the native path uses. build_combined_series
+            # strips the default "#1" composition set from every name it
+            # returns; this path did not, so the two ways of answering one
+            # question named the same phase differently -- BCC_A2 from STEP,
+            # BCC_A2#1 from here. A caller comparing the two, or a test
+            # naming a phase, sees a difference that is not in the chemistry.
+            mass_fractions = native_step._phase_mass_fractions_from_moles(
+                result["phase_molar_amounts"], result["phase_element_composition"]
+            )
+            combined.append((
+                x,
+                {native_step._strip_default_composition_set(name): value
+                 for name, value in mass_fractions.items()},
+                "native_fallback",
+            ))
+
+        if not combined:
+            return {
+                "error": (
+                    "The composition axis could not be scanned: native STEP "
+                    f"failed ({native_backend_error}) and every single-point "
+                    "position failed as well."
+                ),
+                "stage": "EXECUTION",
+                "failed_positions": failures,
+            }
+
+        chart_bytes = None
+        chart_error = None
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                png_path = os.path.join(tmpdir, "section.png")
+                chart_bytes = native_step.render_gnuplot_png(
+                    combined, chart_title, png_path, x_label=x_label,
+                )
+        except Exception as exc:  # a chart is a bonus, never fail the call over it
+            chart_error = str(exc)
+
         data = _shape(
             combined,
+            {"native_step_points": 0, "gap_filled_points": len(combined)},
+            "single_point_scan",
             {
-                "native_step_points": len(combined) - len(gap_filled),
-                "gap_filled_points": len(gap_filled),
-            },
-            "native_oc_step_gnuplot",
-            {
-                "interactive_window_opened": window_opened,
-                "note": (
-                    "Values from native STEP are phase mass fractions; "
-                    "positions its line did not reach, and its two "
-                    "endpoints where a second reading disagreed, come from "
-                    "single-point equilibrium calls converted to the same "
-                    "basis. See each point's 'source' field."
-                ),
-                "chart_error": None,
+                "native_backend_error": native_backend_error,
+                "failed_positions": failures,
+                "chart_error": chart_error,
             },
         )
-        return [
-            _attach_verification(data, _section_args,
-                                 declared_basis=_basis_report),
-            Image(data=chart_bytes, format="png"),
-        ]
-    except Exception as exc:
-        if not settings_engine.is_engine_failure(exc):
-            raise
-        native_backend_error = str(exc)
+        _attach_verification(data, _section_args,
+                             declared_basis=_basis_report)
+        if chart_bytes:
+            return [data, Image(data=chart_bytes, format="png")]
+        return data
 
-    # Native STEP could not run at all. The axis is still perfectly
-    # scannable one position at a time -- that is what fills its gaps in
-    # the normal path anyway -- so the fallback is the same calculation
-    # without the continuation, not a different or lesser answer.
-    combined = []
-    failures = []
-    for i in range(n_points):
-        x = axis_min + (axis_max - axis_min) * i / (n_points - 1)
-        try:
-            point_composition = native_step.composition_at(
-                elements_composition, symbol, x
-            )
-        except Exception as exc:
-            failures.append({"x": x, "error": str(exc)})
-            continue
-        result = _calc_one(
-            database, point_composition, temperature_K, pressure_Pa, None
-        )
-        if "error" in result or not result.get("phase_molar_amounts"):
-            failures.append({
-                "x": x,
-                "error": result.get("error") or (
-                    "Calculation returned no stable phases at this position."
-                ),
-            })
-            continue
-        # Same spelling as the native path uses. build_combined_series
-        # strips the default "#1" composition set from every name it
-        # returns; this path did not, so the two ways of answering one
-        # question named the same phase differently -- BCC_A2 from STEP,
-        # BCC_A2#1 from here. A caller comparing the two, or a test
-        # naming a phase, sees a difference that is not in the chemistry.
-        mass_fractions = native_step._phase_mass_fractions_from_moles(
-            result["phase_molar_amounts"], result["phase_element_composition"]
-        )
-        combined.append((
-            x,
-            {native_step._strip_default_composition_set(name): value
-             for name, value in mass_fractions.items()},
-            "native_fallback",
-        ))
-
-    if not combined:
-        return {
-            "error": (
-                "The composition axis could not be scanned: native STEP "
-                f"failed ({native_backend_error}) and every single-point "
-                "position failed as well."
-            ),
-            "stage": "EXECUTION",
-            "failed_positions": failures,
-        }
-
-    chart_bytes = None
-    chart_error = None
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            png_path = os.path.join(tmpdir, "section.png")
-            chart_bytes = native_step.render_gnuplot_png(
-                combined, chart_title, png_path, x_label=x_label,
-            )
-    except Exception as exc:  # a chart is a bonus, never fail the call over it
-        chart_error = str(exc)
-
-    data = _shape(
-        combined,
-        {"native_step_points": 0, "gap_filled_points": len(combined)},
-        "single_point_scan",
-        {
-            "native_backend_error": native_backend_error,
-            "failed_positions": failures,
-            "chart_error": chart_error,
-        },
-    )
-    _attach_verification(data, _section_args,
-                         declared_basis=_basis_report)
-    if chart_bytes:
-        return [data, Image(data=chart_bytes, format="png")]
-    return data
+    return _tool_frame(
+        lambda: preflight.check_isothermal_section_request(
+            database, elements_composition, axis_element, axis_min, axis_max,
+            temperature_K, pressure_Pa,
+            composition_basis=composition_basis,
+        ),
+        elements_composition, composition_basis, _body)
 
 
 @mcp.tool()
