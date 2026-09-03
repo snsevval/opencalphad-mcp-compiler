@@ -233,10 +233,50 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
 
 
 def run_native_step(db_path, elements_composition, temperature_min_K,
-                     temperature_max_K, n_points, pressure_Pa, timeout=STEP_TIMEOUT_S,
-                     axis_element=None, axis_min=None, axis_max=None):
-    """Run the STEP macro in an isolated scratch directory and return the
-    raw CSV text (or raise NativeStepError if no CSV was produced).
+                    temperature_max_K, n_points, pressure_Pa,
+                    timeout=STEP_TIMEOUT_S, axis_element=None,
+                    axis_min=None, axis_max=None):
+    """Run STEP, and give a STALLED run another go before giving up.
+
+    The stall is not slowness: the engine finishes the calculation and
+    then blocks in the export prompt chain, on a macro line that is
+    sitting in the file and never reaches it. The mechanism is on the
+    Windows side of the interop relay and cannot be followed from here.
+
+    It does not need to be, to be worth retrying. The subprocess is
+    2.7 s (median of 75 runs), and the alternative -- dropping to the
+    next tier -- answers the same request with 100 points instead of
+    215. Paying three seconds to keep the better answer is the trade,
+    and settings/execution.toml [step_retry] holds the count with the
+    measurement beside it.
+
+    Only a stall is retried. A genuine engine failure is deterministic
+    -- alni-4slx reports "Too many stable phases" five times out of
+    five, in 0.3 s -- and retrying it spends the time twice for the
+    same answer, so anything that is not the silence rule is re-raised
+    immediately.
+    """
+    son = None
+    for _ in range(1 + max(0, _step_retries())):
+        try:
+            return _run_native_step_once(
+                db_path, elements_composition, temperature_min_K,
+                temperature_max_K, n_points, pressure_Pa,
+                timeout=timeout, axis_element=axis_element,
+                axis_min=axis_min, axis_max=axis_max)
+        except NativeStepError as exc:
+            if "stopped producing" not in str(exc):
+                raise
+            son = exc
+    raise son
+
+
+def _run_native_step_once(db_path, elements_composition,
+                          temperature_min_K, temperature_max_K,
+                          n_points, pressure_Pa,
+                          timeout=STEP_TIMEOUT_S, axis_element=None,
+                          axis_min=None, axis_max=None):
+    """One attempt. Returns the CSV text, or raises NativeStepError.
 
     axis_element switches the scan from temperature to that element's mole
     fraction, holding temperature at temperature_min_K."""
@@ -511,6 +551,20 @@ def _policy_number(bolum, anahtar, default):
 
 GAP_FILL_TIMEOUT_S = _policy_number("timeouts", "gap_fill_s", 15)
 STEP_SILENCE_S = _policy_number("timeouts", "step_silence_s", 30)
+
+
+def _step_retries():
+    """How many extra attempts a stalled STEP gets.
+
+    Read lazily rather than at import: settings_engine reaches into
+    result_check while compiling, and this module is imported along
+    that path -- a module-level read here would be a circular one.
+    """
+    try:
+        import settings_engine
+        return int(settings_engine.POLICY.execution.step_retry)
+    except Exception:                                    # noqa: BLE001
+        return 1
 REAP_TIMEOUT_S = _policy_number("timeouts", "process_reap_s", 5)
 DUP_TOL = _policy_number("tolerances", "duplicate_axis_position", 1e-6)
 SUM_TOL = _policy_number("tolerances", "combined_sum", 1e-5)

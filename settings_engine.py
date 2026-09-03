@@ -382,7 +382,8 @@ class ExecutionPlan:
                  reviewers, reviewer_budget, binary_order,
                  weak_independence, signals, scheil, engine_failures,
                  timeouts, tolerances, retry_http,
-                 validator_reviewers, vision_reviewers):
+                 validator_reviewers, vision_reviewers,
+                 step_retry=0):
         self.cascades = cascades              # {op: (tiers, entry)}
         self.endpoint_recheck = endpoint_recheck
         self.gap_detection = gap_detection
@@ -396,6 +397,7 @@ class ExecutionPlan:
         self.timeouts = timeouts              # how long each tier gets
         self.tolerances = tolerances          # when two numbers are one
         self.retry_http = retry_http          # provider replies worth retrying
+        self.step_retry = step_retry          # extra STEP attempts on a stall
         self.validator_reviewers = validator_reviewers  # the runner's chain
         self.vision_reviewers = vision_reviewers        # Layer C, reads charts
 
@@ -643,6 +645,7 @@ def compile_settings(giris=None, yurutme=None, cikti=None):
                     if k != "because"},
         retry_http=set(yurutme.get("reviewer_retry", {}).get(
             "transient_http", [])),
+        step_retry=int(yurutme.get("step_retry", {}).get("on_stall", 0)),
         validator_reviewers=list(yurutme.get("validator_reviewer", [])),
         vision_reviewers=list(yurutme.get("vision_reviewer", [])),
     )

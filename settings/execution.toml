@@ -467,6 +467,34 @@ A timeout that fires is reported as `timed_out`, which [signals] lists and
 ## step_timeout_s stays as the backstop. The silence rule cannot catch a
 ## run that keeps writing and never finishes, and that has happened here.
 
+## STEP occasionally stalls: the engine finishes the calculation and then
+## blocks in the export prompt chain, waiting for a macro line that exists
+## in the file but never reaches it. Located precisely -- the last thing it
+## prints is "Dependent values /NP(*)/:" and a healthy run continues from
+## there with " Output on screen" -- but the mechanism is on the Windows
+## side of the WSL interop relay, where /proc cannot follow it.
+##
+## Retrying is worth it without knowing the mechanism, because the run is
+## cheap: the STEP subprocess alone is 2.7 s (median of 75 runs). Falling
+## to the next tier instead costs a coarser answer -- 100 points against
+## 215 on the same request -- for a failure that clears on its own. The
+## rate is roughly 4% (6 stalls in 150 spawns) and it arrives in clusters,
+## so one retry is the right number: it covers the ordinary case without
+## spending two timeouts on a machine that is having a bad minute.
+##
+## Only a stall is retried. A genuine engine failure -- alni-4slx returns
+## "Too many stable phases" 5 times out of 5, in 0.3 s -- is deterministic,
+## and retrying it would only spend the time twice.
+
+[step_retry]
+on_stall = 1
+because = """
+How many extra attempts a stalled STEP gets before the cascade moves on.
+1 rather than 0 because the calculation is 2.7 s and the alternative is a
+coarser scan; 1 rather than more because the stalls cluster, so a second
+retry mostly buys another timeout."""
+
+
 [tolerances]
 duplicate_axis_position = 1e-6
 combined_sum            = 1e-5
