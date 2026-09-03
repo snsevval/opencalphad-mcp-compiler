@@ -227,6 +227,48 @@ def _preflight_failure(problems: list) -> dict:
     return rejection
 
 
+def _tool_frame(preflight_check, composition, basis, body):
+    """The opening every calculation tool shares, in one place.
+
+    Three steps are common to all six tools and run in the same order: this
+    operation's preflight, an immediate return if it rejected, and only then
+    resolving the composition to mole fractions. The third one's position is
+    the point. Resolving first hands every rule an already-tidied
+    composition, and composition-scale-plausible exists to catch {FE: 99,
+    C: 1} as a possible mistake -- which it cannot do once the numbers have
+    been divided by their sum. Measured: three rejection cases returned
+    results instead. Here the order is not a convention each tool remembers
+    separately; it is the only order this function can run in.
+
+    preflight_check is called here rather than handed in as a list of
+    problems. Taking the list would be easier and weaker: a tool could pass
+    an empty one without ever having run its rules, which is the shape of
+    the failure preflight.py already had when nine rules sat in it that
+    nobody called.
+
+    What the tool does with the resolved composition is its own business,
+    and so is what it returns. The six shapes differ legitimately -- one
+    dict, two results, a [dict, Image] pair -- and a frame that knew all of
+    them would be somewhere for the next dropped step to hide. That the
+    verification stage actually ran is proved by the settings audit instead:
+    bind what can be bound, and measure the rest rather than trusting it.
+
+    Anything the tool needs to prepare for itself -- a default step size, a
+    seed temperature -- belongs before the call, not inside `body`. Those
+    are usually parameters, and assigning to one inside a nested function
+    makes it local there; the first version of this change did exactly that
+    and turned three cases into UnboundLocalError.
+    """
+    problems = preflight_check()
+    if problems:
+        return _preflight_failure(problems)
+    composition, basis_report, rejected = _canonical_composition(
+        composition, basis)
+    if rejected is not None:
+        return rejected
+    return body(composition, basis_report)
+
+
 def _attach_coverage(result: dict, axis_key: str, requested_n,
                      span_low, span_high) -> dict:
     """Say how much of the requested scan came back.
@@ -1821,20 +1863,6 @@ def calculate_phase_diagram(
     if seed_temperature_K is None:
         seed_temperature_K = (temperature_min_K + temperature_max_K) / 2.0
 
-    problems = preflight.check_phase_diagram_request(
-        database, elements_composition, axis_element, axis_min, axis_max,
-        temperature_min_K, temperature_max_K, seed_temperature_K, pressure_Pa,
-        composition_basis=composition_basis,
-    )
-    if problems:
-        return _preflight_failure(problems)
-
-    # After the rejection rules, not before.
-    elements_composition, _basis_report, _red = _canonical_composition(
-        elements_composition, composition_basis)
-    if _red is not None:
-        return _red
-
     # Steps, not point counts. 40 across and 70 up match the distribution's
     # own map1.OCM, which is the only calibration available for what this
     # engine finds comfortable.
@@ -1843,99 +1871,108 @@ def calculate_phase_diagram(
     if temperature_step_K is None:
         temperature_step_K = (temperature_max_K - temperature_min_K) / 70.0
 
-    db_path = (
-        database if os.path.isabs(database)
-        else os.path.join(oc_service.DEFAULT_DB_DIR, database)
-    )
-    symbol = axis_element.upper()
-    title = f"{os.path.basename(database)} phase diagram"
-
-    try:
-        plt_text = native_map.run_native_map(
-            db_path, elements_composition, symbol, axis_min, axis_max,
-            axis_step, temperature_min_K, temperature_max_K,
-            temperature_step_K, seed_temperature_K, pressure_Pa,
-            timeout=CALC_TIMEOUT_S,
+    def _body(elements_composition, _basis_report):
+        db_path = (
+            database if os.path.isabs(database)
+            else os.path.join(oc_service.DEFAULT_DB_DIR, database)
         )
-        diagram = native_map.parse_map_plt(plt_text)
-    except Exception as exc:
-        return {
-            "error": (
-                f"The phase diagram could not be traced: {exc} MAP is the "
-                "most fragile calculation this engine offers and has no "
-                "fallback here. A property diagram at one composition, or "
-                "an isothermal section at one temperature, covers the same "
-                "system a slice at a time."
-            ),
-            "stage": "EXECUTION",
-            "seed_temperature_K": seed_temperature_K,
-        }
+        symbol = axis_element.upper()
+        title = f"{os.path.basename(database)} phase diagram"
 
-    chart_bytes = None
-    chart_error = None
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            png_path = os.path.join(tmpdir, "diagram.png")
-            chart_bytes = native_map.render_gnuplot_png(
-                diagram, title, png_path,
-                axis_min=axis_min, axis_max=axis_max,
-                temperature_min_K=temperature_min_K,
-                temperature_max_K=temperature_max_K,
+        try:
+            plt_text = native_map.run_native_map(
+                db_path, elements_composition, symbol, axis_min, axis_max,
+                axis_step, temperature_min_K, temperature_max_K,
+                temperature_step_K, seed_temperature_K, pressure_Pa,
+                timeout=CALC_TIMEOUT_S,
             )
-    except Exception as exc:  # a chart is a bonus, never fail the call over it
-        chart_error = str(exc)
+            diagram = native_map.parse_map_plt(plt_text)
+        except Exception as exc:
+            return {
+                "error": (
+                    f"The phase diagram could not be traced: {exc} MAP is the "
+                    "most fragile calculation this engine offers and has no "
+                    "fallback here. A property diagram at one composition, or "
+                    "an isothermal section at one temperature, covers the same "
+                    "system a slice at a time."
+                ),
+                "stage": "EXECUTION",
+                "seed_temperature_K": seed_temperature_K,
+            }
 
-    boundaries = [
-        {
-            "phases": b["phases"],
-            "invariant": b["invariant"],
-            **({"temperature_K": b["temperature_K"]} if b["invariant"] else {}),
-            "point_count": len(b["points"]),
-            "points": [
-                {
-                    "temperature_K": float(f"{p['temperature_K']:.6g}"),
-                    "compositions": {
-                        phase: float(f"{value:.6g}")
-                        for phase, value in p["compositions"].items()
-                    },
-                }
-                for p in b["points"]
-            ],
+        chart_bytes = None
+        chart_error = None
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                png_path = os.path.join(tmpdir, "diagram.png")
+                chart_bytes = native_map.render_gnuplot_png(
+                    diagram, title, png_path,
+                    axis_min=axis_min, axis_max=axis_max,
+                    temperature_min_K=temperature_min_K,
+                    temperature_max_K=temperature_max_K,
+                )
+        except Exception as exc:  # a chart is a bonus, never fail the call over it
+            chart_error = str(exc)
+
+        boundaries = [
+            {
+                "phases": b["phases"],
+                "invariant": b["invariant"],
+                **({"temperature_K": b["temperature_K"]} if b["invariant"] else {}),
+                "point_count": len(b["points"]),
+                "points": [
+                    {
+                        "temperature_K": float(f"{p['temperature_K']:.6g}"),
+                        "compositions": {
+                            phase: float(f"{value:.6g}")
+                            for phase, value in p["compositions"].items()
+                        },
+                    }
+                    for p in b["points"]
+                ],
+            }
+            for b in diagram["boundaries"]
+        ]
+
+        data = {
+            "database": os.path.basename(database),
+            "axis_element": diagram["axis_element"] or symbol,
+            "axis_min": axis_min,
+            "axis_max": axis_max,
+            "temperature_min_K": temperature_min_K,
+            "temperature_max_K": temperature_max_K,
+            "pressure_Pa": pressure_Pa,
+            "seed_temperature_K": seed_temperature_K,
+            "phases": diagram["phases"],
+            "invariant_temperatures_K": diagram["invariant_temperatures_K"],
+            "boundaries": boundaries,
+            "point_count": diagram["point_count"],
+            "backend_used": "native_oc_map",
+            "chart_error": chart_error,
+            "note": (
+                "Each boundary is a curve along which the named phases coexist. "
+                "An invariant boundary is a reaction at one fixed temperature. "
+                "The chart is the complete intended visualization for this "
+                "data -- present it as-is rather than building a separate plot."
+            ),
         }
-        for b in diagram["boundaries"]
-    ]
+        _attach_verification(data, {
+            "database": database,
+            "elements_composition": elements_composition,
+            "temperature_K": seed_temperature_K,
+            "pressure_Pa": pressure_Pa,
+        }, declared_basis=_basis_report)
+        if chart_bytes:
+            return [data, Image(data=chart_bytes, format="png")]
+        return data
 
-    data = {
-        "database": os.path.basename(database),
-        "axis_element": diagram["axis_element"] or symbol,
-        "axis_min": axis_min,
-        "axis_max": axis_max,
-        "temperature_min_K": temperature_min_K,
-        "temperature_max_K": temperature_max_K,
-        "pressure_Pa": pressure_Pa,
-        "seed_temperature_K": seed_temperature_K,
-        "phases": diagram["phases"],
-        "invariant_temperatures_K": diagram["invariant_temperatures_K"],
-        "boundaries": boundaries,
-        "point_count": diagram["point_count"],
-        "backend_used": "native_oc_map",
-        "chart_error": chart_error,
-        "note": (
-            "Each boundary is a curve along which the named phases coexist. "
-            "An invariant boundary is a reaction at one fixed temperature. "
-            "The chart is the complete intended visualization for this "
-            "data -- present it as-is rather than building a separate plot."
+    return _tool_frame(
+        lambda: preflight.check_phase_diagram_request(
+            database, elements_composition, axis_element, axis_min, axis_max,
+            temperature_min_K, temperature_max_K, seed_temperature_K, pressure_Pa,
+            composition_basis=composition_basis,
         ),
-    }
-    _attach_verification(data, {
-        "database": database,
-        "elements_composition": elements_composition,
-        "temperature_K": seed_temperature_K,
-        "pressure_Pa": pressure_Pa,
-    }, declared_basis=_basis_report)
-    if chart_bytes:
-        return [data, Image(data=chart_bytes, format="png")]
-    return data
+        elements_composition, composition_basis, _body)
 
 
 if __name__ == "__main__":
