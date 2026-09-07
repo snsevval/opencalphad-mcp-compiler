@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Iki kayit arasindaki fark TAM OLARAK hangi alanlarda?
 
+    fark_neresi.py ONCE.jsonl SONRA.jsonl [beklenen_alan]
+
+
 "55 vaka farkli" yeterli degil. Beklenen degisiklik yuke tek bir alan
 eklemekti; farkin baska bir yere de dokunmadigini gostermek gerekiyor,
 yoksa beklenen degisiklik beklenmeyen birini gizler.
@@ -63,6 +66,11 @@ def yollar(a, b, kok=""):
     return [] if a == b else [kok]
 
 
+# Beklenen alan arguman, sabit degil. Sabitken arac bir kez dogru cevabi
+# verip yanlis etiketledi: beklenen degisiklik step_attempts'ti, kodda
+# verification.checked yaziyordu, ve fark "BEKLENMEYEN" diye bildirildi.
+beklenen_alan = sys.argv[3] if len(sys.argv) > 3 else None
+
 once, sonra = oku(sys.argv[1]), oku(sys.argv[2])
 ortak = set(once) & set(sonra)
 sayac = collections.Counter()
@@ -86,16 +94,20 @@ for yol, n in sayac.most_common(40):
 if len(sayac) > 40:
     print("... %d yol daha" % (len(sayac) - 40))
 
-# Beklenen tek degisiklik: verification.checked eklenmesi
-beklenen = {y for y in sayac if y.endswith(".checked <sonradan eklendi>")}
+beklenen = ({y for y in sayac if beklenen_alan and beklenen_alan in y}
+            if beklenen_alan else set())
 digerleri = set(sayac) - beklenen
 print()
 if not sayac:
     # Hic fark yokken "butun farklar sunda" demek, olmayan bir seyi
     # aciklamak olur -- ve bu satir bir kez oyle yazildi.
     print("Fark yok: iki kayit alan alan ayni.")
+elif not beklenen_alan:
+    print("%d yol degisti. Beklenen alani ucuncu arguman olarak vererek"
+          % len(sayac))
+    print("digerlerini ayirabilirsin:  fark_neresi.py ONCE SONRA <alan>")
 elif digerleri:
-    print("BEKLENMEYEN %d yol:" % len(digerleri))
+    print("BEKLENMEYEN %d yol (beklenen: %s):" % (len(digerleri), beklenen_alan))
     for y in sorted(digerleri)[:20]:
         print("   %-58s ornek: %s" % (y, ornek[y][0]))
 else:

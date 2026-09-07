@@ -1206,7 +1206,7 @@ def calculate_property_diagram(
                     database if os.path.isabs(database)
                     else os.path.join(oc_service.DEFAULT_DB_DIR, database)
                 )
-                combined, gap_filled_temperatures = native_step.build_combined_series(
+                combined, gap_filled_temperatures, step_attempts = native_step.build_combined_series(
                     db_path, elements_composition, temperature_min_K,
                     temperature_max_K, n_points, pressure_Pa,
                 )
@@ -1230,6 +1230,12 @@ def calculate_property_diagram(
                     "interactive_window_opened": window_opened,
                     "native_step_points": len(combined) - len(gap_filled_temperatures),
                     "gap_filled_points": len(gap_filled_temperatures),
+                    # How many times STEP was run. 1 unless a stall was
+                    # retried -- and a retried run used to be identical
+                    # in the payload to one that never stalled, which
+                    # took the stall rate out of the call log where
+                    # every rate in this project was measured.
+                    "step_attempts": step_attempts,
                     "note": (
                         "Phase values from OpenCalphad's native STEP are mass "
                         "fractions; temperatures where STEP's own solver could "
@@ -1487,7 +1493,7 @@ def calculate_isothermal_section(
             return _attach_coverage(data, "x", n_points, axis_min, axis_max)
 
         try:
-            combined, gap_filled = native_step.build_combined_series(
+            combined, gap_filled, step_attempts = native_step.build_combined_series(
                 db_path, elements_composition, temperature_K, temperature_K,
                 n_points, pressure_Pa,
                 axis_element=symbol, axis_min=axis_min, axis_max=axis_max,
@@ -1505,6 +1511,7 @@ def calculate_isothermal_section(
                 {
                     "native_step_points": len(combined) - len(gap_filled),
                     "gap_filled_points": len(gap_filled),
+                    "step_attempts": step_attempts,
                 },
                 "native_oc_step_gnuplot",
                 {
@@ -1595,7 +1602,9 @@ def calculate_isothermal_section(
 
         data = _shape(
             combined,
-            {"native_step_points": 0, "gap_filled_points": len(combined)},
+            # STEP hic kosmadi: 0, "bir kez kostu"dan ayirt edilebilsin.
+            {"native_step_points": 0, "gap_filled_points": len(combined),
+             "step_attempts": 0},
             "single_point_scan",
             {
                 "native_backend_error": native_backend_error,

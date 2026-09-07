@@ -257,15 +257,21 @@ def run_native_step(db_path, elements_composition, temperature_min_K,
     five, in 0.3 s -- and retrying it spends the time twice for the
     same answer, so anything that is not the silence rule is re-raised
     immediately.
+
+    Returns (csv_text, attempts). The count is returned rather than
+    logged here because the thing that needs it is the payload: a run
+    that stalled once and succeeded on the retry used to be
+    indistinguishable from one that never stalled, and every stall rate
+    quoted in this project was read out of the call log.
     """
     son = None
-    for _ in range(1 + max(0, _step_retries())):
+    for deneme in range(1, 2 + max(0, _step_retries())):
         try:
             return _run_native_step_once(
                 db_path, elements_composition, temperature_min_K,
                 temperature_max_K, n_points, pressure_Pa,
                 timeout=timeout, axis_element=axis_element,
-                axis_min=axis_min, axis_max=axis_max)
+                axis_min=axis_min, axis_max=axis_max), deneme
         except NativeStepError as exc:
             if "stopped producing" not in str(exc):
                 raise
@@ -837,12 +843,14 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
 
     Returns (combined_points, gap_filled_temperatures) where combined_points
     is a T-sorted list of (temperature_K, {phase_name: mass_fraction}, source)
-    tuples, source being "step" or "native_fallback". Raises NativeStepError
+    tuples, source being "step" or "native_fallback"; and how many STEP
+    attempts it took, which is 1 unless a stall was retried. Raises
+    NativeStepError
     (via _validate_combined_points) if any point's fractions don't sum to
     1 +/- 1e-5 or fall outside [0, 1] -- this is checked before any CSV or
     chart is produced from the data.
     """
-    csv_text = run_native_step(
+    csv_text, step_attempts = run_native_step(
         db_path, elements_composition, temperature_min_K, temperature_max_K,
         n_points, pressure_Pa, timeout=step_timeout,
         axis_element=axis_element, axis_min=axis_min, axis_max=axis_max,
@@ -1116,7 +1124,7 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
 
     combined.sort(key=lambda p: p[0])
     _validate_combined_points(combined)
-    return combined, gap_filled_temperatures
+    return combined, gap_filled_temperatures, step_attempts
 
 
 def render_gnuplot_png(combined_points, title, output_png_path, timeout=20,

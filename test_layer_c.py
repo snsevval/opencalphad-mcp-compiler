@@ -109,7 +109,7 @@ def main():
         return 1
 
     print("Hesap calisiyor: agcu, Ag 0.6 / Cu 0.4, 800-1400 K ...", flush=True)
-    combined, _ = native_step.build_combined_series(
+    combined, _, _ = native_step.build_combined_series(
         DB, COMP, T_MIN, T_MAX, N_POINTS, PRESSURE)
 
     points = [

@@ -122,7 +122,7 @@ def main():
                     # combined ise (T, kesirler, kaynak) uclulerinden olusur.
                     # server.py ile ayni sekle cevir, yoksa Katman A yanlis
                     # sey denetler.
-                    combined, _gap_T = native_step.build_combined_series(
+                    combined, _gap_T, _ = native_step.build_combined_series(
                         dbp, _upper(args["elements_composition"]), tmin, tmax,
                         n, args.get("pressure_Pa", 1e5),
                     )

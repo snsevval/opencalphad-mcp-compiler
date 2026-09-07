@@ -32,7 +32,7 @@ def main():
 
     print(f"Kosuluyor: agcu, Ag 0.6 / Cu 0.4, {T_MIN:.0f}-{T_MAX:.0f} K ...",
           flush=True)
-    combined, gap_filled = native_step.build_combined_series(
+    combined, gap_filled, _ = native_step.build_combined_series(
         DB, COMP, T_MIN, T_MAX, N_POINTS, PRESSURE)
 
     gap_set = {round(float(t), 4) for t in gap_filled}
