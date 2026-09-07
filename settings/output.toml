@@ -621,3 +621,36 @@ A fully conditioned equilibrium has zero degrees of freedom. Anything else
 means the engine solved a less constrained problem than the one described,
 and the number it returns is for that problem. Same origin as the check
 above, and the same availability caveat."""
+
+[[verify]]
+id    = "liquid-fraction-monotonic"
+name  = "liquid_monotonic"
+stage = "result"
+check = "liquid_fraction_monotonic"
+tolerance = 1e-3
+because = """
+Heating a fixed composition may not make liquid disappear. No database
+knowledge is needed to apply it: the series either contradicts itself or
+it does not.
+
+Written after one did. Al-12.2at%Si from 780 to 980 K read solid at 844.5
+K, 99.8% liquid at 847.3 K, solid again at 850.1 K, liquid from 851.7 K.
+Fractions summed to one, every point named its producer, no point carried
+an error, and the summary reported first liquid at 847.29 K -- three
+kelvin low, with nothing marking it.
+
+Which producer was wrong took a third method. Suspending LIQUID and
+comparing Gibbs energies at the same conditions: at 846.5 K the solid is
+57.6 J below what the single-point path returned, so that path had settled
+on a metastable liquid; at 850.087 K the two states are 0.01 J apart,
+which is the eutectic. Literature puts it at 850.15 K. The continuous STEP
+line was right and the points filled into its gaps were not.
+
+1e-3 for the same reason phase-fraction-sums uses it: STEP and the
+single-point path disagree in the fourth decimal on a converged answer,
+and a tighter bound would report arithmetic that is correct.
+
+A retrograde liquidus could lower the liquid fraction on heating and make
+this fire on real chemistry. No system asked of this server does, and if
+one arrives it belongs written down here -- not absorbed by widening the
+tolerance until the message stops."""

@@ -198,13 +198,13 @@ def main():
         import result_check
         # compare_alloys iki sonuc dondurur; ikisini de denetle.
         if tool == "compare_alloys":
-            pa, prob_a = result_check.verify_result(result["a"])
-            pb, prob_b = result_check.verify_result(result["b"])
+            pa, prob_a, _ = result_check.verify_result(result["a"])
+            pb, prob_b, _ = result_check.verify_result(result["b"])
             passed_a, problems_a = pa, prob_a + prob_b
             out["layer_a_passed"] = bool(pa and pb)
             out["layer_a_problems"] = problems_a
         else:
-            passed, problems = result_check.verify_result(result)
+            passed, problems, _ = result_check.verify_result(result)
             out["layer_a_passed"] = bool(passed)
             out["layer_a_problems"] = problems
     else:

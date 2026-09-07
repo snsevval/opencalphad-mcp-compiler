@@ -173,7 +173,7 @@ def _katman_a_esigi():
     import result_check
     yuk = {"points": [{"temperature_K": 900.0 + i} for i in range(20)]}
     yuk["points"][0]["error"] = "olcum icin"
-    _, bulunan = result_check.verify_result(yuk)
+    _, bulunan, _ = result_check.verify_result(yuk)
     return bool(bulunan)
 
 

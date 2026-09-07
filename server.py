@@ -488,11 +488,16 @@ def _attach_verification(result: dict, request_args: Optional[dict] = None,
             result['composition_basis'] = rapor
 
     _t = time.time()
-    passed, problems = result_check.verify_result(result)
+    passed, problems, checked = result_check.verify_result(result)
     verification = {
         "stage": "VERIFY_A",
         "passed": passed,
         "problems": problems,
+        # Which rules ran, by their output.toml ids. Without this a check
+        # that quietly stopped being declared looks exactly like one that
+        # ran and passed -- and the payload is the only place a reader can
+        # tell the difference.
+        "checked": checked,
     }
 
     # Does the result answer the request? A separate question from whether

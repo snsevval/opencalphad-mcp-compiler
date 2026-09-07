@@ -1,0 +1,24 @@
+id                     nokta                          DOSYA bizim                sapma durum    |    ITS-90    sapma durum
+------------------------------------------------------------------------------------------------------------------------------------
+al_erime_cost          erime                         933.47 933.20..933.63      +0.000 ICINDE   |   933.473   +0.000 ICINDE  
+cu_erime_cost          erime                        1357.77 1357.37..1357.80    +0.000 ICINDE   |  1357.770   +0.000 ICINDE  
+ag_erime_agcu          erime                        1235.08 1234.68..1235.11    +0.000 ICINDE   |  1234.930   +0.000 ICINDE  
+cu_erime_agcu          erime                        1358.02 1357.84..1357.94    -0.080 TAMAM    |  1357.770   +0.070 TAMAM   
+zn_erime_cost          erime                         692.68 692.56..692.99      +0.000 ICINDE   |   692.677   +0.000 ICINDE  
+sn_erime_cost          erime                         505.08 505.03..505.46      +0.000 ICINDE   |   505.078   +0.000 ICINDE  
+fe_erime               erime                        1811.00 1810.69..1810.80    -0.200 TAMAM    |      --          (ITS-90 kapsami disi)
+ni_erime               erime                        1728.00 1728.13..1728.56    +0.130 TAMAM    |      --          (ITS-90 kapsami disi)
+si_erime               erime                        1687.00 1686.80..1687.23    +0.000 ICINDE   |      --          (ITS-90 kapsami disi)
+mg_erime               erime                         923.00 922.93..922.94      -0.058 TAMAM    |      --          (ITS-90 kapsami disi)
+mn_erime               erime                        1519.00 1519.05..1519.48    +0.050 TAMAM    |      --          (ITS-90 kapsami disi)
+ti_alfa_beta           alfa (HCP) -> beta (BCC)     1155.00 1155.03..1155.46    +0.028 TAMAM    |      --          (ITS-90 kapsami disi)
+ti_erime               erime                        1941.00 1941.03..1941.46    +0.028 TAMAM    |      --          (ITS-90 kapsami disi)
+cr_erime               erime                        2180.00 2179.60..2180.03    +0.000 ICINDE   |      --          (ITS-90 kapsami disi)
+zr_erime               erime                        2128.00 2127.64..2127.74    -0.260 TAMAM    |      --          (ITS-90 kapsami disi)
+v_erime                erime                        2183.00 2182.60..2183.03    +0.000 ICINDE   |      --          (ITS-90 kapsami disi)
+mo_erime               erime                        2896.00 2895.70..2896.13    +0.000 ICINDE   |      --          (ITS-90 kapsami disi)
+fec_otektoid_sementit  otektoid  gamma -> alfa +     999.68 999.04..999.47      -0.215 TAMAM    |      --          (ITS-90 kapsami disi)
+fec_otektik_sementit   otektik  L -> gamma + seme   1421.31 1421.10..1421.52    +0.000 ICINDE   |      --          (ITS-90 kapsami disi)
+sementit_erime         sementit kongruent erimesi   1497.10 1496.03..1497.31    +0.000 ICINDE   |      --          (ITS-90 kapsami disi)
+------------------------------------------------------------------------------------------------------------------------------------
+DOSYA sutunu:  ICINDE 11   TAMAM 9

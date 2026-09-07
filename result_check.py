@@ -374,6 +374,77 @@ def check_floor_fields(result, request_args=None, rule=None):
             % ", ".join(eksik)]
 
 
+def check_liquid_fraction_monotonic(result, tolerance=1e-3):
+    """Heating a fixed composition may not make liquid disappear.
+
+    The one physical fact this needs: at constant overall composition and
+    pressure, the equilibrium liquid fraction does not fall as temperature
+    rises. It costs no database knowledge and no expertise -- the series
+    contradicts itself or it does not.
+
+    It was written because a series did. Al-12.2at%Si scanned from 780 to
+    980 K came back reading solid at 844.5 K, 99.8% liquid at 847.3 K,
+    SOLID AGAIN at 850.1 K, and liquid from 851.7 K on. Every point summed
+    to one, every point named its producer, nothing carried an error, and
+    the summary duly reported "first liquid at 847.29 K". The reported
+    melting point was three kelvin low and nothing said so.
+
+    The two readings came from different producers, and which one was wrong
+    took a third method to settle. Suspending LIQUID and comparing Gibbs
+    energies at the same conditions: at 846.5 K the solid state is 57.6 J
+    below the state the single-point path returned, so that path had
+    stopped at a metastable liquid; at 850.087 K the two are 0.01 J apart,
+    which is the eutectic itself. The STEP line was right, the points
+    filled into its gaps were not, and sorting them together by temperature
+    produced a sequence no alloy can perform.
+
+    Reporting both producers by name is the useful part of the message.
+    "Non-monotonic" says a number is wrong; "the point from A disagrees
+    with the point from B" says where to look.
+
+    The check can in principle fire on real chemistry -- a retrograde
+    liquidus can lower the liquid fraction on heating. No system this
+    server has been asked about does that, and if one arrives the honest
+    response is to record it here rather than to widen the tolerance until
+    the message goes away.
+    """
+    points = result.get("points")
+    if not isinstance(points, list) or len(points) < 2:
+        return []
+
+    # Only a temperature scan. A composition section holds temperature
+    # fixed, and there monotonicity in liquid means nothing.
+    sicakliklar = [p.get("temperature_K") for p in points
+                   if isinstance(p, dict)]
+    if any(t is None for t in sicakliklar) or len(set(sicakliklar)) < 2:
+        return []
+
+    def sivi(p):
+        toplam = 0.0
+        for ad, deger in (p.get("phase_molar_amounts") or {}).items():
+            if str(ad).upper().startswith("LIQUID") and deger is not None:
+                toplam += deger
+        return toplam
+
+    kullanilir = [p for p in points
+                  if isinstance(p, dict) and not p.get("error")
+                  and p.get("phase_molar_amounts")]
+    sirali = sorted(kullanilir, key=lambda p: p["temperature_K"])
+
+    problems = []
+    for a, b in zip(sirali, sirali[1:]):
+        dusus = sivi(a) - sivi(b)
+        if dusus <= tolerance:
+            continue
+        problems.append(
+            "liquid falls from %.4f at %.3f K (from %s) to %.4f at %.3f K "
+            "(from %s); heating cannot do that, so one of the two points is "
+            "not an equilibrium state"
+            % (sivi(a), a["temperature_K"], a.get("source") or "an unnamed source",
+               sivi(b), b["temperature_K"], b.get("source") or "an unnamed source"))
+    return problems
+
+
 VERIFY_PREDICATES = {
     "phase_fraction_sums": lambda result, req, rule: check_phase_fraction_sums(
         result, tolerance=_rule_value(rule, "tolerance")),
@@ -391,6 +462,9 @@ VERIFY_PREDICATES = {
         result, req),
     "degrees_of_freedom": lambda result, req, rule: check_degrees_of_freedom(
         result),
+    "liquid_fraction_monotonic": lambda result, req, rule:
+        check_liquid_fraction_monotonic(
+            result, tolerance=_rule_value(rule, "tolerance", 1e-3)),
 }
 
 
@@ -413,16 +487,30 @@ def _declared(stage):
 
 
 def verify_result(result):
-    """Run every structural check. Returns (passed, problems)."""
+    """Run every structural check. Returns (passed, problems, checked).
+
+    `checked` names the rules that actually ran. It exists because a
+    silently absent check is indistinguishable from a passing one: a new
+    check was added, the benchmark passed, the differential reported zero
+    changes -- and none of that would have differed had the check never
+    run at all. preflight.py held nine uncalled rules for months for the
+    same reason, that nobody could see the list.
+
+    The neighbouring stage, correspondence, already reports its own
+    `checked`. This is the same field on the other side of the same
+    verification.
+    """
     if not isinstance(result, dict):
-        return False, [f"Result is not a dict (got {type(result).__name__})."]
+        return False, [f"Result is not a dict (got {type(result).__name__})."], []
     if "error" in result:
-        return False, [f"Result carries an error: {result['error']}"]
+        return False, [f"Result carries an error: {result['error']}"], []
 
     problems = []
+    checked = []
     for rule, predicate in _declared("result"):
+        checked.append(rule.get("id") or rule.get("check"))
         problems += predicate(result, None, rule)
-    return (not problems), problems
+    return (not problems), problems, checked
 
 
 # ── CORRESPONDENCE ───────────────────────────────────────────────────

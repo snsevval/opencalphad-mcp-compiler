@@ -162,7 +162,7 @@ class ValidationResult:
 def verify_layer_a(case, result):
     """Deterministic checks. Always runs first, regardless of whether the
     case has a precise numeric reference."""
-    structurally_ok, structural_problems = result_check.verify_result(result)
+    structurally_ok, structural_problems, _ = result_check.verify_result(result)
     if not structurally_ok:
         return ValidationResult(False, "A", "; ".join(structural_problems[:5]))
 

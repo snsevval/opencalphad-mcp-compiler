@@ -11,3 +11,7 @@ agcu_combined.csv
 
 # Call log -- payloads written at runtime, not source
 logs/
+
+# Referans olcumunun ham yuku: 668 KB, her kosumda yeniden uretiliyor.
+# Tablonun kendisi (benchmark/REFERANS_tablo.txt) kayitta; ham yuk degil.
+referans_olcum*.json
