@@ -819,154 +819,140 @@ def composition_at(elements_composition, axis_element, x):
     return out
 
 
-def build_combined_series(db_path, elements_composition, temperature_min_K,
-                           temperature_max_K, n_points, pressure_Pa,
-                           step_timeout=STEP_TIMEOUT_S,
-                           fallback_timeout=GAP_FILL_TIMEOUT_S,
-                           axis_element=None, axis_min=None, axis_max=None):
-    """Run native STEP, detect gaps where its line terminated early, and
-    fill those gaps with native_fallback.run_and_parse single-point calls,
-    on a single consistent basis (phase mass fraction).
+class _AxisFrame:
+    """Taramanin uzerinde yurudugu eksen, iki turu de ayni arayuzle.
 
-    STEP's own points are authoritative wherever they exist, with one
-    measured exception: the two endpoints are read a second time from the
-    single-point engine, which re-minimises globally, and a disagreement
-    there is resolved against STEP (see the endpoint block below for the
-    case that prompted it). Everywhere else fallback only fills positions
-    STEP's line dropped, never overriding one STEP already covered.
-    Fallback's raw
-    phase_molar_amounts (moles of phase, not mass fraction) are converted
-    via _phase_mass_fractions_from_moles before merging, and STEP's own
-    truncated phase-tuple names (e.g. "FCC_A..TO#2") are de-truncated
-    against the full names seen from fallback via _canonicalize_phase_name,
-    so "the same phase" always ends up under one key across both sources.
-
-    Returns (combined_points, gap_filled_temperatures) where combined_points
-    is a T-sorted list of (temperature_K, {phase_name: mass_fraction}, source)
-    tuples, source being "step" or "native_fallback"; and how many STEP
-    attempts it took, which is 1 unless a stall was retried. Raises
-    NativeStepError
-    (via _validate_combined_points) if any point's fractions don't sum to
-    1 +/- 1e-5 or fall outside [0, 1] -- this is checked before any CSV or
-    chart is produced from the data.
+    Sicaklik ekseni ile bilesim ekseni arasinda gercekte yalnizca iki sey
+    degisiyor: kapsanan aralik, ve bir konumda tek nokta hesabinin hangi
+    argumanlari istedigi. Geri kalan her sey -- bosluk esigi, ikinci
+    okuma, uc noktalar -- ikisinde de ayni. Bu sinif o iki farki tek
+    yerde tutuyor, boylece asagidaki adimlarin hicbiri hangi eksende
+    oldugunu bilmek zorunda kalmiyor.
     """
-    csv_text, step_attempts = run_native_step(
-        db_path, elements_composition, temperature_min_K, temperature_max_K,
-        n_points, pressure_Pa, timeout=step_timeout,
-        axis_element=axis_element, axis_min=axis_min, axis_max=axis_max,
-    )
-    raw_points = parse_step_csv(csv_text)
-    step_points = _dedupe_sorted(raw_points)
 
-    # Everything below works on "axis position", which is temperature on
-    # the default axis and a mole fraction on a composition axis. Only two
-    # things differ between them: the range being covered, and what a
-    # single-point call at a given position needs as arguments.
-    if axis_element:
-        span_lo, span_hi = axis_min, axis_max
+    def __init__(self, db_path, elements_composition, temperature_min_K,
+                 temperature_max_K, n_points, pressure_Pa,
+                 fallback_timeout, axis_element, axis_min, axis_max):
+        self.db_path = db_path
+        self.pressure_Pa = pressure_Pa
+        self.fallback_timeout = fallback_timeout
+        self.axis_element = axis_element
+        if axis_element:
+            self.span_lo, self.span_hi = axis_min, axis_max
+            self._args = lambda position: (
+                composition_at(elements_composition, axis_element, position),
+                temperature_min_K)
+        else:
+            self.span_lo, self.span_hi = temperature_min_K, temperature_max_K
+            self._args = lambda position: (elements_composition, position)
 
-        def single_point_args(position):
-            return (composition_at(elements_composition, axis_element, position),
-                    temperature_min_K)
-    else:
-        span_lo, span_hi = temperature_min_K, temperature_max_K
+        self.nominal_spacing = (
+            (self.span_hi - self.span_lo) / max(n_points - 1, 1))
+        # A gap wider than this many spacings is where STEP stopped, not
+        # where it sampled sparsely. From settings/execution.toml.
+        try:
+            import settings_engine
+            _multiple = settings_engine.execution_setting(
+                "gap_detection", "threshold_multiple", default=3)
+        except Exception:                                # noqa: BLE001
+            _multiple = 3
+        self.gap_threshold = self.nominal_spacing * _multiple
+        self.axis_tolerance = max(abs(self.nominal_spacing) * 1e-3, 1e-12)
 
-        def single_point_args(position):
-            return elements_composition, position
+    def args_at(self, position):
+        """(composition, temperature) for a single-point call here."""
+        return self._args(position)
 
-    nominal_spacing = (span_hi - span_lo) / max(n_points - 1, 1)
-    # A gap wider than this many spacings is where STEP stopped, not
-    # where it sampled sparsely. From settings/execution.toml.
-    try:
-        import settings_engine
-        _multiple = settings_engine.execution_setting(
-            "gap_detection", "threshold_multiple", default=3)
-    except Exception:                                    # noqa: BLE001
-        _multiple = 3
-    gap_threshold = nominal_spacing * _multiple
+    def fresh_reading(self, position):
+        """One globally-minimised equilibrium at this axis position.
 
-    def _fresh_reading(position):
-        """One globally-minimised equilibrium at this axis position."""
-        point_composition, point_temperature = single_point_args(position)
+        Raises whatever the engine raises. Every caller decides for itself
+        whether a missing second opinion is fatal, and none of them think
+        it is -- STEP's own point stands instead.
+        """
+        point_composition, point_temperature = self._args(position)
         result = native_fallback.run_and_parse(
-            db_path, point_composition, point_temperature, pressure_Pa,
-            timeout=fallback_timeout,
+            self.db_path, point_composition, point_temperature,
+            self.pressure_Pa, timeout=self.fallback_timeout,
         )
         return _phase_mass_fractions_from_moles(
             result["phase_molar_amounts"], result["phase_element_composition"]
         )
 
-    def _reading_agrees(step_fractions, fresh_fractions):
-        """Same equilibrium? The fresh reading's names are the full ones, so
-        they serve as the vocabulary STEP's truncated headers resolve
-        against.
 
-        Compared at one per cent, not at the 1e-4 used for a single
-        endpoint. The question here is whether the line is still on the
-        stable phases, and a trace phase present in one reading and absent
-        from the other is not evidence that it left them -- at 1e-4 an
-        HCP_A3 sitting at 0.0014 counted as a disagreement and cost fifty
-        degrees of perfectly good STEP resolution. One per cent still
-        separates the case this exists for by a wide margin: ferrite at
-        0.84 against austenite at 0.90, with different phases entirely.
-        """
-        known = set(fresh_fractions)
-        left = {_canonicalize_phase_name(n, known): v
-                for n, v in step_fractions.items()}
-        right = {_canonicalize_phase_name(n, known): v
-                 for n, v in fresh_fractions.items()}
-        # 0.01, not 1e-4: at the tighter value a trace HCP_A3 phase at
-        # 0.0014 cost fifty degrees of otherwise good resolution.
-        try:
-            import settings_engine
-            _tol = settings_engine.execution_setting(
-                "endpoint_recheck", "tolerance", default=0.01)
-        except Exception:                                # noqa: BLE001
-            _tol = 0.01
-        return _fractions_agree(left, right, tol=_tol)
+def _readings_agree(step_fractions, fresh_fractions):
+    """Same equilibrium? The fresh reading's names are the full ones, so
+    they serve as the vocabulary STEP's truncated headers resolve
+    against.
 
-    # Where a STEP line ENDS, check whether it was still on the stable
-    # branch when it got there.
-    #
-    # STEP walks by continuation and never re-minimises globally, so once
-    # the phase set it is following stops being the lowest-energy one it
-    # keeps following it anyway. The endpoint check above catches that at
-    # the ends of the requested range; it does not catch it in the middle,
-    # and the middle is where it actually bit. Measured on steel1
-    # Fe-4C-6Cr-2Mo-0.1V over 900-1500 K: STEP starts at 900 K where
-    # ferrite is stable, and reports BCC_A2+M23C6 all the way to 1243 K.
-    # Fresh single points say austenite takes over around 1150 K --
-    # FCC_A1 0.90 at 1200 K against STEP's BCC_A2 0.84. Roughly ninety
-    # degrees of that diagram named the wrong phase, on a chart that
-    # looked continuous and passed every check the benchmark had.
-    #
-    # The argument that justified checking the endpoints applies here
-    # unchanged, and applying it only to the axis ends was the mistake: a
-    # continuation is least trustworthy where it has travelled furthest
-    # from its start, which is the end of each LINE, not the end of the
-    # axis. A line that stops short of the range is one that struggled,
-    # and its last points are the most suspect.
-    #
-    # So each line's last point is read a second time, and where the two
-    # disagree the divergence is bisected backwards to find where the line
-    # left the stable branch. Everything from there on is dropped and the
-    # region handed to the single-point path, which does re-minimise.
-    # Bisection costs log2(n) calls, against a gap-fill that already runs
-    # dozens.
+    Compared at one per cent, not at the 1e-4 used for a single
+    endpoint. The question here is whether the line is still on the
+    stable phases, and a trace phase present in one reading and absent
+    from the other is not evidence that it left them -- at 1e-4 an
+    HCP_A3 sitting at 0.0014 counted as a disagreement and cost fifty
+    degrees of perfectly good STEP resolution. One per cent still
+    separates the case this exists for by a wide margin: ferrite at
+    0.84 against austenite at 0.90, with different phases entirely.
+    """
+    known = set(fresh_fractions)
+    left = {_canonicalize_phase_name(n, known): v
+            for n, v in step_fractions.items()}
+    right = {_canonicalize_phase_name(n, known): v
+             for n, v in fresh_fractions.items()}
+    # 0.01, not 1e-4: at the tighter value a trace HCP_A3 phase at
+    # 0.0014 cost fifty degrees of otherwise good resolution.
+    try:
+        import settings_engine
+        _tol = settings_engine.execution_setting(
+            "endpoint_recheck", "tolerance", default=0.01)
+    except Exception:                                    # noqa: BLE001
+        _tol = 0.01
+    return _fractions_agree(left, right, tol=_tol)
+
+
+def _trim_untrusted_tail(step_points, frame):
+    """Drop the part of each STEP line that had left the stable branch.
+
+    STEP walks by continuation and never re-minimises globally, so once
+    the phase set it is following stops being the lowest-energy one it
+    keeps following it anyway. The endpoint check further down catches
+    that at the ends of the requested range; it does not catch it in the
+    middle, and the middle is where it actually bit. Measured on steel1
+    Fe-4C-6Cr-2Mo-0.1V over 900-1500 K: STEP starts at 900 K where
+    ferrite is stable, and reports BCC_A2+M23C6 all the way to 1243 K.
+    Fresh single points say austenite takes over around 1150 K --
+    FCC_A1 0.90 at 1200 K against STEP's BCC_A2 0.84. Roughly ninety
+    degrees of that diagram named the wrong phase, on a chart that
+    looked continuous and passed every check the benchmark had.
+
+    The argument that justified checking the endpoints applies here
+    unchanged, and applying it only to the axis ends was the mistake: a
+    continuation is least trustworthy where it has travelled furthest
+    from its start, which is the end of each LINE, not the end of the
+    axis. A line that stops short of the range is one that struggled,
+    and its last points are the most suspect.
+
+    So each line's last point is read a second time, and where the two
+    disagree the divergence is bisected backwards to find where the line
+    left the stable branch. Everything from there on is dropped and the
+    region handed to the single-point path, which does re-minimise.
+    Bisection costs log2(n) calls, against a gap-fill that already runs
+    dozens.
+    """
     line_end_indices = []
     for index in range(len(step_points) - 1):
-        if step_points[index + 1][0] - step_points[index][0] > gap_threshold:
+        if step_points[index + 1][0] - step_points[index][0] > frame.gap_threshold:
             line_end_indices.append(index)
-    if step_points[-1][0] < span_hi - gap_threshold:
+    if step_points[-1][0] < frame.span_hi - frame.gap_threshold:
         line_end_indices.append(len(step_points) - 1)
 
     untrusted_from = None
     for end_index in line_end_indices:
         try:
-            fresh = _fresh_reading(step_points[end_index][0])
+            fresh = frame.fresh_reading(step_points[end_index][0])
         except Exception:
             continue  # no second opinion available; STEP's own point stands
-        if not fresh or _reading_agrees(step_points[end_index][1], fresh):
+        if not fresh or _readings_agree(step_points[end_index][1], fresh):
             continue
 
         # This line ended off the stable branch. Find where it left it:
@@ -976,101 +962,113 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
         while low < high:
             middle = (low + high) // 2
             try:
-                probe = _fresh_reading(step_points[middle][0])
+                probe = frame.fresh_reading(step_points[middle][0])
             except Exception:
                 break
-            if probe and _reading_agrees(step_points[middle][1], probe):
+            if probe and _readings_agree(step_points[middle][1], probe):
                 low = middle + 1
             else:
                 high = middle
         untrusted_from = low if untrusted_from is None else min(untrusted_from, low)
 
-    if untrusted_from is not None:
-        step_points = step_points[:untrusted_from]
-        if not step_points:
-            raise NativeStepError(
-                "Every point STEP produced disagreed with an independent "
-                "equilibrium at the same position -- its line never followed "
-                "the stable phases. The single-point path covers this system."
-            )
+    if untrusted_from is None:
+        return step_points
+    trimmed = step_points[:untrusted_from]
+    if not trimmed:
+        raise NativeStepError(
+            "Every point STEP produced disagreed with an independent "
+            "equilibrium at the same position -- its line never followed "
+            "the stable phases. The single-point path covers this system."
+        )
+    return trimmed
 
+
+def _gap_positions(step_points, frame):
+    """Where STEP's line is missing: before it, inside it, after it."""
     gaps = []
-    if step_points[0][0] > span_lo + gap_threshold:
-        gaps.append((span_lo, step_points[0][0]))
+    if step_points[0][0] > frame.span_lo + frame.gap_threshold:
+        gaps.append((frame.span_lo, step_points[0][0]))
     for (T1, _), (T2, _) in zip(step_points, step_points[1:]):
-        if T2 - T1 > gap_threshold:
+        if T2 - T1 > frame.gap_threshold:
             gaps.append((T1, T2))
-    if step_points[-1][0] < span_hi - gap_threshold:
-        gaps.append((step_points[-1][0], span_hi))
+    if step_points[-1][0] < frame.span_hi - frame.gap_threshold:
+        gaps.append((step_points[-1][0], frame.span_hi))
+    return gaps
 
-    # Fill gaps first (mass fraction, from moles + composition) so we have
-    # a pool of full, untruncated phase names to de-truncate STEP's own
-    # column headers against.
+
+def _fill_gaps(gaps, step_points, frame):
+    """Single-point equilibria at the positions STEP's line never covered.
+
+    A position STEP already has is skipped rather than recomputed: this
+    tier COMPLETES the line, it does not overrule it. A failed fill is
+    left as a genuine gap -- one unreachable point should not cost the
+    whole chart.
+    """
     fallback_points = []
     step_temperatures = {T for T, _ in step_points}
     for lo, hi in gaps:
-        n_fill = max(int(round((hi - lo) / nominal_spacing)) - 1, 1)
+        n_fill = max(int(round((hi - lo) / frame.nominal_spacing)) - 1, 1)
         for i in range(1, n_fill + 1):
             T = lo + (hi - lo) * i / (n_fill + 1)
             if any(abs(T - existing) < 1e-6 for existing in step_temperatures):
                 continue  # STEP already has this exact temperature -- keep STEP's
             try:
-                point_composition, point_temperature = single_point_args(T)
-                result = native_fallback.run_and_parse(
-                    db_path, point_composition, point_temperature, pressure_Pa,
-                    timeout=fallback_timeout
-                )
+                mass_fractions = frame.fresh_reading(T)
             except Exception:
                 continue  # leave this point as a genuine gap rather than fail the whole chart
-            mass_fractions = _phase_mass_fractions_from_moles(
-                result["phase_molar_amounts"], result["phase_element_composition"]
-            )
             if not mass_fractions:
                 continue
             fallback_points.append((T, mass_fractions))
+    return fallback_points
 
-    # The two ends of the range the CALLER asked for, read from the
-    # single-point engine. This settles two separate things with one call
-    # each, which is why they are handled together.
-    #
-    # Coverage: gap-fill only ever places points strictly inside a gap, so
-    # a limit STEP's line never reached is simply missing from the answer.
-    # Measured: a scan of x(C) requested from 0.001 to 0.05 came back
-    # ending at 0.0455, and one of x(Mo) requested to 0.15 ended at 0.1364.
-    # A range someone asked for should have both its ends in the result.
-    #
-    # Correctness: where STEP DID reach a limit, it got there by
-    # continuation -- it does not re-minimise globally at each step, so
-    # where its line stops being the global minimum it keeps following it
-    # and reports a metastable equilibrium with nothing to say anything is
-    # wrong. Measured on steel1 Fe-Cr-C at 1100 K, scanning x(Cr) from 0.01
-    # to 0.30: STEP's ordinary steps matched fresh single-point equilibria
-    # to five decimals, but the point it carried to the axis limit reported
-    # FCC_A1+M7C3 where the stable answer is BCC_A2+M23C6. An endpoint is
-    # where a continuation has travelled furthest from the solution it
-    # started at, so it is both the most suspect point and the cheapest to
-    # check. Disagreements are resolved in favour of the global
-    # minimisation.
-    axis_tolerance = max(abs(nominal_spacing) * 1e-3, 1e-12)
+
+def _axis_limit_readings(frame):
+    """The two ends of the range the CALLER asked for, read from the
+    single-point engine. This settles two separate things with one call
+    each, which is why they are handled together.
+
+    Coverage: gap-fill only ever places points strictly inside a gap, so
+    a limit STEP's line never reached is simply missing from the answer.
+    Measured: a scan of x(C) requested from 0.001 to 0.05 came back
+    ending at 0.0455, and one of x(Mo) requested to 0.15 ended at 0.1364.
+    A range someone asked for should have both its ends in the result.
+
+    Correctness: where STEP DID reach a limit, it got there by
+    continuation -- it does not re-minimise globally at each step, so
+    where its line stops being the global minimum it keeps following it
+    and reports a metastable equilibrium with nothing to say anything is
+    wrong. Measured on steel1 Fe-Cr-C at 1100 K, scanning x(Cr) from 0.01
+    to 0.30: STEP's ordinary steps matched fresh single-point equilibria
+    to five decimals, but the point it carried to the axis limit reported
+    FCC_A1+M7C3 where the stable answer is BCC_A2+M23C6. An endpoint is
+    where a continuation has travelled furthest from the solution it
+    started at, so it is both the most suspect point and the cheapest to
+    check. Disagreements are resolved in favour of the global
+    minimisation.
+    """
     endpoint_readings = {}
-    for position in (span_lo, span_hi):
+    for position in (frame.span_lo, frame.span_hi):
         try:
-            point_composition, point_temperature = single_point_args(position)
-            result = native_fallback.run_and_parse(
-                db_path, point_composition, point_temperature, pressure_Pa,
-                timeout=fallback_timeout
-            )
-            fresh = _phase_mass_fractions_from_moles(
-                result["phase_molar_amounts"], result["phase_element_composition"]
-            )
+            fresh = frame.fresh_reading(position)
         except Exception:
             continue  # no second reading available; STEP's own point stands
         if fresh:
             endpoint_readings[position] = fresh
+    return endpoint_readings
 
-    # Built from the RAW fallback names, before canonicalization: these are
-    # the full, untruncated spellings that STEP's truncated headers get
-    # matched back against.
+
+def _merge_sources(step_points, fallback_points, endpoint_readings, frame):
+    """One series out of three sources, under one spelling of each phase.
+
+    The phase-name vocabulary is built from the RAW fallback names, before
+    canonicalization: those are the full, untruncated spellings that
+    STEP's truncated column headers get matched back against. Both sides
+    then go through the same canonicalization -- the fallback side needs
+    it too, since it is the one that spells the default composition set
+    as "LIQUID#1" where STEP writes plain "LIQUID".
+
+    Returns (combined, gap_filled_positions).
+    """
     known_full_names = set()
     for _, fractions in fallback_points:
         known_full_names.update(fractions.keys())
@@ -1090,11 +1088,12 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
     for position, fresh in endpoint_readings.items():
         covering = [
             (T, f) for T, f in step_points
-            if abs(T - position) <= axis_tolerance
+            if abs(T - position) <= frame.axis_tolerance
         ]
         if not covering:
             already_filled = any(
-                abs(T - position) <= axis_tolerance for T, _ in fallback_points
+                abs(T - position) <= frame.axis_tolerance
+                for T, _ in fallback_points
             )
             if not already_filled:
                 endpoint_additions[position] = fresh
@@ -1102,9 +1101,6 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
                                   _canonicalize(fresh)):
             endpoint_replacements[covering[0][0]] = fresh
 
-    # Both sources go through the same canonicalization -- the fallback
-    # side needs it too, since it's the one that spells the default
-    # composition set as "LIQUID#1" where STEP writes plain "LIQUID".
     combined = []
     for T, fractions in step_points:
         if T in endpoint_replacements:
@@ -1123,8 +1119,70 @@ def build_combined_series(db_path, elements_composition, temperature_min_K,
         gap_filled_temperatures.append(T)
 
     combined.sort(key=lambda p: p[0])
+    return combined, gap_filled_temperatures
+
+
+def build_combined_series(db_path, elements_composition, temperature_min_K,
+                           temperature_max_K, n_points, pressure_Pa,
+                           step_timeout=STEP_TIMEOUT_S,
+                           fallback_timeout=GAP_FILL_TIMEOUT_S,
+                           axis_element=None, axis_min=None, axis_max=None):
+    """Run native STEP, then repair, complete and merge what it produced.
+
+    STEP's own points are authoritative wherever they exist, with one
+    measured exception: the two endpoints are read a second time from the
+    single-point engine, which re-minimises globally, and a disagreement
+    there is resolved against STEP. Everywhere else fallback only fills
+    positions STEP's line dropped, never overriding one STEP already
+    covered. Fallback's raw phase_molar_amounts (moles of phase, not mass
+    fraction) are converted via _phase_mass_fractions_from_moles before
+    merging, and STEP's own truncated phase-tuple names (e.g.
+    "FCC_A..TO#2") are de-truncated against the full names seen from
+    fallback via _canonicalize_phase_name, so "the same phase" always ends
+    up under one key across both sources.
+
+    The five steps below were one 304-line function until they were
+    separated, and the separation is not tidying. The silent wrong answer
+    found on 7 September lived exactly at the seam between two of them:
+    points from two sources were sorted together by temperature and the
+    result read solid at 844.5 K, 99.8 per cent liquid at 847.3, SOLID
+    AGAIN at 850.1, liquid from 851.7. Nothing in a single body of code
+    marks where one source stops being responsible and the next begins.
+    Named steps do.
+
+    Returns (combined_points, gap_filled_positions, step_attempts) where
+    combined_points is a position-sorted list of (position, {phase_name:
+    mass_fraction}, source) tuples; and step_attempts is 1 unless a stall
+    was retried. Raises NativeStepError (via _validate_combined_points) if
+    any point's fractions don't sum to 1 +/- 1e-5 or fall outside [0, 1] --
+    checked before any CSV or chart is produced from the data.
+    """
+    csv_text, step_attempts = run_native_step(
+        db_path, elements_composition, temperature_min_K, temperature_max_K,
+        n_points, pressure_Pa, timeout=step_timeout,
+        axis_element=axis_element, axis_min=axis_min, axis_max=axis_max,
+    )
+    step_points = _dedupe_sorted(parse_step_csv(csv_text))
+
+    frame = _AxisFrame(
+        db_path, elements_composition, temperature_min_K, temperature_max_K,
+        n_points, pressure_Pa, fallback_timeout,
+        axis_element, axis_min, axis_max)
+
+    # Order matters and is the whole argument. Trim first: a line that had
+    # left the stable branch must not be treated as coverage, or the gaps
+    # it should have opened stay closed. Gaps and their filling come next,
+    # because the axis limits need to know what is already covered. Merge
+    # last, since it is the only step that sees all three sources.
+    step_points = _trim_untrusted_tail(step_points, frame)
+    fallback_points = _fill_gaps(
+        _gap_positions(step_points, frame), step_points, frame)
+    endpoint_readings = _axis_limit_readings(frame)
+
+    combined, gap_filled = _merge_sources(
+        step_points, fallback_points, endpoint_readings, frame)
     _validate_combined_points(combined)
-    return combined, gap_filled_temperatures, step_attempts
+    return combined, gap_filled, step_attempts
 
 
 def render_gnuplot_png(combined_points, title, output_png_path, timeout=20,
