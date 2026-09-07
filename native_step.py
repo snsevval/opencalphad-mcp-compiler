@@ -15,7 +15,8 @@ Runs OpenCalphad's own continuation-based STEP algorithm (via the native
 ./OC command-line binary) instead of recomputing every temperature from
 scratch in Python -- this is what OpenCalphad's own CAE GUI does, and its
 generated macro (captured in tests/fixtures/step_diagram/, produced by
-OpenCalphad CAE 0.1.0) is the template generate_step_macro follows.
+OpenCalphad CAE 0.1.0) is where generate_step_steps takes its command
+syntax from; the prompts it answers were read off the engine itself.
 
 Known, confirmed limitation (see the plan file, Faz 6): STEP's own internal
 line-tracer can terminate a temperature line early when the local
@@ -53,6 +54,12 @@ import tempfile
 import time
 
 import native_fallback
+import oc_console
+
+# Motorun komut istemi. Parametre istemleri kendi sorularini
+# yaziyor ("Select elements", "Step options?", "LIST what?"); bu,
+# "sirada bir komut bekliyorum" diyen tek istem.
+COMMAND = "--->OC6:"
 
 import paths
 
@@ -112,10 +119,10 @@ class NativeStepError(Exception):
     """Raised when the native STEP macro itself fails to run or produce a CSV."""
 
 
-def generate_step_macro(db_path, elements_composition, temperature_min_K,
+def generate_step_steps(db_path, elements_composition, temperature_min_K,
                          temperature_max_K, n_points, pressure_Pa, csv_basename,
                          axis_element=None, axis_min=None, axis_max=None):
-    """Build the native STEP .ocm macro.
+    """Build the native STEP console script, prompt by prompt.
 
     Scans temperature by default. Pass axis_element to scan that element's
     mole fraction instead, between axis_min and axis_max, holding
@@ -124,15 +131,14 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
     happens to this alloy as it heats".
 
 
-    Matches the exact working syntax captured from OpenCalphad CAE's own
-    "Generate Macro File" (tests/fixtures/step_diagram/
-    steel1_FeC_300_2000_step100.ocm): separate "set condition ..." lines
-    (not the "set c ..." shorthand), TWO blank lines after the element
-    list, and the specific blank-line counts around "step"/"normal" that
-    answer OC's own default-accept prompts. The plot/render section is
-    deliberately omitted -- we build our own gnuplot script from the
-    (gap-filled) data instead of using OC's own wxt-terminal render, which
-    would otherwise try to open an interactive window.
+    Returns a list of (prompt, line) pairs for oc_console.run_script.
+
+    The command syntax still follows the working macro captured from
+    OpenCalphad CAE's own "Generate Macro File" (tests/fixtures/
+    step_diagram/steel1_FeC_300_2000_step100.ocm) -- separate
+    "set condition ..." lines rather than the "set c ..." shorthand. What
+    is gone is everything that was not syntax: the blank-line padding
+    that guessed how many questions the engine would ask.
     """
     total = sum(elements_composition.values())
     fractions = {el: amt / total for el, amt in elements_composition.items()}
@@ -177,61 +183,58 @@ def generate_step_macro(db_path, elements_composition, temperature_min_K,
         seed_line = ""
         csv_x_column = "T"
 
-    macro = (
-        # "set echo"/"set log" (from the GUI-captured macro this is
-        # otherwise based on) are intentionally omitted: we never read the
-        # resulting .LOG file, and "set log" hangs specifically when the
-        # engine binary runs against a UNC working directory (confirmed
-        # with the Windows 6.058 binary invoked from WSL over
-        # \\wsl.localhost\...) trying to create the log file there.
-        f"read tdb {db_stem}.TDB\n"
-        # Four, not one. A database that warns while loading makes the
-        # engine stop and wait for RETURN, and the next macro line answers
-        # that prompt instead of being read as a command -- so `set c`
-        # never arrives and the calculation runs with no conditions at
-        # all, returning G=0 and NaN. From outside that looks like an
-        # alloy the solver could not handle. Measured on iron4cd, where it
-        # cost a whole question and was written up as an engine limit.
-        # Spare blank lines at a command prompt are harmless.
-        f"{elements_line}\n"
-        "\n"
-        "\n"
-        "\n"
-        "\n"
-        f"set condition T = {seed_T:.10g}\n"
-        f"set condition P = {pressure_Pa:.10g}\n"
-        "set condition n = 1.0\n"
-        f"{x_condition_lines}\n"
-        f"{seed_line}"
-        "\n"
-        "calculate equilibrium\n"
-        "\n"
-        "list result 4\n"
-        "\n"
-        "\n"
-        f"set axis 1 {axis_name} {axis_lo:.10g} {axis_hi:.10g} {n_points}\n"
-        "\n"
-        "\n"
-        "\n"
-        "\n"
-        "step\n"
-        "normal\n"
-        "\n"
-        "\n"
-        "\n"
-        "\n"
-        "\n"
-        "\n"
-        "\n"
-        "list\n"
-        "excel_csv_file\n"
-        f"{csv_x_column}\n"
-        "BPW(*)\n"
-        f"{csv_basename}\n"
-        "\n"
-        "exit Y\n"
-    )
-    return macro
+    # "set echo"/"set log" (from the GUI-captured macro this was
+    # otherwise based on) are deliberately absent: the .LOG file is never
+    # read, and "set log" hangs specifically when the engine binary runs
+    # against a UNC working directory (confirmed with the Windows 6.058
+    # binary invoked from WSL) trying to create the log file there. The
+    # plot/render section is absent too -- the gnuplot script is built
+    # from the (gap-filled) data instead of using OC's own wxt render,
+    # which would try to open an interactive window.
+    #
+    # Each entry is (prompt, line): wait until the engine asks THIS, then
+    # answer. The prompts are the engine's own, read off it rather than
+    # assumed -- see oc_console for how they were measured.
+    return [
+        (COMMAND, f"read tdb {db_stem}"),
+        # The element list, and then an empty line to end it. This is
+        # where the positional version needed its largest guess: a
+        # database that warns while loading stops and waits for RETURN,
+        # and the next macro line answered that prompt instead of being
+        # read as a command -- so `set condition` never arrived and the
+        # calculation ran with no conditions at all, returning G=0 and
+        # NaN. From outside that looked like an alloy the solver could
+        # not handle; measured on iron4cd, where it cost a whole
+        # benchmark question and was written up as an engine limit. The
+        # fix then was four blank lines instead of one. Here there is
+        # nothing to guess: an unexpected prompt gets an empty line and
+        # the command waits its turn.
+        ("select elements", elements_line),
+        ("select elements", ""),
+        (COMMAND, f"set condition T = {seed_T:.10g}"),
+        (COMMAND, f"set condition P = {pressure_Pa:.10g}"),
+        (COMMAND, "set condition n = 1.0"),
+    ] + [
+        (COMMAND, line) for line in x_condition_lines.splitlines() if line
+    ] + ([(COMMAND, seed_line.strip())] if seed_line.strip() else []) + [
+        (COMMAND, "calculate equilibrium"),
+        (COMMAND, "list result 4"),
+        (COMMAND, f"set axis 1 {axis_name} {axis_lo:.10g} {axis_hi:.10g} "
+                  f"{n_points}"),
+        (COMMAND, "step"),
+        ("step options", "normal"),
+        (COMMAND, "list"),
+        # The export chain. Its real shape was not what the positional
+        # macro assumed: "excel_csv_file" answers "LIST what?", not an
+        # output-mode question, and there is no filename prompt at all --
+        # this binary always prints the table to the screen. The macro
+        # sent a filename anyway, at a command prompt, where it was read
+        # as an unknown command.
+        ("list what", "excel_csv_file"),
+        ("independent variable", csv_x_column),
+        ("dependent values", "BPW(*)"),
+        (COMMAND, "exit Y"),
+    ]
 
 
 def run_native_step(db_path, elements_composition, temperature_min_K,
@@ -306,132 +309,75 @@ def _run_native_step_once(db_path, elements_composition,
         with open(db_path, "rb") as src, open(scratch_db, "wb") as dst:
             dst.write(src.read())
 
-        macro_text = generate_step_macro(
+        steps = generate_step_steps(
             db_path, elements_composition, temperature_min_K,
             temperature_max_K, n_points, pressure_Pa, csv_basename,
             axis_element=axis_element, axis_min=axis_min, axis_max=axis_max,
         )
-        macro_path = os.path.join(scratch, "step.ocm")
-        with open(macro_path, "w") as f:
-            f.write(macro_text)
 
         env = os.environ.copy()
         env["LD_LIBRARY_PATH"] = os.path.join(OC_BUILD_DIR, ".libs")
 
         stdout_path = os.path.join(scratch, "stdout.txt")
-        stderr_path = os.path.join(scratch, "stderr.txt")
-        # Stop when the data is in hand, not when the clock runs out.
-        #
-        # The engine prints "MACRO ENDS WITHOUT SET INTERACTIVE" when it
-        # reaches the end of the macro and then loops on its own prompt
-        # forever. Everything this function wants -- the CSV file, or the
-        # table printed to the screen -- has already been produced by the
-        # time that warning appears, so the loop that follows is pure
-        # waiting. Waiting it out was how this ran until now, which is why
-        # a temperature diagram reliably cost the full timeout: 66s of
-        # which about two were the calculation.
-        #
-        # That was not merely slow, it was fragile. The timeout doubled as
-        # the termination mechanism, so its value had to be large enough
-        # for a slow run and smaller than whatever limit the caller kept --
-        # and when the two crossed, four passing cases turned into
-        # TimeoutError at the client's 180s while the engine sat spinning.
-        # Watching for the end of the macro removes the conflict instead of
-        # retuning it: the timeout goes back to being a safety net for a
-        # run that never gets there.
         csv_path = os.path.join(scratch, f"{csv_basename}.csv")
-        end_marker = "MACRO ENDS WITHOUT SET INTERACTIVE"
 
-        with open(macro_path) as stdin_f, \
-             open(stdout_path, "w") as stdout_f, \
-             open(stderr_path, "w") as stderr_f:
-            proc = subprocess.Popen(
-                [OC_BINARY],
-                cwd=scratch,
-                stdin=stdin_f,
-                stdout=stdout_f,
-                stderr=stderr_f,
-                env=env,
+        # Stop when the data is in hand, not when the clock runs out. The
+        # engine prints "STOP" as it leaves; everything this function
+        # wants has been produced by then. Waiting for the process to be
+        # reaped instead was how this ran until the end marker went in,
+        # and it cost a temperature diagram the full timeout: 66 s of
+        # which about two were the calculation.
+        def _bitti(metin):
+            return "STOP" in metin[-400:]
+
+        def _sonda(proc, metin):
+            return _stall_probe(proc, stdout_path, csv_path, 0.0, 0.0)
+
+        console_error = None
+        try:
+            oc_console.run_script(
+                OC_BINARY, scratch, steps, env=env, timeout=timeout,
+                silence=STEP_SILENCE_S, stdout_path=stdout_path,
+                stop_when=_bitti, on_stall=_sonda,
             )
-            basladi = time.monotonic()
-            deadline = basladi + timeout
-            finished = False
-            # When the output last GREW. A run that went quiet after three
-            # seconds and one that was still writing at the deadline are
-            # different failures, and the timeout alone cannot tell them
-            # apart. The size comes from a read this loop already does.
-            son_boyut, son_degisim = -1, 0.0
-            takilma, sessizlikten = "", False
-            try:
-                while time.monotonic() < deadline:
-                    if proc.poll() is not None:
-                        finished = True
-                        break  # exited on its own
-                    try:
-                        with open(stdout_path, errors="ignore") as probe:
-                            govde = probe.read()
-                        if len(govde) != son_boyut:
-                            son_boyut = len(govde)
-                            son_degisim = time.monotonic() - basladi
-                        if end_marker in govde:
-                            finished = True
-                            break
-                    except OSError:
-                        pass
-                    if os.path.isfile(csv_path) and os.path.getsize(csv_path) > 0:
-                        finished = True
-                        break
-                    # Give up on silence rather than on the clock. A stalled
-                    # run stops producing; a slow one does not.
-                    if (time.monotonic() - basladi) - son_degisim > STEP_SILENCE_S:
-                        sessizlikten = True
-                        break
-                    time.sleep(0.2)
-                if not finished:
-                    takilma = _stall_probe(proc, stdout_path, csv_path,
-                                           son_degisim,
-                                           time.monotonic() - basladi)
-                    if sessizlikten:
-                        takilma = "sessizlik>%ss " % STEP_SILENCE_S + takilma
-            finally:
-                proc.kill()
-                try:
-                    proc.wait(timeout=REAP_TIMEOUT_S)
-                except subprocess.TimeoutExpired:
-                    pass
-
-        # Reaching the deadline is a failure, not a result.
-        #
-        # Until now the timeout was swallowed and whatever partial CSV
-        # existed got parsed as if the run had finished. What that produces
-        # is a diagram quietly missing points -- and quietly is the problem,
-        # because nothing downstream can tell a truncated scan from a
-        # complete one. Measured: the isothermal section of steel1
-        # Fe-10Cr-C intermittently hangs (roughly one run in four), and on
-        # those runs the first point simply vanished, taking BCC_A2 with
-        # it. The benchmark then reported a missing phase, which is a true
-        # statement about the data and a misleading one about the system.
-        #
-        # Both callers have somewhere better to go: the section tool falls
-        # back to scanning single points, the property diagram to its own
-        # Python loop. Slower and reliable beats fast and unverifiable.
-        if not finished:
-            # The stall report rides along in the message because the
-            # message already reaches the payload as native_backend_error,
-            # and from there the call log -- so a run that stalls is
-            # diagnosable afterwards without having been watched live.
-            nicin = (
-                f"STEP stopped producing output for more than "
-                f"{STEP_SILENCE_S}s and was stopped"
-                if sessizlikten else
-                f"STEP did not finish within {timeout}s and was stopped")
-            raise NativeStepError(
-                nicin + ". Whatever it had written by then may be "
-                "incomplete, so it is discarded rather than passed on as a "
-                "full scan."
-                + (f" [stall: {takilma}]" if takilma else "")
-            )
-
+        except oc_console.ConsoleError as exc:
+            # Two different endings, and telling them apart is the whole
+            # point of the distinction oc_console draws.
+            #
+            # The engine EXITED: the run is over, however badly. Whatever
+            # it printed may still hold the table, and the recovery below
+            # is where that gets decided -- so this is not raised here.
+            # alni-4slx ends this way, reporting "Too many stable phases"
+            # in 0.3 s, five times out of five. Treating that as a stall
+            # cost 60.8 s: thirty seconds of waiting, then a retry of a
+            # deterministic failure, and thirty more.
+            #
+            # The engine STOPPED PROMPTING while still alive: that is the
+            # stall, and it is worth a second attempt. The wording carries
+            # "stopped producing" because run_native_step keys its retry on
+            # exactly that phrase.
+            #
+            # Reaching either is a failure, not a result. Until the
+            # timeout stopped being swallowed, whatever partial CSV existed
+            # got parsed as if the run had finished, and what that produces
+            # is a diagram quietly missing points -- quietly being the
+            # problem, since nothing downstream can tell a truncated scan
+            # from a complete one. Measured: the isothermal section of
+            # steel1 Fe-10Cr-C intermittently hangs (roughly one run in
+            # four), and on those runs the first point simply vanished,
+            # taking BCC_A2 with it. The benchmark then reported a missing
+            # phase, which is a true statement about the data and a
+            # misleading one about the system. Both callers have somewhere
+            # better to go: the section tool falls back to scanning single
+            # points, the property diagram to its own Python loop.
+            if exc.stalled:
+                raise NativeStepError(
+                    "STEP stopped producing output and was stopped. Whatever "
+                    "it had written by then may be incomplete, so it is "
+                    "discarded rather than passed on as a full scan. [%s]"
+                    % exc
+                )
+            console_error = exc
 
         if os.path.isfile(csv_path):
             with open(csv_path, errors="ignore") as f:
@@ -459,8 +405,9 @@ def _run_native_step_once(db_path, elements_composition,
         raise NativeStepError(
             "Native STEP did not produce a CSV output file or a "
             "recognizable on-screen CSV block "
-            f"(macro likely failed before reaching the list step). "
-            f"stdout tail: {tail}"
+            "(the script likely failed before reaching the list step)."
+            + (f" {console_error}" if console_error else "")
+            + f" stdout tail: {tail}"
         )
 
 
