@@ -262,11 +262,96 @@ def yon_dort():
         tazele(("semantic_check", "result_check"))
     return sorunlar
 
+def yon_bes():
+    """Her hesap araci cerceveden ve dogrulamadan geciyor mu?
+
+    _tool_frame girisi yapisal olgu yapti: preflight kosmadan, reddi
+    dondurmeden, cozumu ondan sonra yapmadan gecilemiyor. Cikis kasitla
+    disarida -- alti aracin donus sekli farkli ve hepsini bilen bir cerceve
+    bir sonraki dusen adimin saklanma yeri olurdu.
+
+    Geriye "dogrulama kostu" bir gelenek olarak kaliyor, ve bu projede
+    gelenegin ne demek oldugu olculu: preflight.py'de dokuz kural aylarca
+    cagrilmadan durdu. Fark edilmemesinin sebebi kimsenin sormamasiydi.
+
+    Burasi soruyor. Metin aramasi degil, sozdizimi agaci uzerinden: hangi
+    fonksiyon @mcp.tool() ile kayitli, hangisi _tool_frame cagiriyor,
+    hangisinde _attach_verification var.
+
+    Kesif araclari disarida: motor calistirmiyorlar, dogrulanacak sonuc
+    yok. Hangilerinin hesap araci oldugu execution.toml'un cascade
+    listesinden geliyor -- elle tutulan bir liste burada da ayni sekilde
+    eskiyebilirdi.
+    """
+    import ast
+
+    kaynak = io.open(os.path.join(HERE, "server.py"), encoding="utf-8").read()
+    agac = ast.parse(kaynak)
+
+    try:
+        import settings_engine
+        islemler = set(settings_engine.POLICY.execution.cascades)
+    except Exception as exc:                             # noqa: BLE001
+        return ["yon_bes: kademe listesi okunamadi (%s)" % exc]
+
+    def cagirilanlar(dugum):
+        adlar = set()
+        for n in ast.walk(dugum):
+            if not isinstance(n, ast.Call):
+                continue
+            f = n.func
+            if isinstance(f, ast.Name):
+                adlar.add(f.id)
+            elif isinstance(f, ast.Attribute):
+                adlar.add(f.attr)
+        return adlar
+
+    sorunlar = []
+    gorulen = 0
+    for d in agac.body:
+        if not isinstance(d, ast.FunctionDef):
+            continue
+        dekorator = {
+            (x.func.attr if isinstance(x, ast.Call)
+             and isinstance(x.func, ast.Attribute) else
+             getattr(x, "attr", getattr(x, "id", "")))
+            for x in d.decorator_list}
+        if "tool" not in dekorator:
+            continue
+        # Hangi islem? Arac adi islem adiyla BASLIYOR ama birebir ayni
+        # olmak zorunda degil: calculate_scheil_solidification -> scheil,
+        # compare_alloys -> compare. Iki ozel durum yazmak yerine en uzun
+        # eslesen islem aliniyor; ozel durum listesi burada da eskirdi.
+        sade = d.name.replace("calculate_", "")
+        eslesenler = [i for i in islemler if sade.startswith(i)]
+        if not eslesenler:
+            continue                                     # kesif araci
+        islem = max(eslesenler, key=len)
+        gorulen += 1
+        adlar = cagirilanlar(d)
+        if "_tool_frame" not in adlar:
+            sorunlar.append(
+                "%s cerceveden GECMIYOR: _tool_frame cagrilmiyor, yani "
+                "preflight'in kostugu ve bilesimin ondan SONRA cozuldugu "
+                "artik garanti degil" % d.name)
+        if "_attach_verification" not in adlar:
+            sorunlar.append(
+                "%s dogrulamadan GECMIYOR: _attach_verification cagrilmiyor, "
+                "yani sonuc kontrol edilmeden cikiyor" % d.name)
+
+    if gorulen != len(islemler):
+        sorunlar.append(
+            "kademe listesinde %d islem var ama %d hesap araci bulundu -- "
+            "adlandirma ile ayar dosyasi ayrismis"
+            % (len(islemler), gorulen))
+    return sorunlar
+
+
 def main():
     metinler = _kaynak()
     hepsi = "\n".join(metinler.values())
     sorunlar = (yon_bir(hepsi) + yon_iki(metinler)
-                + yon_uc(metinler) + yon_dort())
+                + yon_uc(metinler) + yon_dort() + yon_bes())
     if sorunlar:
         print("AYAR DENETIMI: %d sorun" % len(sorunlar))
         for s in sorunlar:
