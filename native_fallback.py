@@ -29,7 +29,11 @@ import re
 import subprocess
 import time
 
-OC_BUILD_DIR = os.environ.get("OC_BUILD_DIR", "/root/projects/opencalphad")
+import paths
+
+# Tek tanim paths.py'de. Burada ikinci bir varsayilan tutmak, ayni
+# yolun ikinci bir kopyasini eskimeye birakmak olurdu.
+OC_BUILD_DIR = paths.build_dir()
 _LINUX_BINARY = os.path.join(OC_BUILD_DIR, "OC")
 def _resolve_binary():
     """The native engine to run, in the order execution.toml gives.

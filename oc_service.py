@@ -9,7 +9,12 @@ import os
 import re
 import sys
 
-OC_BUILD_DIR = os.environ.get("OC_BUILD_DIR", "/root/projects/opencalphad")
+import paths  # noqa: E402
+
+HERE = paths.HERE
+# Motorun yeri de veritabanlarinin yeri de paths.py'de; burada
+# tekrar tanimlamak uc kopyayi ikiye indirmek olurdu, bire degil.
+OC_BUILD_DIR = paths.build_dir()
 sys.path.insert(0, OC_BUILD_DIR)
 
 import pyOC  # noqa: E402
@@ -18,13 +23,15 @@ from pyOC import PhaseStatus  # noqa: E402
 
 import native_fallback  # noqa: E402
 
-# Where the TDB files live. Environment, not rule: it changes from machine
-# to machine and there is nothing to explain about a path, so it belongs in
-# neither settings file. The default is where the OpenCalphad CAE install
-# puts them on Windows, reached through WSL; OC_DB_DIR overrides it, which
-# is what any other machine will need.
-DEFAULT_DB_DIR = os.environ.get(
-    "OC_DB_DIR", "/mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros")
+
+DEFAULT_DB_DIR, DB_DIR_REPORT = paths.resolve_database_dir()
+
+if DB_DIR_REPORT["chosen"] is None:
+    # stderr, not an exception. The server still starts, list_databases
+    # still answers (with nothing), and the message says what to do --
+    # which is more useful than a stack trace at import time to someone
+    # who has just cloned this.
+    sys.stderr.write(paths.missing_database_message(DB_DIR_REPORT))
 
 # One atmosphere, from settings/input.toml [accept.defaults].
 # It was declared there and hardcoded here at the same time; the file
@@ -134,7 +141,15 @@ def calculate_equilibrium(
     """
     db_path = database if os.path.isabs(database) else os.path.join(DEFAULT_DB_DIR, database)
     if not os.path.isfile(db_path):
-        raise EquilibriumError(f"Database not found: {db_path}")
+        # Naming the directory and how it was chosen, because the same
+        # message on a fresh machine used to mean "your file is missing"
+        # when it meant "this install has no database directory at all".
+        nasil = DB_DIR_REPORT.get("chosen_source")
+        raise EquilibriumError(
+            "Database not found: %s (database directory: %s)"
+            % (db_path,
+               ("%s, from %s" % (DEFAULT_DB_DIR, nasil)) if nasil
+               else "none found -- set OC_DB_DIR"))
 
     composition = {el.upper(): amt for el, amt in elements_composition.items()}
 

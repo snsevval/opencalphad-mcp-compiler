@@ -20,9 +20,9 @@ import time
 import urllib.error
 import urllib.request
 
-ENV_PATH = "/root/projects/oc-mcp/.env"
+ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 BASE_URL = "https://integrate.api.nvidia.com/v1"
-LOG_PATH = "/root/projects/oc-mcp/capacity_probe.log"
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "capacity_probe.log")
 
 # OpenClaw'in surdugu model + Katman B'nin kullandigi iki model.
 MODELS = [

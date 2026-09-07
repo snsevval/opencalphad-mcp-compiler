@@ -11,7 +11,7 @@ import json
 import os
 import sys
 
-ROOT = "/root/projects/oc-mcp"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 sys.path.insert(0, os.path.join(ROOT, "benchmark"))
 import referans as R                                      # noqa: E402
 

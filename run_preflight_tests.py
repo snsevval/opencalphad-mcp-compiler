@@ -5,10 +5,11 @@ calismadan once deterministik kod olarak kosuyor. Dolayisiyla NVIDIA
 kapasitesinden bagimsiz olarak calistirilabilirler.
 """
 import json
+import os
 import sys
 import time
 
-sys.path.insert(0, "/root/projects/oc-mcp")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from verification import executor
 
 CASES = [
@@ -130,7 +131,8 @@ def main():
     gecen = sum(1 for s in sonuclar if s["gecti"])
     print(f"\nSONUC: {gecen}/{len(sonuclar)} PREFLIGHT'ta yakalandi", flush=True)
 
-    with open("/root/projects/oc-mcp/preflight_test_sonuc.json", "w") as fh:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "preflight_test_sonuc.json"), "w") as fh:
         json.dump(sonuclar, fh, indent=2, ensure_ascii=False)
 
 

@@ -54,7 +54,9 @@ import time
 
 import native_fallback
 
-OC_BUILD_DIR = os.environ.get("OC_BUILD_DIR", "/root/projects/opencalphad")
+import paths
+
+OC_BUILD_DIR = paths.build_dir()
 # Now sharing native_fallback.OC_BINARY (prefers the bundled 6.058 Windows
 # binary when present): its STEP line-tracer is far more capable than our
 # own 6.120 build's -- it finds the true invariant node and adaptively

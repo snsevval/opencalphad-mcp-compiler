@@ -8,7 +8,7 @@ import json
 import os
 from collections import defaultdict
 
-HERE = "/root/projects/oc-mcp"
+HERE = os.path.dirname(os.path.abspath(__file__))
 IN_JSON = os.path.join(HERE, "ablation_results.json")
 OUT_CSV = os.path.join(HERE, "results.csv")
 

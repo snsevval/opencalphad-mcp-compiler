@@ -5,9 +5,10 @@ okunamayan karar donduren, ikinci cagrida (skip_models ile) kullanilabilir
 karar donduren bir sahte kullanilir. Test edilen sey ag degil, server.py'nin
 karar mantigi.
 """
+import os
 import sys
 
-sys.path.insert(0, "/root/projects/oc-mcp")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import server  # noqa: E402
 import semantic_check  # noqa: E402
 

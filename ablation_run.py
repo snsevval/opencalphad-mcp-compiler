@@ -16,9 +16,14 @@ import subprocess
 import sys
 import time
 
-HERE = "/root/projects/oc-mcp"
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import paths  # noqa: E402
 WORKER = os.path.join(HERE, "ablation_worker.py")
-PY = "/root/projects/ocvenv/bin/python"
+# Kosan yorumlayici. Ayrisik bir surum secmek istenirse OC_PYTHON,
+# yoksa bu scripti calistiran yorumlayicinin kendisi -- ki dogru
+# olan da odur: ablation ayni ortamda kosmali.
+PY = os.environ.get("OC_PYTHON", sys.executable)
 OUT_JSON = os.path.join(HERE, "ablation_results.json")
 
 # Gecersiz olmasi BEKLENEN istekler (PREFLIGHT yakalamali).
@@ -103,10 +108,14 @@ CASES = [
 ]
 
 ENV = dict(os.environ)
-ENV["OC_BUILD_DIR"] = "/root/projects/opencalphad"
-ENV["LD_LIBRARY_PATH"] = "/root/projects/opencalphad/.libs"
-ENV["LD_PRELOAD"] = ("/root/projects/opencalphad/.libs/libOC.so.0:"
-                     "/root/projects/opencalphad/.libs/libOPENCALPHAD.so.0")
+# run_server.sh ile ayni ortam, ayni kaynaktan: paths.build_dir().
+# Uc satir daha once motorun yerini kendi basina yaziyordu ve o yol tek
+# bir makinede vardi.
+_BUILD = paths.build_dir()
+ENV["OC_BUILD_DIR"] = _BUILD
+ENV["LD_LIBRARY_PATH"] = os.path.join(_BUILD, ".libs")
+ENV["LD_PRELOAD"] = (os.path.join(_BUILD, ".libs", "libOC.so.0") + ":"
+                     + os.path.join(_BUILD, ".libs", "libOPENCALPHAD.so.0"))
 
 # Katman B'nin NVIDIA anahtarina ihtiyaci var. run_server.sh bunu .env'den
 # yukluyor; bu kosucu sunucu uzerinden gitmedigi icin ayni isi burada yapmak

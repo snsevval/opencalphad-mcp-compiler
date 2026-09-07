@@ -1,8 +1,9 @@
 """Ablation isci surecinin duzeltilmis halini tek vakada dogrular."""
 import json
+import os
 import sys
 
-sys.path.insert(0, "/root/projects/oc-mcp")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ablation_run as ar  # noqa: E402
 
 case3 = next(c for c in ar.CASES if c["no"] == 3)

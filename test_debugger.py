@@ -5,9 +5,10 @@ Sinifllandirma birimi gercek gozlenmis basarisizlik sekilleriyle sinaniyor
 protokolu uzerinden.
 """
 import json
+import os
 import sys
 
-sys.path.insert(0, "/root/projects/oc-mcp")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import failure_classify as fc  # noqa: E402
 
 VAKALAR = [

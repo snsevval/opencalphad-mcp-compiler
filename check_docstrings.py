@@ -1,7 +1,8 @@
 """Docstring degisikliginin uc araca da temiz uygulandigini dogrular."""
+import os
 import sys
 
-sys.path.insert(0, "/root/projects/oc-mcp")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import server  # noqa: E402
 
 ESKI_IZLER = ("Suggesting a corrected request", "report the rejection")

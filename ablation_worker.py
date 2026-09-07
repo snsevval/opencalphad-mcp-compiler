@@ -20,8 +20,7 @@ import os
 import sys
 import time
 
-sys.path.insert(0, "/root/projects/oc-mcp")
-
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 MOD_SIRASI = ["bare", "preflight", "cascade", "layera", "full"]
 
 

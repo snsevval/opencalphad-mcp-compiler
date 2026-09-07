@@ -10,7 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 async def main():
     params = StdioServerParameters(
-        command="/root/projects/oc-mcp/run_server.sh",
+        command=os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_server.sh"),
         args=[],
     )
     async with stdio_client(params) as (read, write):

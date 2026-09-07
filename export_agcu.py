@@ -9,16 +9,18 @@ import csv
 import os
 import sys
 
-sys.path.insert(0, "/root/projects/oc-mcp")
-
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import native_step
 
-DB = "/mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros/agcu.TDB"
+import oc_service  # noqa: E402
+DB = os.path.join(oc_service.DEFAULT_DB_DIR, "agcu.TDB")
 COMP = {"AG": 0.6, "CU": 0.4}
 T_MIN, T_MAX, N_POINTS = 800.0, 1400.0, 15
 PRESSURE = 100000.0
 
-OUT_DIR = "/mnt/c/Users/sevval/Desktop"
+# Ciktinin yeri de makineye ozguydu. Varsayilan artik calisilan
+# klasor; OUT_DIR ile degistirilebilir.
+OUT_DIR = os.environ.get("OUT_DIR", os.getcwd())
 CSV_PATH = os.path.join(OUT_DIR, "agcu_combined.csv")
 PNG_PATH = os.path.join(OUT_DIR, "agcu_gnuplot.png")
 

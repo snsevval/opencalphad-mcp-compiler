@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 
-ENV_PATH = "/root/projects/oc-mcp/.env"
+ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 BASE_URL = "https://integrate.api.nvidia.com/v1"
 MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 

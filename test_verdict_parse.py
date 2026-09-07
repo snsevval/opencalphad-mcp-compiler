@@ -4,9 +4,10 @@ Canli vakadan: deepseek "SONUC: BASARISIZ" ile acti, gerekcesini yazdi,
 "basarili kabul edilmelidir" ile kapatti. Eski ayristirici ILK isareti
 aldigi icin dogru bir hesabi hatali isaretledi.
 """
+import os
 import sys
 
-sys.path.insert(0, "/root/projects/oc-mcp")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import semantic_check as sc  # noqa: E402
 
 CANLI_VAKA = (

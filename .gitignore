@@ -15,3 +15,10 @@ logs/
 # Referans olcumunun ham yuku: 668 KB, her kosumda yeniden uretiliyor.
 # Tablonun kendisi (benchmark/REFERANS_tablo.txt) kayitta; ham yuk degil.
 referans_olcum*.json
+
+# Birakma yeri: klasor ve talimati kayitta, dosyalar degil.
+# TDB'ler ya OpenCalphad ile geliyor ya kendi lisansini tasiyor;
+# tek tek bakilmamis dosyalari bu depodan dagitmak, kontrol
+# edilmemis kosullari uslenmek olurdu.
+databases/*.TDB
+databases/*.tdb

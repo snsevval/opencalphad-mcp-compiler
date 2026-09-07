@@ -81,10 +81,58 @@ is answerable by a different tool says which one.
 
 ## Running
 
-Set `OC_BUILD_DIR` to the OpenCalphad build directory, then run
-`run_server.sh`, which sets the required `LD_LIBRARY_PATH`/`LD_PRELOAD`
-and starts the MCP server over stdio. Point an MCP-compatible client
+Run `run_server.sh`. It sets the `LD_LIBRARY_PATH`/`LD_PRELOAD` the OCASI
+bindings need before the process starts, loads `.env` if present, and
+starts the MCP server over stdio. Point an MCP-compatible client
 (OpenClaw, or any stdio MCP client) at this script.
+
+Nothing has to be configured for a layout where the OpenCalphad build sits
+beside this checkout and the databases are where the installer put them.
+Both are searched, in a stated order, and either can be overridden.
+
+### Where the engine is found
+
+1. `OC_BUILD_DIR`, if set
+2. `../opencalphad` next to this checkout
+3. `./opencalphad` inside it
+4. `~/opencalphad`
+
+The first directory containing a `.libs/` is used. If none is found the
+script says so on stderr before failing, rather than leaving an import
+error to explain it.
+
+### Where the databases are found
+
+TDB files are not shipped with this repository. The directory holding them
+is resolved once at startup:
+
+1. `OC_DB_DIR`, if set -- this wins outright, and if it holds no `.TDB`
+   files that is reported rather than quietly worked around; answering
+   from a directory the caller did not choose would be worse than failing
+2. `databases/` inside this checkout
+3. `$OC_BUILD_DIR/macros`, where OpenCalphad keeps its example databases
+4. `~/OpenCalphad/OC6/macros`
+5. `/mnt/c/Users/*/Documents/OpenCalphad/OC6/macros`, where the Windows
+   installer puts them, reached through WSL
+
+A candidate has to *contain* a database, not merely exist: an empty
+directory that happens to be present would otherwise shadow a full one
+further down, and the failure would look like a missing file rather than a
+wrong directory. If nothing is found the server still starts and says on
+stderr every place it looked, so the fix is `OC_DB_DIR=...` or dropping
+the files into `databases/`.
+
+### Environment
+
+| Variable | Meaning |
+|---|---|
+| `OC_BUILD_DIR` | OpenCalphad build directory (contains `.libs/`) |
+| `OC_DB_DIR` | Directory holding the `.TDB` files |
+| `OC_PYTHON` | Interpreter to run the server with |
+| `OC_SEMANTIC_CHECK` | `0` disables VERIFY B (the outside reviewer) |
+| `OC_INTERACTIVE_WINDOW` | `0` suppresses interactive gnuplot windows |
+| `OC_CALL_LOG` | Path for the request/response log |
+| `NVIDIA_API_KEY` | VERIFY B credential; read from `.env` if present |
 
 ## Files
 

@@ -90,9 +90,13 @@ if len(sayac) > 40:
 beklenen = {y for y in sayac if y.endswith(".checked <sonradan eklendi>")}
 digerleri = set(sayac) - beklenen
 print()
-if digerleri:
+if not sayac:
+    # Hic fark yokken "butun farklar sunda" demek, olmayan bir seyi
+    # aciklamak olur -- ve bu satir bir kez oyle yazildi.
+    print("Fark yok: iki kayit alan alan ayni.")
+elif digerleri:
     print("BEKLENMEYEN %d yol:" % len(digerleri))
     for y in sorted(digerleri)[:20]:
         print("   %-58s ornek: %s" % (y, ornek[y][0]))
 else:
-    print("Butun farklar tek bir alandan: verification.checked eklendi.")
+    print("Butun farklar tek bir alandan: %s" % sorted(beklenen)[0])

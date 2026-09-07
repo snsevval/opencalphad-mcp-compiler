@@ -2,12 +2,13 @@
 # Bir modelin gercekten cevap verip vermedigini olcer.
 # Bu projeden bagimsiz: yalnizca NVIDIA'ya duz bir HTTP istegi atar.
 #
-#   wsl -e bash /root/projects/oc-mcp/model_test.sh
+#   wsl -e bash ./model_test.sh
 #
 # Bir model adi verilirse yalnizca onu dener.
 
 set -a
-. /root/projects/oc-mcp/.env 2>/dev/null
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$HERE/.env" 2>/dev/null
 set +a
 
 if [ -z "$NVIDIA_API_KEY" ]; then

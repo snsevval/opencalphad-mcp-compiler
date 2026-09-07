@@ -19,13 +19,16 @@ import subprocess
 import sys
 import tempfile
 
-sys.path.insert(0, "/root/projects/oc-mcp")
-sys.path.insert(0, "/root/projects/oc-mcp/verification")
-
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "verification"))
 import native_step
 import validator
 
-DB = "/mnt/c/Users/sevval/Documents/OpenCalphad/OC6/macros/agcu.TDB"
+# Klasor oc_service tarafindan aranarak bulunuyor; burada tekrar
+# yazmak, ayni yolun ikinci bir kopyasini eskimeye birakmak olurdu.
+import oc_service  # noqa: E402
+DB = os.path.join(oc_service.DEFAULT_DB_DIR, "agcu.TDB")
 COMP = {"AG": 0.6, "CU": 0.4}
 T_MIN, T_MAX, N_POINTS, PRESSURE = 800.0, 1400.0, 15, 100000.0
 
