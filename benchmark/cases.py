@@ -1743,19 +1743,27 @@ G_CELIK_DISI = [
         "id": "G3_cho_gaz",
         "zorluk": "orta",
         "olcum": "GAZ FAZI -- hic denenmedi, ve BIR KUSUR BULDU.\n\n"
-                 "Motor hesabi yapiyor (GAS = 1.0, G = -136100 J) ama "
-                 "ayristirici gaz fazinin bilesimini yanlis okuyor: element "
-                 "kesirleri yerine MOLEKUL TURLERINI dolduruyor --\n"
-                 "  H2 0.4339, C1O1 0.3223, C1O2 0.1211, H2O1 0.1138, "
-                 "C1H4 0.0088 ...\n"
-                 "ve baslik metninden bir kalinti yakaliyor: 'ARE': 73.0.\n\n"
-                 "Element kutle dengesi bu yuzden asla kapanamaz (C icin "
-                 "2.5e-30 dondu, 0.2 beklenirken). Kati ve sivi fazlarda "
-                 "bilesenler zaten element oldugu icin kusur bugune kadar "
-                 "gorunmemisti; gaz fazinda bilesenler molekul.\n\n"
-                 "Vaka bilerek acik birakildi: bu bir gerileme degil, "
-                 "belgelenmis bir sinir. Duzeltilirse bayrak kalkar ve vaka "
-                 "normal olcutlerine doner.",
+                 "Motor dogru sayiyi bastan beri basiyordu:\n"
+                 "  GAS ... X:  H 5.00000E-01  O 3.00000E-01  C 2.00000E-01\n"
+                 "  Constitution: There are    73 constituents:\n"
+                 "   H2 4.33875E-01  C1O1 3.22321E-01  ...\n"
+                 "Ayristirici faz satirindan sonraki her satiri bilesim "
+                 "sayiyor ve Constitution blogunda durmuyordu. Uc sonucu "
+                 "vardi: 73 molekul turu element kesirlerinin yanina "
+                 "yaziliyordu, 'There are' ifadesinden ARE=73.0 kaliyordu, "
+                 "ve en zararlisi -- sabit listesindeki ATOMIK turler "
+                 "element adlariyla cakisiyordu. Gazdaki atomik C 2.53E-30, "
+                 "ve X: satirindaki element C=0.20000'in UZERINE yaziyordu. "
+                 "Kutle dengesinin C icin 2.5e-30 dondurmesi buydu.\n\n"
+                 "Kapsam olculdu: Constitution blogu dort sistemde denendi "
+                 "ve yalnizca gazda basiliyor (CHO-gas 1 kez; steel1, "
+                 "steel7, agcu sifir). Kati cozeltilerde mol kesirlerinin "
+                 "yerine orgu kesirlerinin yazilmasi diye bir durum yok.\n\n"
+                 "Blok atilmadi, ayri bir alana alindi: gazin tur dagilimi "
+                 "(CO/CO2 orani) gercek bir bilgi, yanlis olan onu element "
+                 "bilesimi diye sunmakti. Motorun bildirdigi tur sayisi da "
+                 "okunuyor ve toplananla karsilastiriliyor -- 73 bildirildi, "
+                 "73 toplandi.",
         "soru": "CHO-gas.TDB'de C=0.2 H=0.5 O=0.3 icin 1000 K'de denge "
                 "hesapla",
         "tool": "calculate_equilibrium",
@@ -1766,8 +1774,10 @@ G_CELIK_DISI = [
             "temperature_K": 1000,
         },
         "expected": {
-            "known_defect": "gaz fazi bilesimi element yerine molekul turu "
-                            "olarak ayristiriliyor; kutle dengesi kapanamaz",
+            "phases": ["GAS"],
+            "phase_count": 1,
+            "mass_balance": True,
+            "elements_present": True,
         },
     },
     {

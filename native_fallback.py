@@ -367,6 +367,12 @@ def parse_native_output(raw_text):
     # phase by definition, and the only way to answer "would this phase form
     # if it could?" for one that is not.
     phase_status = {}
+    # Gaz fazinin tur dagilimi: element bilesimi DEGIL, ayri bir sey.
+    # Ikisini ayni sozlukte tutmak, ayristiricinin bugune kadarki
+    # kusuruydu -- atomik turler element adlariyla cakisip uzerlerine
+    # yaziyordu.
+    phase_constituents = {}
+    phase_constituent_count = {}
     phase_volume_m3 = {}
     phase_formula_units = {}
     phase_driving_force_RT = {}
@@ -377,12 +383,26 @@ def parse_native_output(raw_text):
     )
     if phases_section:
         current_phase = None
+        # Constitution blogu basladiktan sonra gelen satirlar TUR
+        # dagilimi. Bayrak yeni bir faz satirinda ve bos satirda
+        # dusuyor; bloklarin arasi zaten bos satirla ayriliyor.
+        in_constitution = False
         phase_line_re = re.compile(
             rf"\s*([A-Za-z0-9_#]+)\.*\s+(\S+)\s+({_FLOAT})\s+({_FLOAT})\s+"
             rf"({_FLOAT})\s+({_FLOAT})\s+({_FLOAT})\s+X:\s*(.*)$"
         )
         for line in phases_section.group(1).splitlines():
             if not line.strip():
+                in_constitution = False
+                continue
+            if "Constitution:" in line:
+                in_constitution = True
+                # "There are    73 constituents". Motor kac tane oldugunu
+                # soyluyorsa toplananla karsilastirilabilir, ve bedava bir
+                # kontrol atlanmaz.
+                sayi = re.search(r"(\d+)\s+constituents", line)
+                if current_phase is not None and sayi:
+                    phase_constituent_count[current_phase] = int(sayi.group(1))
                 continue
             m = phase_line_re.match(line)
             if m:
@@ -395,7 +415,11 @@ def parse_native_output(raw_text):
                 phase_driving_force_RT[name] = float(m.group(7))
                 phase_element_composition[name] = {}
                 current_phase = name
+                in_constitution = False
                 _consume_constituents(m.group(8), phase_element_composition[name])
+            elif in_constitution and current_phase is not None:
+                _consume_constituents(
+                    line, phase_constituents.setdefault(current_phase, {}))
             elif current_phase is not None:
                 _consume_constituents(line, phase_element_composition[current_phase])
 
@@ -476,6 +500,10 @@ def parse_native_output(raw_text):
         ("activities", activities or None),
         ("component_mole_fractions", component_mole_fractions or None),
         ("phase_status", phase_status or None),
+        # Yalnizca gaz fazinda dolu olur; kati cozeltilerde motor boyle
+        # bir blok basmiyor (dort sistemde olculdu).
+        ("phase_constituents", phase_constituents or None),
+        ("phase_constituent_count", phase_constituent_count or None),
         ("phase_volume_m3", phase_volume_m3 or None),
         ("phase_formula_units", phase_formula_units or None),
         ("phase_driving_force_RT", phase_driving_force_RT or None),
