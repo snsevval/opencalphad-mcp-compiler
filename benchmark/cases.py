@@ -1559,13 +1559,25 @@ E_YARI_KARARLI = [
         "olcum": "Alti elementli sistemde AYNI ANDA IKI karbur kapatiliyor. "
                  "B10'da dort faz cikiyordu; ikisi engellenince kalan "
                  "elementlerin baska bir denge bulmasi gerekiyor.\n\n"
-                 "SONUC: hesaplanamiyor, ve bu bir MIMARI SINIRI ortaya "
-                 "cikardi. Faz kapatma yalnizca OCASI'de destekleniyor; "
-                 "native motor kademesi suspended_phases verilen istekler "
-                 "icin hic devreye girmiyor. Yani yari kararli hesaplarda "
-                 "kademeli motorun guvenlik agi YOK -- OCASI yakinsamazsa "
-                 "baska deneyecek bir sey kalmiyor. B12'de iki kademe de "
-                 "denenmisti; burada tek kademe var.",
+                 "Bu vaka bir sure 'hesaplanamiyor' diye kayitliydi ve "
+                 "teshisi yanlisti: 'faz kapatma yalnizca OCASI'de "
+                 "destekleniyor' deniyordu. Native makro yazici status "
+                 "blogunu bastan beri yaziyordu; eksik olan tek sey "
+                 "argumanin cagrida gecirilmesiydi. Gecirilmedigi icin "
+                 "kademe bu istekleri hic gormuyordu, ve gormedigi icin "
+                 "ayar dosyasina 'bunlara bakamaz' diye yazilmisti -- "
+                 "eksikligi tarif eden kural eksikligi kalici yapmisti.\n\n"
+                 "Simdi OCASI yakinsamiyor (4204) ve native devraliyor. "
+                 "Askiya almanin uygulandigi iki bagimsiz yoldan gorunuyor: "
+                 "iki karbur de sonucta yok, ve Gibbs enerjisi askisiz "
+                 "hesabin -57674 J'undan -57618 J'a YUKSELIYOR. Bir fazi "
+                 "minimizasyondan cikarmak minimumu ancak yukseltebilir, "
+                 "yani istek uygulanmis; etiket degistirilmemis.\n\n"
+                 "Yan kazanc: native yol kosullarini yazdirdigi icin "
+                 "correspondence'in iki kontrolu daha (conditions, "
+                 "degrees_of_freedom) OCASI'de 'ulasilamaz' iken burada "
+                 "kosabiliyor. Yedek kademe daha az degil, daha cok "
+                 "denetim veriyor.",
         "soru": "steel7.TDB'de C=0.04 Cr=0.06 Mo=0.05 Si=0.003 V=0.01 "
                 "Fe=0.837 icin 1173 K'de M23C6 ve M6C fazlarini kapatarak "
                 "hesapla",
@@ -1579,9 +1591,11 @@ E_YARI_KARARLI = [
             "suspended_phases": ["M23C6", "M6C"],
         },
         "expected": {
-            "known_defect": "yari kararli hesapta kademeli motorun yedegi "
-                            "yok: suspended_phases yalnizca OCASI'de "
-                            "destekleniyor, o yakinsamazsa alternatif kalmiyor",
+            "phases": ["FCC_A1", "HCP_A3"],
+            "phases_absent": ["M23C6", "M6C"],
+            "phase_count": 2,
+            "mass_balance": True,
+            "elements_present": True,
         },
     },
 ]

@@ -206,8 +206,17 @@ def calculate_equilibrium(
         return result
 
     def _native_single():
+        # suspended_phases travels with the request. It did not, once, and
+        # the omission was invisible from here: this tier simply never saw
+        # a suspension, so execution.toml recorded that it could not serve
+        # one, and the recorded limitation kept it from ever being handed
+        # one again. Measured on steel7 with M23C6 and M6C suspended --
+        # both carbides leave the result and the Gibbs energy rises from
+        # -57674 to -57618 J, which is the only direction removing a phase
+        # from the minimisation can move it.
         native_result = native_fallback.run_and_parse(
-            db_path, composition, temperature_K, pressure_Pa
+            db_path, composition, temperature_K, pressure_Pa,
+            suspended_phases=suspended_phases,
         )
         native_result.update(
             {
@@ -215,7 +224,12 @@ def calculate_equilibrium(
                 "temperature_K": temperature_K,
                 "pressure_Pa": pressure_Pa,
                 "composition": composition,
-                "suspended_phases": [],
+                # What was actually suspended, not an empty list. The empty
+                # one was written when this tier could not suspend anything;
+                # left in place it would now claim a request was ignored
+                # that was honoured, and the correspondence check that reads
+                # this field would have nothing to check against.
+                "suspended_phases": list(suspended_phases or []),
                 "backend_used": "native_oc",
                 "fallback_reason": str(hatalar.get("ocasi", "")),
             }

@@ -121,14 +121,26 @@ still returns a result. If it is not a named signal, show it."""
 operation = "equilibrium"
 tiers = [
   { handler = "ocasi",         start = true },
-  { handler = "native_single", on = ["did_not_converge", "engine_crashed", "no_stable_phases"], cannot_serve = ["phase_status"] },
+  { handler = "native_single", on = ["did_not_converge", "engine_crashed", "no_stable_phases"] },
 ]
 exhausted = "fail"
 because = """
 OCASI is faster and hands back structured values directly, with no text to
 parse. It also fails to converge from a cold start on cases the native
 binary solves easily -- steel1 Fe-C at 1200 K is the one this was built
-for, and the reason the second tier exists at all."""
+for, and the reason the second tier exists at all.
+
+This tier carried `cannot_serve = ["phase_status"]` until it was measured.
+The restriction was true when written and false by the time it was read:
+the native macro writer emits the status block, the entry point takes the
+argument, and only the call in between omitted it. So a request with a
+suspended phase reached one tier and stopped there -- and a metastable
+calculation, which is exactly the kind a caller cannot check by eye, was
+the one case with no engine behind it. Measured on steel7 at 1173 K with
+M23C6 and M6C suspended: both carbides leave the result and the Gibbs
+energy rises from -57674 to -57618 J. Removing a phase from a minimisation
+can only raise the minimum, so the suspension was applied rather than
+relabelled."""
 
 [[cascade]]
 operation = "compare"
