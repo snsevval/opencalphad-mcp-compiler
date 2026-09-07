@@ -130,7 +130,7 @@ the files into `databases/`.
 | `OC_DB_DIR` | Directory holding the `.TDB` files |
 | `OC_PYTHON` | Interpreter to run the server with |
 | `OC_SEMANTIC_CHECK` | `0` disables VERIFY B (the outside reviewer) |
-| `OC_INTERACTIVE_WINDOW` | `0` suppresses interactive gnuplot windows |
+| `OC_INTERACTIVE_WINDOW` | `1` opens a gnuplot window per diagram; off by default because these use `gnuplot -persist` and never close on their own |
 | `OC_CALL_LOG` | Path for the request/response log |
 | `NVIDIA_API_KEY` | VERIFY B credential; read from `.env` if present |
 

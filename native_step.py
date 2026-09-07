@@ -1258,9 +1258,13 @@ def open_interactive_window(combined_points, title, x_label="Temperature (K)"):
     the user to close the window; never raises (best-effort only, a failed
     window must not break the main tool call).
 
-    Set OC_INTERACTIVE_WINDOW=0 to skip it. Automated callers should:
-    nobody watches a benchmark run, and the windows are what make one
-    unwatchable.
+    OFF unless OC_INTERACTIVE_WINDOW=1 is set. It used to be the other way
+    round -- on unless switched off -- and that put the cost of forgetting
+    on the wrong side. A caller that forgets to ask for a window loses
+    nothing; a caller that forgets to switch one off leaves it on the
+    desktop, and these are opened with `gnuplot -persist`, which means
+    they never close on their own. Two harnesses in this repository did
+    forget: ablation_run.py and test_client.py.
 
     Measured, after four benchmark runs had left eighteen of these open:
     the same scan that took 1.1 s on a clean machine took 156 s, and a
@@ -1271,7 +1275,7 @@ def open_interactive_window(combined_points, title, x_label="Temperature (K)"):
     convergence trouble then fails outright. Three benchmark cases were
     failing this way and the cause had been written off as machine load.
     """
-    if os.environ.get("OC_INTERACTIVE_WINDOW", "1") == "0":
+    if os.environ.get("OC_INTERACTIVE_WINDOW", "0") != "1":
         return False
     try:
         phase_names = []
