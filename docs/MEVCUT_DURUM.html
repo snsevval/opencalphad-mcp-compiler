@@ -215,19 +215,19 @@ footer{
 <div class="page">
 
 <header>
-  <p class="eyebrow">Mevcut Durum · 2 Eylül 2026 · main @ 47aa32e</p>
+  <p class="eyebrow">Mevcut Durum · 7 Eylül 2026 · main @ 6bb9fcd</p>
   <h1>opencalphad-mcp-compiler</h1>
   <p class="standfirst">Kurallar nerede yaşıyor, derleyici onları nasıl bağlıyor, bir istek hangi aşamalardan geçiyor, motor hangi sırayla deniyor.</p>
 
   <div class="meta">
     <div><span class="k">Araç</span><span class="v">8 <span style="color:var(--faint)">(2 keşif · 6 hesap)</span></span></div>
-    <div><span class="k">Python</span><span class="v">8.158 satır · 14 modül</span></div>
-    <div><span class="k">Ayar</span><span class="v">1.637 satır · 3 dosya</span></div>
+    <div><span class="k">Python</span><span class="v">8.803 satır · 15 modül</span></div>
+    <div><span class="k">Ayar</span><span class="v">1.742 satır · 3 dosya</span></div>
     <div><span class="k">Motor zinciri</span><span class="v">6 cascade</span></div>
-    <div><span class="k">Doğrulama</span><span class="v">8 verify · 7 beyan</span></div>
+    <div><span class="k">Doğrulama</span><span class="v">9 verify · 7 beyan</span></div>
     <div><span class="k">Derleme</span><span class="v">11 durdurur · 3 uyarır</span></div>
     <div><span class="k">Derlenmiş politika</span><span class="v">30 alan · 3 nesne</span></div>
-    <div><span class="k">Son commit</span><span class="v">2 Eyl akşam</span></div>
+    <div><span class="k">Kıyaslama</span><span class="v">88/88 · 117,4 s</span></div>
   </div>
 </header>
 
@@ -277,7 +277,7 @@ footer{
       <text class="t-s" x="16" y="212">yapısal denetim</text>
       <rect class="n-toml" x="176" y="172" width="256" height="72" rx="3"/>
       <text class="t-m" x="192" y="198">settings/output.toml</text>
-      <text class="t-s" x="192" y="216">8 × [[verify]] + eşikler</text>
+      <text class="t-s" x="192" y="216">9 × [[verify]] + eşikler</text>
       <text class="t-s" x="192" y="232">tolerance, minimum_covered…</text>
       <rect class="n-box" x="452" y="172" width="256" height="72" rx="3"/>
       <text class="t-m" x="468" y="198">result_check.py</text>
@@ -490,7 +490,7 @@ footer{
       <tbody>
         <tr><td><code>input.toml</code></td><td class="r">555</td><td>24 × <code>[[reject]]</code>, <code>[[route]]</code>, <code>[accept]</code>, <code>[accept.composition.basis]</code></td><td>Fiziği <b>değiştirebilir</b> — hangi isteğin motora gideceğine karar veriyor</td></tr>
         <tr><td><code>execution.toml</code></td><td class="r">459</td><td>6 × <code>[[cascade]]</code>, <code>[signals]</code>, <code>[binary]</code>, <code>[[reviewer]]</code>, <code>[timeouts]</code>, <code>[tolerances]</code></td><td>Hangi işleyici, hangi sırayla, hangi bütçeyle</td></tr>
-        <tr><td><code>output.toml</code></td><td class="r">623</td><td>8 × <code>[[verify]]</code>, <code>[honesty]</code> (7), 7 × <code>[[note]]</code>, <code>[conversion]</code>, <code>[floor]</code>, <code>[derive]</code></td><td>Fiziği <b>değiştiremez</b> — birim ve sunum. Her ayarı permüte et, fizik bayt bayt aynı gelmeli</td></tr>
+        <tr><td><code>output.toml</code></td><td class="r">656</td><td>9 × <code>[[verify]]</code>, <code>[honesty]</code> (7), 7 × <code>[[note]]</code>, <code>[conversion]</code>, <code>[floor]</code>, <code>[derive]</code></td><td>Fiziği <b>değiştiremez</b> — birim ve sunum. Her ayarı permüte et, fizik bayt bayt aynı gelmeli</td></tr>
       </tbody>
     </table>
   </div>
@@ -500,7 +500,7 @@ footer{
     <p>Bir bölümün okunmuyor olması, unutulduğu mu kasıtlı mı olduğunu söylemiyordu. Dört değer bunu çözüyor: <b>yok</b> = kod okuyor, çalışıyor · <b>"code"</b> = asla taşınmayacak, burada belge · <b>"todo"</b> = taşınabilir, yapılmadı · <b>"planned"</b> = taşıma değil, yeni iş. <code>settings_audit.py</code> bu alandan okuyor — elle tutulan "bunlar sessiz olmalı" listesi yok.</p>
   </div>
 
-  <p><code>settings_audit.py</code> (227 satır) <b>dört ayrı soru</b> soruyor. Dördü de aynı arıza sınıfına bakıyor: <i>kod çalışıyor, test geçiyor, ama bir şey bağlı değil.</i></p>
+  <p><code>settings_audit.py</code> (365 satır) <b>beş ayrı soru</b> soruyor. Beşi de aynı arıza sınıfına bakıyor: <i>kod çalışıyor, test geçiyor, ama bir şey bağlı değil.</i></p>
 
   <div class="scroll">
     <table>
@@ -510,6 +510,7 @@ footer{
         <tr><td><code>yon_iki</code></td><td>Kodda, dosyaya taşınmış olması gereken kural kalmış mı?</td><td>Taşımanın geride bıraktığı kopya</td></tr>
         <tr><td><code>yon_uc</code></td><td>Yürütücünün dışarı açtığı her şey gerçekten çağrılıyor mu?</td><td>Çağıranı kaybolmuş fonksiyon — ve tersi</td></tr>
         <tr><td><code>yon_dort</code></td><td>Ayarı <b>okuduğunu sanan</b> ama sessizce yedeğe düşen okuyucu var mı?</td><td>1 Eylül: iki gerçek düşüş · 2 Eylül: <code>output.toml</code> ve <b>iki yanlı ölçüm</b> eklendi</td></tr>
+        <tr><td><code>yon_bes</code></td><td>Her hesap aracı ortak çerçeveden <b>ve</b> doğrulayıcıdan geçiyor mu?</td><td>Söz dizimi ağacı üzerinden, metin araması değil. Hangi araçların hesap aracı olduğu <code>execution.toml</code>'un kademe listesinden okunuyor — elle tutulan bir liste burada da eskiyebilirdi</td></tr>
       </tbody>
     </table>
   </div>
@@ -630,7 +631,7 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
       <text class="t-s" x="112" y="150" text-anchor="middle">6 cascade · signals · binary</text>
       <rect class="n-toml" x="24" y="176" width="176" height="52" rx="3"/>
       <text class="t-m" x="112" y="200" text-anchor="middle">output.toml</text>
-      <text class="t-s" x="112" y="216" text-anchor="middle">8 verify · 7 honesty · 7 note</text>
+      <text class="t-s" x="112" y="216" text-anchor="middle">9 verify · 7 honesty · 7 note</text>
 
       <line class="s-line" x1="200" y1="70" x2="256" y2="110" marker-end="url(#ar6)"/>
       <line class="s-line" x1="200" y1="136" x2="256" y2="136" marker-end="url(#ar6)"/>
@@ -790,8 +791,8 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
 
   <div class="note">
     <span class="k">Katman A da artık derleme anında bağlı</span>
-    <p><code>output.toml</code> sekiz kontrolü <b>beyan ediyor</b>, <code>result_check.py</code> aritmetiğini <b>tutuyor</b>. İkisini birleştiren adım <b>her sonuçta</b> koşuyordu: tembel bir import, ham kuralları aşamaya göre süzme, ve kural başına bir sözlük araması. Güvensiz değildi — çözülmeyen bir ada derleme zaten izin vermiyor — ama <b>biçim yanlıştı</b>: adları çalışma anında tutup arayan bir kural motoru. Giriş kuralları derleyici geldiğinden beri bağlı geliyordu, bunlar gelmiyordu.</p>
-    <p>Artık <code>VerificationPlan</code> var: 8 kontrol, aşamaya göre anahtarlanmış (<code>result</code> 2 · <code>correspondence</code> 6), <b>beyan sırası korunmuş</b> — dosya kontrolleri koşacakları sırayla listeliyor, ve dosyayı okuyan kişi koşum sırasını okuyor olmalı.</p>
+    <p><code>output.toml</code> dokuz kontrolü <b>beyan ediyor</b>, <code>result_check.py</code> aritmetiğini <b>tutuyor</b>. İkisini birleştiren adım <b>her sonuçta</b> koşuyordu: tembel bir import, ham kuralları aşamaya göre süzme, ve kural başına bir sözlük araması. Güvensiz değildi — çözülmeyen bir ada derleme zaten izin vermiyor — ama <b>biçim yanlıştı</b>: adları çalışma anında tutup arayan bir kural motoru. Giriş kuralları derleyici geldiğinden beri bağlı geliyordu, bunlar gelmiyordu.</p>
+    <p>Artık <code>VerificationPlan</code> var: 9 kontrol, aşamaya göre anahtarlanmış (<code>result</code> 3 · <code>correspondence</code> 6), <b>beyan sırası korunmuş</b> — dosya kontrolleri koşacakları sırayla listeliyor, ve dosyayı okuyan kişi koşum sırasını okuyor olmalı.</p>
   </div>
 
   <h3>Derlenmiş politikada bir işlem</h3>
@@ -857,10 +858,10 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
       <text class="t-s" x="38" y="140">check = "mass_balance"</text>
       <rect class="n-box" x="356" y="100" width="272" height="52" rx="3"/>
       <text class="t-m" x="370" y="122">result_check.VERIFY_PREDICATES</text>
-      <text class="t-s" x="370" y="140">8 kontrol — Katman A</text>
+      <text class="t-s" x="370" y="140">9 kontrol — Katman A</text>
       <rect class="n-sunk" x="676" y="100" width="300" height="52" rx="3"/>
       <text class="t-m" x="690" y="122">OutputPlan.verify</text>
-      <text class="t-s" x="690" y="140">sırası korunmuş 8 kural</text>
+      <text class="t-s" x="690" y="140">sırası korunmuş 9 kural</text>
 
       <rect class="n-toml" x="24" y="164" width="290" height="52" rx="3"/>
       <text class="t-m" x="38" y="186">output.toml · [honesty.*]</text>
@@ -967,12 +968,14 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
   <div class="sec-head"><span class="num">06</span><h2>Sonuç nasıl doğrulanıyor</h2></div>
   <p>VERIFY A iki ayrı soru soruyor ve bunlar <code>output.toml</code>'da <code>stage</code> alanıyla ayrılmış: <b>result</b> — bu düzgün bir termodinamik sonuç mu · <b>correspondence</b> — sorulan sorunun sonucu mu.</p>
 
+  <p><b>7 Eylül'den beri <code>result</code> aşaması da hangi kuralları koştuğunu yazıyor.</b> Yazmıyordu, ve beyandan düşen bir kural koşup geçen bir kuralla aynı görünüyordu — yanındaki <code>correspondence</code> aşaması kendi <code>checked</code> listesini baştan beri yazıyor.</p>
   <div class="scroll">
     <table>
       <thead><tr><th>Kontrol</th><th>Aşama</th><th>Eşik</th><th>Ne yakalıyor</th></tr></thead>
       <tbody>
         <tr><td><code>phase-fraction-sums</code></td><td>result</td><td>1e-3</td><td>Toplamı 1 etmeyen faz kesirleri, NaN, aralık dışı</td></tr>
         <tr><td><code>failed-points</code></td><td>result</td><td>0.10</td><td>Gelen noktaların kaçı hata taşıyor</td></tr>
+        <tr><td><code>liquid-fraction-monotonic</code></td><td>result</td><td>1e-3</td><td><b>7 Eylül'de eklendi.</b> Sabit bileşimde ısıtırken sıvı oranı azalamaz. Al-Si taraması katı → %99,8 sıvı → <b>katı</b> → sıvı diyordu; faz oranları bire topluyor, her nokta üreticisini söylüyor, hiçbiri hata taşımıyordu</td></tr>
         <tr><td><code>requested-elements</code></td><td>correspondence</td><td>—</td><td>Fe-0.1Ni istendi, saf demir döndü — makro yazamadığı elementi sessizce düşürmüştü</td></tr>
         <tr><td><code>mass-balance</code></td><td>correspondence</td><td>2e-4</td><td>Koşulları yanlış sırayla yazan makro, başka bir alaşım için yakınsamış cevap üretir</td></tr>
         <tr><td><code>suspended-phases-absent</code></td><td>correspondence</td><td>—</td><td>Kapatılan faz yalnız OCASI yolunda onurlandırılıyor; alt kademede hiçbir şey kapatılmamış gibi döner</td></tr>
@@ -1024,32 +1027,33 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
   </div>
   <p>Makale (7 Ağustos) beş araç yazıyor. Scheil ve MAP orada "kapsam dışı" olarak listelenmişti; ikisi de artık var.</p>
 
-  <h3>Çalışan modüller — 14 dosya, 8.158 satır</h3>
+  <h3>Çalışan modüller — 15 dosya, 8.803 satır</h3>
   <div class="scroll">
     <table>
       <thead><tr><th>Modül</th><th class="r">Satır</th><th>Sorumluluk</th></tr></thead>
       <tbody>
-        <tr><td><code>server.py</code></td><td class="r">1935</td><td>Araç tanımları, boru hattı düzenlemesi</td></tr>
-        <tr><td><code>settings_engine.py</code></td><td class="r">1162</td><td>Derleyici: <code>compile_settings</code>, <code>check</code>, <code>route_for</code>, <code>run_cascade</code>, <code>note</code>, <code>resolve_composition</code></td></tr>
-        <tr><td><code>native_step.py</code></td><td class="r">1100</td><td>STEP, boşluk doldurma, normalleştirme, gnuplot</td></tr>
-        <tr><td><code>result_check.py</code></td><td class="r">684</td><td>8 VERIFY A yüklemi + 7 çıktı değişmezi — <b>hiçbir şey import etmiyor</b>, derleyici bu yüzden ona uzanabiliyor</td></tr>
-        <tr><td><code>native_fallback.py</code></td><td class="r">497</td><td>Kademe 2 — makro üretimi, sınırlı okuma, metin ayrıştırma</td></tr>
+        <tr><td><code>server.py</code></td><td class="r">1972</td><td>Araç tanımları, boru hattı düzenlemesi</td></tr>
+        <tr><td><code>settings_engine.py</code></td><td class="r">1214</td><td>Derleyici: <code>compile_settings</code>, <code>check</code>, <code>route_for</code>, <code>run_cascade</code>, <code>note</code>, <code>resolve_composition</code></td></tr>
+        <tr><td><code>native_step.py</code></td><td class="r">1258</td><td>STEP, boşluk doldurma, normalleştirme, gnuplot</td></tr>
+        <tr><td><code>result_check.py</code></td><td class="r">777</td><td>9 VERIFY A yüklemi + 7 çıktı değişmezi — <b>hiçbir şey import etmiyor</b>, derleyici bu yüzden ona uzanabiliyor</td></tr>
+        <tr><td><code>native_fallback.py</code></td><td class="r">529</td><td>Kademe 2 — makro üretimi, sınırlı okuma, metin ayrıştırma</td></tr>
         <tr><td><code>native_map.py</code></td><td class="r">495</td><td>MAP — iki boyutlu faz diyagramı</td></tr>
         <tr><td><code>native_scheil.py</code></td><td class="r">432</td><td>Scheil–Gulliver katılaşma</td></tr>
         <tr><td><code>semantic_check.py</code></td><td class="r">430</td><td>Layer B çekirdeği</td></tr>
-        <tr><td><code>oc_service.py</code></td><td class="r">413</td><td>Kademe 1 — OCASI</td></tr>
+        <tr><td><code>oc_service.py</code></td><td class="r">442</td><td>Kademe 1 — OCASI</td></tr>
         <tr><td><code>scan_summary.py</code></td><td class="r">331</td><td>Tarama özeti</td></tr>
-        <tr><td><code>settings_audit.py</code></td><td class="r">227</td><td><b>Dört yönlü</b> ayar↔kod denetimi</td></tr>
+        <tr><td><code>settings_audit.py</code></td><td class="r">365</td><td><b>Dört yönlü</b> ayar↔kod denetimi</td></tr>
         <tr><td><code>preflight.py</code></td><td class="r">155</td><td><b>Yalnız 5 giriş noktası</b> — kurallar burada değil</td></tr>
         <tr><td><code>call_log.py</code></td><td class="r">149</td><td>Çağrı kaydı</td></tr>
         <tr><td><code>failure_classify.py</code></td><td class="r">148</td><td>DEBUGGER — 8 arıza sınıfı</td></tr>
+        <tr><td><code>paths.py</code></td><td class="r">106</td><td>Motorun ve veritabanlarının nerede arandığı — <b>tek tanım</b>. 7 Eylül'de eklendi; aynı sabit üç modülde ayrı yazılıydı ve üçü de bir geliştiricinin ev dizinini gösteriyordu</td></tr>
       </tbody>
     </table>
   </div>
-  <p>Bu on dört dosya sunucunun kendisi. Depoda ayrıca <code>verification/validator.py</code>
+  <p>Bu on beş dosya sunucunun kendisi. Depoda ayrıca <code>verification/validator.py</code>
   (659 satır, kıyaslamanın Katman C'si), kıyaslama koşucusu ve prob araçları var —
-  37 dosyada toplam <b>11.213 satır</b>. Rapordaki her sayı bu ayrımı koruyor:
-  <b>8.158</b> çalışan sistem, <b>11.213</b> depo.</p>
+  39 dosyada toplam <b>15.883 satır</b>. Rapordaki her sayı bu ayrımı koruyor:
+  <b>8.803</b> çalışan sistem, <b>15.883</b> depo.</p>
 </section>
 
 
@@ -1086,7 +1090,7 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
       </tbody>
     </table>
   </div>
-  <p><code>server.py</code> toplam 1.943 satır, 26 üst düzey fonksiyon. Bu altısı dosyanın <b>%61'i</b>. Notlar, <code>stop_rule</code> ve kapsama dosyadan okunuyor; boru hattını dizen sıra kodda.</p>
+  <p><code>server.py</code> toplam 1.972 satır, 27 üst düzey fonksiyon. Bu altısı dosyanın <b>%61'i</b>. Notlar, <code>stop_rule</code> ve kapsama dosyadan okunuyor; boru hattını dizen sıra kodda.</p>
 
   <h3>Neden riskli — ve bugün kapatılan yarısı</h3>
   <p>Altı fonksiyonun her biri kendi boru hattını <b>elle diziyor</b>. Bir kontrol o diziden düşerse hiçbir şey fark etmez — bu tam olarak <code>preflight.py</code>'da yaşandı: dokuz kural aylarca çağrılmadan durdu, düzenlense hiçbir etkisi olmayacaktı.</p>
@@ -1142,7 +1146,7 @@ DERLEME: temiz -- her ad bagli, okunmayan anahtar yok</code></pre>
       <text class="t-s" x="484" y="164">ARIZA 2 · baz dönüşümü PREFLIGHT'tan ÖNCE koşuyordu —</text>
       <text class="t-s" x="484" y="178">normalize edilen bileşim, ölçek kuralına görünmeden geçti</text>
     </svg>
-    <figcaption><b>Statik denetimler ve birim testleri sistemin çalıştığını göstermiyor.</b> Kıyaslama koşumu bu turda iki kez yeniden başlatıldı; iki arıza da yalnızca uçtan uca koşumda göründü. Birincisi MCP protokolünü, ikincisi kural sırasını gerektiriyordu. Düzeltmeden sonra koşum <b>86/86</b> — ve bu rapor yazılırken tekrar ölçüldü: kolay 30/30 · orta 35/35 · zor 21/21, 163,7 saniye. Havuz 88 vaka; ikisi <b>belgelenmiş açık kusur</b> olduğu için ayrı tutuluyor (askıya alınmış fazın yedek motoru yok · gaz fazı molekül türü olarak ayrıştırılıyor). Bayrağın kendisi bir yapılacak iş kaydı.</figcaption>
+    <figcaption><b>Statik denetimler ve birim testleri sistemin çalıştığını göstermiyor.</b> Kıyaslama koşumu bu turda iki kez yeniden başlatıldı; iki arıza da yalnızca uçtan uca koşumda göründü. Birincisi MCP protokolünü, ikincisi kural sırasını gerektiriyordu. Düzeltmeden sonra koşum <b>86/86</b> idi; havuzdaki 88 vakanın ikisi <b>belgelenmiş açık kusur</b> olarak ayrı tutuluyordu. <b>7 Eylül'de ikisi de kapandı</b> ve koşum <b>88/88</b> oldu: kolay 30/30 · orta 36/36 · zor 22/22, 117,4 saniye. Bayrak bir yapılacak iş kaydıydı ve işi yapıldı; ayrıntısı 09. bölümde.</figcaption>
   </figure>
 
   <div class="note">
@@ -1197,13 +1201,13 @@ esik tahmin degil: saglikli kosumun en uzun ic sessizligi 8,0 s
       <thead><tr><th>Borç</th><th>Ölçü</th><th>Risk</th></tr></thead>
       <tbody>
         <tr><td><code>server.py</code>'ın altı fonksiyonu</td><td>1.167 satır</td><td>Boru hattı elle diziliyor. İki tarama aracında artık tek <code>_shape()</code>'ten geçiyor; diğer dördünde sıra hâlâ elle</td></tr>
-        <tr><td><code>build_combined_series</code></td><td>302 satır, tek fonksiyon</td><td><code>native_step.py</code> içinde; hem hesap hem sunum taşıyor</td></tr>
-        <tr><td>Faz adı kanonikleştirme</td><td>3 modülde ayrı tanım</td><td>Çıkışta tek yazıma indirildi (<code>e354894</code>); tanımlar hâlâ <code>native_step</code>, <code>native_map</code> ve <code>server</code>'da ayrı</td></tr>
+        <tr><td><code>build_combined_series</code></td><td>304 satır, tek fonksiyon</td><td><code>native_step.py</code> içinde; hem hesap hem sunum taşıyor. 7 Eylül'de bulunan sessiz yanlış cevap tam burada oluşuyordu: iki kaynağın noktaları sıralanıyor ve sıranın fiziksel olarak mümkün olup olmadığını kimse sormuyordu</td></tr>
+        <tr><td>Makineye özgü yollar</td><td>17 yerde</td><td><b>7 Eylül'de kapandı</b> (<code>6bb9fcd</code>). Veritabanı ve motor klasörü bir geliştiricinin ev dizinine yazılıydı; başka bir makinede sunucu temiz açılıp her isteğe <i>Database not found</i> diyordu. Artık <code>paths.py</code>'de tek tanım ve beyan edilmiş bir arama sırası</td></tr>
       </tbody>
     </table>
   </div>
 
-  <p><b>1 Eylül akşamı iki borç kapandı.</b> <code>c7aa612</code> <code>verification/validator.py</code> içindeki ikinci Katman B kopyasını sildi — kendi model zinciri, kendi token bütçesi, kendi verdict ayrıştırıcısı vardı ve iki kopyanın ayrışacağı gibi ayrışmıştı: canlı yol Ağustos'ta 4000'e çıkarılmışken kopya 1500'de kalmıştı. <code>e354894</code> faz adı yazımını sonucun çıktığı sınırda tekleştirdi; bir kıyaslama vakasına mal olmuştu, çünkü yavaş kademeye düşen bir tarama <code>FCC_A1</code> yerine <code>FCC_A1#1</code> döndürünce arıza farklı bir faz gibi görünüyordu.</p>
+  <p><b>1 Eylül akşamı iki borç kapandı.</b> <code>c7aa612</code> <code>verification/validator.py</code> içindeki ikinci Katman B kopyasını sildi — kendi model zinciri, kendi token bütçesi, kendi verdict ayrıştırıcısı vardı ve iki kopyanın ayrışacağı gibi ayrışmıştı: canlı yol Ağustos'ta 4000'e çıkarılmışken kopya 1500'de kalmıştı. <code>e354894</code> faz adı yazımını sonucun çıktığı sınırda tekleştirdi. <b>Bu rapor bir süre onu eksik anlattı:</b> borç tablosunda <i>“3 modülde ayrı tanım”</i> yazıyordu, oysa algoritma <code>native_step.canonical_phase_name</code>'de tek yerde duruyor ve <code>native_map</code> ile <code>server</code> ona delege ediyor — iki ince çağrı yeri, ayrı tanım değil. Satır 7 Eylül'de düzeltildi. Düzeltmenin kendisi ise şuna mal olmuştu: bir kıyaslama vakasına mal olmuştu, çünkü yavaş kademeye düşen bir tarama <code>FCC_A1</code> yerine <code>FCC_A1#1</code> döndürünce arıza farklı bir faz gibi görünüyordu.</p>
 
   <h3>Aylardır açık olan yavaşlama — teşhis kondu</h3>
   <p>Tam koşum, hızlı koşumun yirmi katı sürüyordu ve sebebi bilinmiyordu. Elenmişti:
@@ -1249,9 +1253,187 @@ en pahali uc vaka                sure      verify_b       pay
   </div>
 </section>
 
+<section>
+  <div class="sec-head"><span class="num">09</span><h2>7 Eylül — sayının doğru olup olmadığını sormak</h2></div>
+
+  <p>Buraya kadarki her ölçüt sonucun <b>kendi içinden</b> doğrulanabilen
+  bir şeydi: kütle korunuyor mu, faz oranları bire topluyor mu, özet ham
+  veriyle tutuyor mu. Bu bilinçli bir tercihti ve kıyaslama dosyası
+  gerekçesini yazıyor — <i>“sistemin kendi çıktısını kendine referans
+  yapmak hiçbir şey ölçmeyen bir test üretir”</i>.</p>
+
+  <p>Ama tercih bir boşluk bırakıyor. <b>Kütlesi korunan, toplamı bir olan,
+  özeti tutarlı bir sonuç yine de yanlış sıcaklıkta olabilir.</b> Ölçüldü:
+  88 vakada <code>reference</code>, <code>literature</code>,
+  <code>melting_K</code>, <code>transition_K</code> sözcükleri
+  <b>hiç geçmiyordu</b>.</p>
+
+  <h3>Yirmi referans, iki sütun</h3>
+  <p>Yirmi soru kuruldu ve her biri cevabının geldiği belgeyi taşıyor.
+  Altısı sıcaklık ölçeğinin <b>tanımlayıcı metniyle</b> karşılaştırılıyor
+  (Preston-Thomas, <i>Metrologia</i> 27, 3–10, 1990) — PDF indirildi ve
+  Tablo 1 okundu, alıntılayan bir sayfadan aktarılmadı. On dördü
+  <b>motorun okuduğu dosyanın kendisiyle</b>: SGTE fonksiyonları erime
+  noktasında kesildiği için dosya kendi cevabını yazıyor, ve üçü
+  <code>iron4cd.TDB</code>'nin Fe-C bloğundan geliyor — o blok hangi
+  değerlendirmeyi uyguladığını (Gustafson, <i>Scand. J. Metall.</i> 14,
+  259–67, 1985) ve ondan çıkan değişmez sıcaklıkları yazıyor.</p>
+
+  <div class="note">
+    <span class="k">Neden tek değil iki referans sütunu</span>
+    <p>Tek sütun iki soruyu aynı anda cevaplar ve ikisini de söylemez.
+    <code>agcu.TDB</code> gümüşü <b>1235,08 K</b>'de, ITS-90 <b>1234,93</b>'te
+    tutuyor. Yalnız ITS-90'a bakınca bu bizim 0,15 K'lik hatamız gibi
+    görünüyordu; iki sütunla bakınca <b>dosyanın</b> olduğu ve bizim
+    değerimizin dosyanın kendi aralığı içinde kaldığı görülüyor. Aynı
+    element <code>cost507R</code>'de bakır için 1357,77, <code>agcu</code>'da
+    1358,02 — <b>bir metal, iki dosya, iki sayı</b>, ve karşılaştırma bunu
+    söylüyor.</p>
+    <p><b>dosyanın beyanı → BİZİ ölçer</b> · <b>ITS-90 → DOSYAYI ölçer</b></p>
+  </div>
+
+  <p><b>Yirmisi de geçti.</b> On biri örnekleme aralığının içinde, dokuzu
+  tolerans içinde; <b>en büyük sapma 0,26 K</b> ve örnekleme adımı 0,43 K.
+  Yarı kararlı üç Fe-C değeri Gustafson'ı <b>0,22 K</b> içinde üretiyor.</p>
+
+  <h3>Tablonun ilk koşumunda bulduğu şey</h3>
+  <p>İlk sürüm on yedi satırdı ve biri yanlıştı — saklanmaya değer
+  şekilde. Al-Si ötektiğini <b>3 K düşük</b> okuyor ve geçiyordu. Arkasındaki
+  seri şunu diyordu:</p>
+  <pre><code>844,5 K  katı        847,3 K  %99,8 sıvı
+850,1 K  KATI        851,7 K  sıvı</code></pre>
+  <p>Faz oranları bire topluyordu, her nokta üreticisini söylüyordu, hiçbiri
+  hata taşımıyordu. Hangi okumanın yanlış olduğunu <b>üçüncü bir yöntem</b>
+  söyledi: <code>LIQUID</code> askıya alınıp aynı koşullarda Gibbs enerjileri
+  karşılaştırıldı. 846,5 K'de katı hal, tek nokta yolunun döndürdüğü halden
+  <b>57,6 J düşük</b> — yani o yol yarı kararlı bir sıvıda takılmış.
+  850,087 K'de iki hal <b>0,01 J</b> farkla eşit, ki ötektiğin ta kendisi;
+  literatür 850,15 diyor. Sürekli STEP çizgisi doğruydu, boşluklarına
+  doldurulan noktalar değil.</p>
+
+  <div class="note">
+    <span class="k">Katman A'ya eklenen kontrol</span>
+    <p><b>Sabit bileşimde ısıtırken sıvı oranı azalamaz.</b> Veritabanı
+    bilgisi gerektirmiyor, uzmanlık gerektirmiyor: seri ya kendisiyle
+    çelişiyor ya çelişmiyor. Mesaj iki üreticiyi de adıyla söylüyor —
+    <i>“tekdüze değil”</i> bir sayının yanlış olduğunu söyler,
+    <i>“A'dan gelen nokta B'den gelenle çelişiyor”</i> nereye bakılacağını.</p>
+  </div>
+
+  <h3>Kontrolü eklemek başka bir şeyi açığa çıkardı</h3>
+  <p>Kontrol eklendi, kıyaslama <b>86/86</b> geçti, fark testi <b>sıfır
+  değişiklik</b> bildirdi — ki kontrol hiç koşmasaydı da tam olarak bu
+  olurdu. <code>result</code> aşaması kaç kural koştuğunu da hangilerini
+  koştuğunu da yazmıyordu; beyandan düşen bir kural, koşup geçen bir
+  kuralla <b>aynı görünüyordu</b>. Yanındaki <code>correspondence</code>
+  aşaması kendi <code>checked</code> listesini baştan beri yazıyor. Artık
+  o da yazıyor, ve fark testi eklemenin <b>yalnızca o alana</b>
+  dokunduğunu söylüyor: 55 yük değişti, farkların hepsi
+  <code>verification.checked</code>'te.</p>
+
+  <h3>İki bilinen kusur kapandı</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Kusur</th><th>Kayıtlı teşhis</th><th>Gerçek sebep</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>E4</code> — yarı kararlı hesap</td>
+          <td>“Faz kapatma yalnızca OCASI'de destekleniyor”</td>
+          <td><b>Yanlıştı.</b> Native makro yazıcı status bloğunu baştan beri
+          yazıyordu ve giriş noktası argümanı alıyordu; yalnızca aradaki
+          çağrı onu geçirmiyordu. Geçirmediği için kademe bu istekleri hiç
+          görmedi, görmediği için ayar dosyasına <i>“bakamaz”</i> yazıldı —
+          <b>eksikliği tarif eden kural eksikliği kalıcı yaptı</b></td>
+        </tr>
+        <tr>
+          <td><code>G3</code> — gaz fazı</td>
+          <td>Gaz bileşimi molekül türü olarak ayrıştırılıyor</td>
+          <td>Motor doğru sayıyı basıyordu. Ayrıştırıcı
+          <code>Constitution</code> bloğunda durmuyor ve 73 türü element
+          kesirlerinin yanına yazıyordu. En zararlısı: türler arasındaki
+          <b>atomik C (2,53E-30)</b>, element <b>C (0,20000)</b>'in üzerine
+          yazıyordu — kütle dengesinin 2,5e-30 döndürmesi buydu</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>E4 nasıl doğrulandı:</b> bağlamadan önce native yol doğrudan
+  çağrıldı. Askısız hesapta M23C6 (0,0298) ve M6C (0,0944) var,
+  <code>G = −57.674 J</code>; askılı hesapta ikisi de yok,
+  <code>G = −57.618 J</code>. Enerji <b>yükseliyor</b>, ki bir fazı
+  minimizasyondan çıkarmanın tek yönü budur — istek uygulanmış, etiket
+  değiştirilmemiş. Yan kazanç: native yol kullandığı koşulları yazdırdığı
+  için <code>conditions</code> ve <code>degrees_of_freedom</code> kontrolleri
+  OCASI'de <i>ulaşılamaz</i> iken burada koşuyor. <b>Yedek kademe daha az
+  değil, daha çok denetim veriyor.</b></p>
+
+  <p><b>G3'ün kapsamı tahmin edilmedi, ölçüldü:</b> aynı blok bir katı
+  çözeltide basılsaydı mol kesirlerinin yerine örgü kesirleri yazılırdı ve
+  hata çok daha büyük olurdu. Dört sistem denendi — <code>CHO-gas</code>
+  bir kez, <code>steel1</code>, <code>steel7</code>, <code>agcu</code> hiç.
+  Blok atılmadı, <code>phase_constituents</code> alanına alındı: gazın tür
+  dağılımı gerçek bir cevap, yanlış olan onu element bileşimi diye
+  sunmaktı. Motorun bildirdiği tür sayısı da okunup toplananla
+  karşılaştırılıyor — <b>73 bildirildi, 73 toplandı</b>.</p>
+
+  <div class="note">
+    <span class="k">Teslimat engeli</span>
+    <p>Veritabanı klasörü bir geliştiricinin ev dizinindeki bir klasörü
+    gösteren tek satırdı. <code>OC_DB_DIR</code> onu ezebiliyordu ve
+    <b>README bundan hiç bahsetmiyordu</b>, yani başka bir makinede belirti
+    şuydu: sunucu temiz açılıyor, hiç veritabanı listelemiyor, her isteğe
+    <i>“Database not found”</i> diyor — o makinenin hiç sahip olmadığı bir
+    yola karşı. <b>Burada hiçbir şey bozuk değildi ve orada hiçbir şey
+    çalışamazdı.</b></p>
+    <p>Aynı hatanın <b>17 örneği</b> vardı: motor klasörü üç modülde ayrı
+    yazılıydı, başlatıcı üç yolu birden sabitliyordu, on script depoyu
+    <code>sys.path</code>'e tam yolla ekliyordu. Hepsi
+    <code>paths.py</code>'de tek tanıma indirildi ve arama sırası beyan
+    edildi. Bir aday <b>var olmakla kalmayıp veritabanı içermeli</b>; boş
+    bir klasör dolu olanı gölgelerse arıza <i>yanlış klasör</i> yerine
+    <i>eksik dosya</i> gibi görünür.</p>
+    <p>Olmayan makine sahnelendi: <code>OC_DB_DIR</code> doğru → kullanıldı;
+    boş bir klasörü gösteriyor → yine seçildi ve <b>boş olduğu bildirildi</b>,
+    başka yere kaymadı; hiçbir yerde yok → sunucu yine açıldı ve stderr
+    bakılan her yeri yazdı. Hiçbir <code>OC_</code>/<code>LD_</code> değişkeni
+    yokken başlatıcı motoru buldu ve <b>15 veritabanı</b> listelendi.</p>
+  </div>
+
+  <h3>Günün doğrulaması</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Commit</th><th>Ne</th><th>Kıyaslama</th><th>Fark testi</th></tr></thead>
+      <tbody>
+        <tr><td><code>75099d2</code></td><td>Denetimin beşinci yönü: her hesap aracı çerçeveden ve doğrulayıcıdan geçiyor mu</td><td>86/86</td><td>0 fark</td></tr>
+        <tr><td><code>7787bea</code></td><td>20 referans + tekdüzelik kontrolü + <code>checked</code> listesi</td><td>86/86</td><td>55 yük, hepsi <code>verification.checked</code></td></tr>
+        <tr><td><code>a3bcecb</code></td><td>E4 — yarı kararlı hesaba yedek kademe</td><td>87/87</td><td>1 yük (E4: hata → sonuç)</td></tr>
+        <tr><td><code>b21570b</code></td><td>G3 — gaz ayrıştırıcısı</td><td><b>88/88</b></td><td>1 yük (gaz vakası)</td></tr>
+        <tr><td><code>6bb9fcd</code></td><td>Makineye özgü yollar</td><td>88/88</td><td>0 fark</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Fark testi her adımda <b>ne değişmesi gerekiyorsa onu</b> ve başka
+  hiçbir şeyi gösterdi. Klasörlerin nerede bulunduğunu değiştiren bir
+  commit'in hesaplanan hiçbir şeye dokunmaması gerekiyordu; dokunmadı.
+  Ayar denetimi beş turun beşinde de temiz.</p>
+
+  <div class="note">
+    <span class="k">Tablonun söylemediği</span>
+    <p>Yirmi sorunun <b>altısı</b> dış bir otoriteye karşı ölçülüyor, <b>on
+    dördü</b> programın kendi girdisine. İkincisi de gerçek bir doğrulama —
+    <i>“boru hattı dosyadaki sayıyı üretiyor mu”</i> — ama farklı bir şeyin
+    doğrulaması, ve <i>“dosyadaki fizik doğru mu”</i> sorusuna cevap vermiyor.
+    On dördünü dış referansa çevirmek ücretli derlemelere erişim istiyor
+    (Massalski, Landolt-Börnstein, Gustafson'ın 1985 makalesi). Bu bir eksik
+    ve tabloda öyle işaretli duruyor.</p>
+  </div>
+</section>
+
 <footer>
-  Kaynak: /root/projects/oc-mcp · WSL Ubuntu · main @ f570668 (2 Eylül 14:28) · 67 commit, <b>hepsi gönderildi</b> — çalışma ağacı temiz<br>
-  Her sayı 2 Eylül 2026'da ölçüldü: satır sayıları depodan, ayar sayıları <b>ayakta duran sunucunun POLICY nesnesinden</b>, kıyaslama o gün koşturulan turdan. Hiçbiri makaleden ya da docs/ altındaki belgelerden alınmadı.
+  Kaynak: bu depo · WSL Ubuntu · main @ 6bb9fcd (7 Eylül 15:50) · 77 commit, <b>hepsi gönderildi</b> — çalışma ağacı temiz<br>
+  Her sayı 7 Eylül 2026'da yeniden ölçüldü: satır sayıları depodan (15 modül, 8.803 satır), ayar sayıları <b>ayakta duran sunucunun POLICY nesnesinden</b> (6 kademe, 9 doğrulama kuralı), kıyaslama o gün koşturulan turdan (88/88, 117,4 s). Hiçbiri makaleden ya da docs/ altındaki belgelerden alınmadı.<br>
+  Kaynak yolu artık bir makineye değil: klasörler <code>paths.py</code>'nin beyan ettiği sırayla aranıyor.
 </footer>
 
 </div>
